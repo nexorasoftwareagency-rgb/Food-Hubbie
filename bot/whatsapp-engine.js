@@ -201,7 +201,8 @@ async function handleDishSelection(sock, jid, user, text) {
   
   let sMsg = `📏 *SELECT SIZE*\n\n`;
   user.sizeList.forEach(([s, p], i) => {
-    sMsg += `${i + 1}️⃣  ${s} — ₹${p}\n`;
+    const price = typeof p === 'object' ? (p.price || 0) : p;
+    sMsg += `${i + 1}️⃣  ${s} — ₹${price}\n`;
   });
   sMsg += `\n0️⃣ *Back* 🔙`;
 
@@ -219,7 +220,9 @@ async function handleSizeSelection(sock, jid, user, text) {
   const sizeData = user.sizeList[idx];
   if (!sizeData) return sock.sendMessage(jid, { text: "⚠️ Invalid size. Please reply with a number from the list." });
 
-  const [size, price] = sizeData;
+  const [size, p] = sizeData;
+  const price = typeof p === 'object' ? (p.price || 0) : p;
+  
   user.current.size = size;
   user.current.unitPrice = price;
   user.current.addons = [];
@@ -362,7 +365,22 @@ async function handleLocationReceived(sock, jid, user, location, text) {
   };
 
   const dist = calculateDistance(user.location.lat, user.location.lng, outletCoords.lat, outletCoords.lng);
-  const fee = calculateDeliveryFee(dist, delSettings.slabs || []);
+  
+  // Tiered Resolution: Outlet -> Global -> Default
+  let slabs = delSettings.slabs;
+  if (!slabs || slabs.length === 0) {
+    const globalSlabs = await require('./firebase').getGlobalData('system/settings/delivery/slabs');
+    if (globalSlabs && globalSlabs.length > 0) {
+      // Map 'upToKm' from SuperAdmin to 'km' for bot/shared logic compatibility
+      slabs = globalSlabs.map(s => ({ km: s.upToKm, fee: s.fee }));
+    }
+  }
+
+  const fee = calculateDeliveryFee(dist, slabs || [
+    { km: 2, fee: 20 },
+    { km: 5, fee: 40 },
+    { km: 10, fee: 60 }
+  ]);
   user.deliveryFee = fee;
 
   let subtotal = user.cart.reduce((s, i) => s + i.total, 0);

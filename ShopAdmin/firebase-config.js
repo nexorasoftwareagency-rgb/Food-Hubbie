@@ -3,7 +3,7 @@
  * FOODHUBBIE SAAS | ShopAdmin Firebase Config
  * ============================================================
  * PROJECT: food-hubbie (NEW — Triple Isolation)
- * Replaces legacy prashant-pizza-e86e4 config.
+ * PROJECT: food-hubbie (NEW — Triple Isolation)
  * ============================================================
  */
 

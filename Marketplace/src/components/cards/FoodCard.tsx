@@ -52,17 +52,17 @@ export function FoodCard({ item, delay = 0 }: FoodCardProps) {
   return (
     <>
       <motion.div
-        initial={{ y: 6, scale: 0.99 }}
-        whileInView={{ y: 0, scale: 1 }}
-        viewport={{ once: true, margin: "-40px" }}
-        transition={{ delay: delay * 0.1, duration: 0.4 }}
-        className="flex gap-4 p-4 bg-card rounded-2xl border border-border shadow-sm hover-elevate"
+        initial={{ y: 8, opacity: 0 }}
+        whileInView={{ y: 0, opacity: 1 }}
+        viewport={{ once: true, margin: "-20px" }}
+        transition={{ delay: delay * 0.05, duration: 0.4 }}
+        className="flex gap-4 p-4 bg-card rounded-2xl border border-border/50 shadow-soft hover:shadow-premium transition-all duration-300 group"
       >
         <div className="flex-1 flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1.5">
               <div
-                className={`w-3 h-3 rounded-sm border flex items-center justify-center ${
+                className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${
                   item.isVeg ? "border-green-600" : "border-red-600"
                 }`}
               >
@@ -73,54 +73,60 @@ export function FoodCard({ item, delay = 0 }: FoodCardProps) {
                 />
               </div>
               {item.isBestSeller && (
-                <span className="text-[10px] font-bold text-secondary-foreground bg-secondary px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                <span className="text-[10px] font-black text-secondary-foreground bg-secondary px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-0.5">
+                  <Star className="h-2 w-2 fill-current" />
                   Bestseller
                 </span>
               )}
             </div>
-            <h3 className="font-heading font-bold text-lg leading-tight text-card-foreground">
+            <h3 className="font-heading font-bold text-lg leading-tight text-card-foreground group-hover:text-primary transition-colors">
               {item.name}
             </h3>
-            <div className="flex items-center gap-1 mt-1 text-sm font-medium">
-              <span className="text-foreground">₹{item.price}</span>
+            <div className="flex items-center gap-2 mt-1.5 font-bold">
+              <span className="text-foreground text-base">₹{item.price}</span>
               {item.rating && (
-                <span className="flex items-center text-xs text-muted-foreground ml-2">
-                  <Star className="h-3 w-3 fill-secondary text-secondary mr-0.5" />
+                <span className="flex items-center text-[11px] bg-secondary/10 text-secondary-foreground px-1.5 py-0.5 rounded-md">
+                  <Star className="h-2.5 w-2.5 fill-secondary text-secondary mr-1" />
                   {item.rating}
                 </span>
               )}
             </div>
-            <p className="text-muted-foreground text-xs mt-2 line-clamp-2">
+            <p className="text-muted-foreground text-xs mt-2.5 line-clamp-2 leading-relaxed font-medium">
               {item.description}
             </p>
           </div>
         </div>
 
-        <div className="relative w-28 h-28 flex-shrink-0">
+        <div className="relative w-32 h-32 flex-shrink-0">
           <img
             src={item.image}
             alt={item.name}
-            className="w-full h-full object-cover rounded-xl shadow-sm"
+            className="w-full h-full object-cover rounded-2xl shadow-sm group-hover:scale-105 transition-transform duration-500"
           />
-          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-24">
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-24 z-10">
             {quantity === 0 ? (
               <button
                 onClick={handleAdd}
-                className="w-full bg-background border border-border text-primary font-bold py-1.5 rounded-lg shadow-sm hover:bg-muted transition-colors uppercase text-sm tracking-wider"
+                className="w-full bg-background border border-primary/20 text-primary font-black py-2 rounded-xl shadow-lg hover:shadow-primary/20 hover:bg-primary hover:text-white transition-all uppercase text-xs tracking-widest active:scale-95"
               >
-                Add
-                {item.customizable && <span className="absolute top-0 right-1 text-[10px]">+</span>}
+                ADD
+                {item.customizable && <span className="absolute top-0 right-1 text-[8px] opacity-70">+</span>}
               </button>
             ) : (
-              <div className="flex items-center justify-between w-full bg-primary text-primary-foreground font-bold py-1.5 px-2 rounded-lg shadow-sm text-sm">
-                <button onClick={handleDecrement} className="p-0.5 hover:bg-primary-foreground/20 rounded">
+              <div className="flex items-center justify-between w-full bg-primary text-primary-foreground font-black py-2 px-2.5 rounded-xl shadow-lg text-sm transition-all animate-in zoom-in-95 duration-200">
+                <button onClick={handleDecrement} className="p-0.5 hover:bg-white/20 rounded-md transition-colors">
                   <Minus className="h-4 w-4" />
                 </button>
-                <span>{quantity}</span>
-                <button onClick={handleIncrement} className="p-0.5 hover:bg-primary-foreground/20 rounded">
+                <span className="tabular-nums">{quantity}</span>
+                <button onClick={handleIncrement} className="p-0.5 hover:bg-white/20 rounded-md transition-colors">
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
+            )}
+            {item.customizable && quantity === 0 && (
+              <p className="text-[9px] text-center text-muted-foreground mt-4 font-bold uppercase tracking-tighter opacity-70">
+                Customisable
+              </p>
             )}
           </div>
         </div>

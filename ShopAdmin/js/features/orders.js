@@ -366,9 +366,14 @@ export function renderOrders(snap) {
         if (activeTab === 'dashboard') {
             const itemSummary = items.length > 0 ? `${items.length} Items` : "No Items";
             const onlineRiders = (state.ridersList || []).filter(r => r.status === "Online" || r.status === "On Delivery");
-            const riderOptions = onlineRiders.map(r => `
-                <option value="${r.id}" ${o.riderId === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>
-            `).join('');
+            const riderOptions = onlineRiders.map(r => {
+                let dist = "";
+                if (r.location && r.location.lat) {
+                    const d = calculateDistance(r.location.lat, r.location.lng, 25.887944, 85.026194);
+                    dist = ` (${d.toFixed(1)}km)`;
+                }
+                return `<option value="${r.id}" ${o.riderId === r.id ? 'selected' : ''}>${escapeHtml(r.name)}${dist}</option>`;
+            }).join('');
 
             tr.innerHTML = `
                 <td data-label="Order">
@@ -391,7 +396,14 @@ export function renderOrders(snap) {
                 <td data-label="Details">
                     <div class="flex-col">
                         <span class="font-600 fs-13">${itemSummary}</span>
-                        <span class="text-muted-small">${truncatedAddress}</span>
+                        <div class="flex-row flex-center flex-gap-6">
+                            <span class="text-muted-small truncate-100">${truncatedAddress}</span>
+                            ${(o.locationLink || (o.lat && o.lng)) ? 
+                                `<a href="${escapeHtml(o.locationLink || `https://www.google.com/maps?q=${o.lat},${o.lng}`)}" target="_blank" rel="noopener noreferrer" class="text-primary hover-scale" title="View on Map">
+                                    <i data-lucide="map-pin" style="width:12px;height:12px;"></i>
+                                </a>` : ""
+                            }
+                        </div>
                     </div>
                 </td>
                 <td data-label="Total">
@@ -455,7 +467,14 @@ export function renderOrders(snap) {
                 <td data-label="Kitchen">
                     <div class="flex-col">
                         <span class="font-600 fs-13">${itemSummary}</span>
-                        <span class="text-muted-small">${o.type}</span>
+                        <div class="flex-row flex-center flex-gap-6">
+                            <span class="text-muted-small">${o.type}</span>
+                            ${(o.locationLink || (o.lat && o.lng)) ? 
+                                `<a href="${escapeHtml(o.locationLink || `https://www.google.com/maps?q=${o.lat},${o.lng}`)}" target="_blank" rel="noopener noreferrer" class="text-primary" title="View Location">
+                                    <i data-lucide="map-pin" style="width:12px;height:12px;"></i>
+                                </a>` : ""
+                            }
+                        </div>
                     </div>
                 </td>
                 <td data-label="Total">
@@ -980,8 +999,72 @@ export async function assignRider(id, riderId) {
 
         await Outlet.ref(`orders/${id}`).update(updateData);
         
-        // Notify Rider
-        await addRiderNotification(riderId, "New Order Assigned!", `Order #${id.slice(-5)} for ₹${order.total} assigned to you.`, 'new');
+        // Proximity Check for Notification (1km)
+        const outletKey = (order.outlet || 'outlet_pizza').toLowerCase();
+        const storeSnap = await db.ref(`${outletKey}/settings/Store`).once('value');
+        const storeSettings = storeSnap.val() || {};
+        const outletCoords = {
+            lat: parseFloat(storeSettings.lat || 25.887944),
+            lng: parseFloat(storeSettings.lng || 85.026194)
+        };
+
+        let canNotify = true;
+        if (rider.location && rider.location.lat && rider.location.lng) {
+            const d = calculateDistance(rider.location.lat, rider.location.lng, outletCoords.lat, outletCoords.lng);
+            if (d > 1.0) {
+                canNotify = false;
+                showToast(`⚠️ Rider assigned but notification skipped (Too far: ${d.toFixed(1)}km)`, "warning");
+            }
+        } else {
+            canNotify = false;
+            showToast(`⚠️ Rider assigned but notification skipped (No GPS)`, "warning");
+        }
+
+        // Notify Rider via WhatsApp (The standard Zomato-style flow)
+        try {
+            if (!canNotify) return;
+
+            const rawPhone = rider.phone || "";
+            const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+            
+            if (cleanPhone.length === 10) {
+                const orderIdShort = id.slice(-5).toUpperCase();
+                const itemsSummary = items.map(i => `${i.qty}x ${i.name}`).join('\n');
+                const mapsLink = order.locationLink || `https://www.google.com/maps?q=${order.lat},${order.lng}`;
+                
+                let message = `🚀 *NEW TASK ASSIGNED!* [#${orderIdShort}]\n`;
+                message += `━━━━━━━━━━━━━━━━━━━━\n`;
+                message += `📍 *CUSTOMER DETAILS*\n`;
+                message += `👤 Name: ${order.customerName || 'Customer'}\n`;
+                message += `📞 Phone: ${order.phone || 'N/A'}\n`;
+                message += `🏠 Address: ${order.address || 'N/A'}\n`;
+                message += `🗺️ *Location:* ${mapsLink}\n\n`;
+                
+                message += `📦 *INVOICE ITEMS*\n${itemsSummary}\n\n`;
+                
+                message += `💰 *BILLING SUMMARY*\n`;
+                message += `• Subtotal: ₹${order.subtotal || 0}\n`;
+                message += `• Delivery Fee: ₹${order.deliveryFee || 0}\n`;
+                message += `💵 *Collect Amount:* ₹${order.total || 0}\n\n`;
+                
+                message += `🚲 *YOUR EARNING:* ₹${order.deliveryFee || 0}\n`;
+                message += `━━━━━━━━━━━━━━━━━━━━\n`;
+                message += `_Accept and reach restaurant for pickup!_`;
+
+                const botOutlet = (order.outlet || 'pizza').toLowerCase();
+                const cmdRef = db.ref(`bot/outlet_${botOutlet}/commands`).push();
+                
+                await cmdRef.set({
+                    action: "SEND_GENERIC_MESSAGE",
+                    phone: cleanPhone,
+                    message: message,
+                    timestamp: ServerValue.TIMESTAMP
+                });
+                console.log(`[Orders] WhatsApp notification sent to Rider ${rider.name} for #${orderIdShort}`);
+            }
+        } catch (notifErr) {
+            console.warn("[Orders] Failed to send WhatsApp notification to rider:", notifErr);
+        }
 
         logAudit("Orders", `Assigned Rider: ${rider.name} to #${id.slice(-5)}`, id);
     } catch (e) {

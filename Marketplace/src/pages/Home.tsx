@@ -133,13 +133,30 @@ export default function Home() {
                   transition={{ delay: 0.2 }}
                   className="relative max-w-md"
                 >
-                  <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
-                  <input
-                    type="search"
-                    placeholder="Search pizzas, burgers, drinks..."
-                    data-testid="input-hero-search"
-                    className="w-full bg-white rounded-xl pl-12 pr-4 py-3.5 text-sm focus:outline-none shadow-xl text-foreground font-medium"
-                  />
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const input = e.currentTarget.querySelector('input');
+                      if (input?.value.trim()) {
+                        setLocation(`/search?q=${encodeURIComponent(input.value.trim())}`);
+                      }
+                    }}
+                    className="relative group"
+                  >
+                    <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <input
+                      type="search"
+                      placeholder="Search pizzas, burgers, drinks..."
+                      className="w-full bg-background border-2 border-transparent rounded-2xl pl-12 pr-4 py-4 text-base shadow-xl focus:outline-none focus:border-primary/20 focus:ring-4 focus:ring-primary/5 transition-all"
+                      data-testid="input-hero-search"
+                    />
+                    <button 
+                      type="submit"
+                      className="absolute right-2 top-2 bottom-2 bg-primary text-white px-6 rounded-xl font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                    >
+                      Search
+                    </button>
+                  </form>
                 </motion.div>
               </div>
             </>
@@ -148,28 +165,28 @@ export default function Home() {
       </section>
 
       {/* Food categories */}
-      <section className="container mx-auto px-4 pb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-heading font-bold text-foreground">
+      <section className="container mx-auto px-4 pb-10">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-heading font-bold text-foreground">
             What's on your mind?
           </h2>
         </div>
-        <div className="flex overflow-x-auto gap-4 pb-2 -mx-4 px-4 scrollbar-hide">
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-4 md:gap-6">
           {categories.map((cat, i) => (
             <motion.div
               key={cat.name}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer group"
-              data-testid={`category-${cat.name.toLowerCase()}`}
+              onClick={() => setLocation(`/search?q=${encodeURIComponent(cat.name)}`)}
+              className="flex flex-col items-center gap-3 cursor-pointer group"
             >
               <div
-                className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center ${cat.color} group-hover:scale-110 transition-transform shadow-sm`}
+                className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl flex items-center justify-center ${cat.color} group-hover:scale-105 transition-transform shadow-sm group-hover:shadow-md`}
               >
-                <cat.icon className="w-7 h-7 md:w-8 md:h-8" />
+                <cat.icon className="w-8 h-8 md:w-10 md:h-10" />
               </div>
-              <span className="text-xs md:text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+              <span className="text-xs md:text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors text-center">
                 {cat.name}
               </span>
             </motion.div>
@@ -177,145 +194,107 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Popular Near You */}
-      <section className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-5">
+      {/* Trending Dishes - MOVED UP */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-heading font-bold text-foreground">
-              Popular Near You
+            <h2 className="text-3xl font-heading font-bold text-foreground">
+              Trending Now
             </h2>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              {openOutlets.length} restaurants open now
-            </p>
+            <p className="text-muted-foreground">Most loved dishes in your area</p>
           </div>
           <Link
-            href="/outlets"
-            className="text-primary font-semibold flex items-center text-sm hover:underline"
+            href="/search?q=trending"
+            className="text-primary font-bold flex items-center text-sm hover:underline"
           >
-            See all <ChevronRight className="h-4 w-4" />
+            Explore all <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <SkeletonLoader count={4} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <SkeletonLoader type="list" count={4} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {openOutlets.slice(0, 4).map((outlet, i) => (
-              <OutletCard key={outlet.id} outlet={outlet} delay={i} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {bestSellers.map((item, i) => (
+              <FoodCard key={item.id} item={item} delay={i} />
             ))}
           </div>
         )}
       </section>
 
-      {/* Trending Dishes */}
-      <section className="bg-muted/40 py-8">
+      {/* Quick Bites - New Section */}
+      <section className="bg-primary/5 py-16">
         <div className="container mx-auto px-4">
-          <div className="mb-5">
-            <h2 className="text-2xl font-heading font-bold text-foreground">
-              Trending Dishes
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              Most ordered right now
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              <SkeletonLoader type="list" count={4} />
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-3xl font-heading font-bold text-foreground">
+                Quick Bites
+              </h2>
+              <p className="text-muted-foreground">Fast food, faster delivery</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {bestSellers.map((item, i) => (
-                <FoodCard key={item.id} item={item} delay={i} />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Fast Delivery */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-2xl font-heading font-bold text-foreground">
-              Fast Delivery
-            </h2>
-            <p className="text-muted-foreground text-sm">Under 30 minutes</p>
           </div>
-          <Link
-            href="/outlets"
-            className="text-primary font-semibold flex items-center text-sm hover:underline"
-          >
-            See all <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <SkeletonLoader count={4} />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {fastDelivery.map((outlet, i) => (
-              <OutletCard key={outlet.id} outlet={outlet} delay={i} />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {recommended.slice(0, 4).map((item, i) => (
+              <FoodCard key={item.id} item={item} delay={i} />
             ))}
           </div>
-        )}
-      </section>
-
-      {/* Recommended Combos */}
-      <section className="bg-muted/40 py-8">
-        <div className="container mx-auto px-4">
-          <div className="mb-5">
-            <h2 className="text-2xl font-heading font-bold text-foreground">
-              Recommended For You
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              Chef's picks across the city
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              <SkeletonLoader type="list" count={4} />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {recommended.map((item, i) => (
-                <FoodCard key={item.id} item={item} delay={i} />
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
-      {/* Top Rated */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-2xl font-heading font-bold text-foreground">
-              Top Rated Outlets
+      {/* Explore Outlets Promo */}
+      <section className="container mx-auto px-4 py-16">
+        <div className="bg-card border border-border rounded-[2rem] p-8 md:p-12 flex flex-col md:flex-row items-center gap-8 shadow-sm">
+          <div className="flex-1 text-center md:text-left">
+            <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">
+              Prefer browsing by <span className="text-primary">Restaurant?</span>
             </h2>
-            <p className="text-muted-foreground text-sm">Rated 4.5 and above</p>
+            <p className="text-muted-foreground text-lg mb-8 max-w-lg">
+              Explore our curated list of top-rated restaurants, local favorites, and premium cafes.
+            </p>
+            <Link 
+              href="/outlets"
+              className="inline-flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-2xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 hover:scale-105"
+            >
+              <Store className="h-5 w-5" />
+              View All Restaurants
+            </Link>
           </div>
-          <Link
-            href="/outlets"
-            className="text-primary font-semibold flex items-center text-sm hover:underline"
-          >
-            See all <ChevronRight className="h-4 w-4" />
-          </Link>
+          <div className="flex-1 grid grid-cols-2 gap-4">
+            {outlets.slice(0, 4).map((o, i) => (
+              <motion.img 
+                key={o.id}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.1 }}
+                src={o.logo}
+                alt={o.name}
+                className="w-full h-32 md:h-40 object-cover rounded-2xl border border-border shadow-sm"
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Recommended For You */}
+      <section className="container mx-auto px-4 py-16">
+        <div className="mb-8">
+          <h2 className="text-3xl font-heading font-bold text-foreground">
+            Curated For You
+          </h2>
+          <p className="text-muted-foreground">Dishes we think you'll love</p>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <SkeletonLoader count={4} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <SkeletonLoader type="list" count={4} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {topRated.map((outlet, i) => (
-              <OutletCard key={outlet.id} outlet={outlet} delay={i} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {recommended.slice(4, 8).map((item, i) => (
+              <FoodCard key={item.id} item={item} delay={i} />
             ))}
           </div>
         )}

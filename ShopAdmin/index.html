@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f36b21">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -145,7 +145,7 @@
                         <div class="version-badge">Premium v4.2</div>
                     </div>
                 </div>
-                <button class="sidebar-close-btn" id="btnSidebarClose" title="Close Sidebar">
+                <button class="sidebar-close-btn" id="btnSidebarClose" title="Close Sidebar" data-action="toggleSidebar">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -584,8 +584,6 @@
                         <h2>Rider Management</h2>
                         <p class="text-secondary-sm">Monitor delivery staff, earnings, and live status.</p>
                     </div>
-                    <button class="btn-primary" data-action="showAddRiderModal"><i data-lucide="user-plus"></i> Add New
-                        Rider</button>
                 </div>
 
                 <!-- Rider Stats Summary Row -->
@@ -1050,7 +1048,7 @@
                                     <button id="btnEnableNotif" class="btn-primary flex-center flex-gap-8 flex-1">
                                         <i data-lucide="bell"></i> <span>Enable Alerts</span>
                                     </button>
-                                    <button id="btnTestNotif" class="btn-secondary flex-center flex-gap-8">
+                                    <button id="btnTestNotif" class="btn-secondary flex-center flex-gap-8" data-action="testNotification">
                                         <i data-lucide="play-circle"></i> <span>Test</span>
                                     </button>
                                 </div>
@@ -1913,7 +1911,7 @@
         <div class="sheet-handle"></div>
         <div class="sheet-header">
             <h3>Recent Notifications</h3>
-            <button id="btnClearNotificationsBottom" class="sheet-clear-btn" title="Remove All Notifications">Clear
+            <button id="btnClearNotificationsBottom" class="sheet-clear-btn" title="Remove All Notifications" data-action="clearAllNotifications">Clear
                 All</button>
         </div>
         <div id="notificationList" class="sheet-content">

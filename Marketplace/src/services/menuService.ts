@@ -17,7 +17,7 @@ function mapLegacyDish(id: string, dish: any, outletId: string, businessId: stri
       sizes.push({
         id: sId,
         name: sData.name || sId,
-        price: sData.price || 0
+        price: typeof sData === 'number' ? sData : (sData.price || 0)
       });
     }
   }
@@ -29,7 +29,7 @@ function mapLegacyDish(id: string, dish: any, outletId: string, businessId: stri
       addons.push({
         id: aId,
         name: aData.name || aId,
-        price: aData.price || 0
+        price: typeof aData === 'number' ? aData : (aData.price || 0)
       });
     }
   }
@@ -183,14 +183,32 @@ export function getCategories(items: MenuItem[]): string[] {
 
 /** Filter menu items by search query */
 export function searchMenu(items: MenuItem[], query: string): MenuItem[] {
-  if (!query.trim()) return items;
   const q = query.toLowerCase();
   return items.filter(
-    (i) =>
-      i.name.toLowerCase().includes(q) ||
-      i.description.toLowerCase().includes(q) ||
-      i.category.toLowerCase().includes(q)
+    (item) =>
+      item.name.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q)
   );
+}
+
+/** Fetch ALL menu items (for global search) */
+export async function fetchAllMenuItems(): Promise<MenuItem[]> {
+  try {
+    const rootSnap = await get(ref(db, "dishes"));
+    if (rootSnap.exists()) {
+      const allDishes = rootSnap.val();
+      const result: MenuItem[] = [];
+      for (const id in allDishes) {
+        result.push(mapLegacyDish(id, allDishes[id], allDishes[id].outlet || "Pizza-Shop", "business_roshani"));
+      }
+      return result;
+    }
+    return [];
+  } catch (err) {
+    console.error("Fetch all menu items error:", err);
+    return [];
+  }
 }
 
 /** Filter menu items by category */

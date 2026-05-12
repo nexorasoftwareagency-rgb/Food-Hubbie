@@ -23,38 +23,55 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
   const requestLocation = () => {
     if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          let address = "Unknown Location";
-          
-          try {
-            // Free Reverse Geocoding (Nominatim) with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            const data = await res.json();
-            address = data.display_name.split(',').slice(0, 2).join(',') || `GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-          } catch (e) {
-            console.warn("Reverse geocoding failed, using coordinates.");
-            address = `Detected: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-          }
+      const highAccuracyOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 };
+      const lowAccuracyOptions = { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 };
+      
+      const success = async (position: GeolocationPosition) => {
+        const { latitude, longitude } = position.coords;
+        
+        // Update coordinates immediately so we can show outlets
+        setState((prev) => ({
+          ...prev,
+          coords: { lat: latitude, lng: longitude },
+          permissionStatus: "granted",
+          address: prev.address || "Detecting address...",
+        }));
 
-          setState((prev) => ({
-            ...prev,
-            coords: { lat: latitude, lng: longitude },
-            permissionStatus: "granted",
-            address: address, 
+        // Then try reverse geocoding in the background
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          const data = await res.json();
+          const address = data.display_name.split(',').slice(0, 3).join(',') || `GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+          
+          setState((prev) => ({ ...prev, address }));
+        } catch (e) {
+          console.warn("Reverse geocoding failed, using coordinates as label");
+          setState((prev) => ({ 
+            ...prev, 
+            address: prev.address === "Detecting address..." ? `Area: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}` : prev.address 
           }));
-        },
-        (error) => {
-          console.error("Location error:", error);
+        }
+      };
+
+      const error = (err: GeolocationPositionError) => {
+        console.warn(`Location attempt failed (code ${err.code}): ${err.message}`);
+        
+        // If high accuracy failed/timed out, try low accuracy (faster, more reliable)
+        if (err.code === 3 || err.code === 1) { 
+          navigator.geolocation.getCurrentPosition(success, (finalErr) => {
+            console.error("Final location fallback failed:", finalErr.message);
+            setState((prev) => ({ ...prev, permissionStatus: "denied" }));
+          }, lowAccuracyOptions);
+        } else {
           setState((prev) => ({ ...prev, permissionStatus: "denied" }));
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 300000 }
-      );
+        }
+      };
+
+      // Start with high accuracy request
+      navigator.geolocation.getCurrentPosition(success, error, highAccuracyOptions);
     } else {
       setState((prev) => ({ ...prev, permissionStatus: "denied" }));
     }

@@ -13,7 +13,7 @@
  * 
  * CLEANED:
  * - Removed hardcoded 'pizza'/'cake' outlet defaults
- * - Removed old Firebase URL (prashant-pizza-e86e4)
+ * - Removed legacy Firebase URL
  * - Uses FIREBASE_DATABASE_URL from config
  * ============================================================
  */
@@ -106,6 +106,15 @@ async function saveUserProfile(jid, data) {
   return ops.saveUserProfile(jid, data, BUSINESS_ID, OUTLET_ID);
 }
 
+/**
+ * Access global/system nodes outside the business/outlet scope
+ */
+async function getGlobalData(path) {
+  const ref = db.ref(path);
+  const snap = await ref.once('value');
+  return snap.val();
+}
+
 // ─── Exports ───────────────────────────────────────────────
 
 module.exports = {
@@ -119,6 +128,7 @@ module.exports = {
   pushData,
   getUserProfile,
   saveUserProfile,
+  getGlobalData,
   BUSINESS_ID,
   OUTLET_ID
 };

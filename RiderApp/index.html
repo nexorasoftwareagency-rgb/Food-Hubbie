@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#FF5200">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -270,24 +270,73 @@
             </section>
 
             <section id="sec-earnings" class="view-section">
-                <h2 class="section-heading mb-15">Wallet Summary</h2>
-                <div class="premium-dashboard-card mb-20 text-center">
-                    <span class="text-muted font-bold text-small uppercase">Total Cash to Settle</span>
-                    <h1 class="text-orange fs-2-5rem fw-900" id="e-total">₹0</h1>
-                    <button class="btn-text-primary-sm mt-10" id="btnViewSettlements" style="font-size: 0.8rem;">
-                        <i data-lucide="history" style="width:12px; height:12px; margin-right:4px;"></i> VIEW SETTLEMENT HISTORY
-                    </button>
-                </div>
-                <div class="earnings-grid-split">
-                    <div class="premium-dashboard-card border-left-orange">
-                        <span class="text-muted font-bold">Pizza Outlet</span>
-                        <h2 class="text-orange" id="e-pizza">&#8377;0</h2>
-                        <span class="text-xtra-small">Today: <span id="e-pizza-today">&#8377;0</span></span>
+                <div class="earnings-hero">
+                    <div class="hero-label">TODAY'S EARNINGS</div>
+                    <div class="hero-amount" id="e-today-total">₹0</div>
+                    <div class="hero-stats">
+                        <div class="stat-mini">
+                            <span id="e-today-count">0</span>
+                            <label>Orders</label>
+                        </div>
+                        <div class="stat-mini">
+                            <span id="e-today-hours">--</span>
+                            <label>Online</label>
+                        </div>
                     </div>
-                    <div class="premium-dashboard-card border-left-pink">
-                        <span class="text-muted font-bold">Cake Outlet</span>
-                        <h2 class="text-pink" id="e-cake">&#8377;0</h2>
-                        <span class="text-xtra-small">Today: <span id="e-cake-today">&#8377;0</span></span>
+                </div>
+
+                <div class="earnings-summary-grid">
+                    <div class="summary-card gold-border">
+                        <div class="summary-label">CASH TO SETTLE</div>
+                        <div class="summary-val" id="e-total">₹0</div>
+                        <button class="btn-settle-mini" id="btnViewSettlements">History</button>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">WEEKLY TARGET</div>
+                        <div class="summary-val">82%</div>
+                        <div class="progress-bar-mini"><div class="progress-fill" style="width: 82%"></div></div>
+                    </div>
+                </div>
+
+                <div class="weekly-chart-card">
+                    <h3>Weekly Progress</h3>
+                    <div class="chart-container" id="weeklyChart">
+                        <div class="bar-group"><div class="bar" style="height: 40%"></div><span>M</span></div>
+                        <div class="bar-group"><div class="bar" style="height: 60%"></div><span>T</span></div>
+                        <div class="bar-group"><div class="bar" style="height: 30%"></div><span>W</span></div>
+                        <div class="bar-group"><div class="bar" style="height: 80%"></div><span>T</span></div>
+                        <div class="bar-group"><div class="bar" style="height: 55%"></div><span>F</span></div>
+                        <div class="bar-group"><div class="bar" style="height: 90%"></div><span>S</span></div>
+                        <div class="bar-group active"><div class="bar" style="height: 70%"></div><span>S</span></div>
+                    </div>
+                </div>
+
+                <div class="shop-breakdown-list">
+                    <div class="shop-stat-item pizza">
+                        <div class="shop-info">
+                            <div class="shop-logo">🍕</div>
+                            <div>
+                                <h4>Pizza Outlet</h4>
+                                <p id="e-pizza-orders">0 Orders</p>
+                            </div>
+                        </div>
+                        <div class="shop-amount">
+                            <span class="total" id="e-pizza">₹0</span>
+                            <span class="today" id="e-pizza-today">Today: ₹0</span>
+                        </div>
+                    </div>
+                    <div class="shop-stat-item cake">
+                        <div class="shop-info">
+                            <div class="shop-logo">🎂</div>
+                            <div>
+                                <h4>Cake Outlet</h4>
+                                <p id="e-cake-orders">0 Orders</p>
+                            </div>
+                        </div>
+                        <div class="shop-amount">
+                            <span class="total" id="e-cake">₹0</span>
+                            <span class="today" id="e-cake-today">Today: ₹0</span>
+                        </div>
                     </div>
                 </div>
             </section>

@@ -127,141 +127,138 @@ export default function Checkout() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">
             {/* Delivery address */}
-            <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
-              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                Delivery Address
-              </h2>
+            <div className="bg-card rounded-2xl border border-border shadow-soft overflow-hidden">
+              <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
+                <h2 className="font-bold text-lg flex items-center gap-2 text-primary">
+                  <MapPin className="h-5 w-5" />
+                  Delivery Address
+                </h2>
+              </div>
 
-              {/* Saved addresses quick-pick */}
-              {user?.savedAddresses && user.savedAddresses.length > 0 && (
-                <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-                  {user.savedAddresses.map((addr) => (
-                    <button
-                      key={addr.id}
-                      onClick={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          address: addr.address,
-                          landmark: addr.landmark ?? "",
-                        }))
-                      }
-                      data-testid={`btn-address-${addr.id}`}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                        form.address === addr.address
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border bg-background hover:bg-muted"
-                      }`}
-                    >
-                      {addr.label}
-                    </button>
+              <div className="p-6">
+                {/* Saved addresses quick-pick */}
+                {user?.savedAddresses && user.savedAddresses.length > 0 && (
+                  <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                    {user.savedAddresses.map((addr) => (
+                      <button
+                        key={addr.id}
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            address: addr.address,
+                            landmark: addr.landmark ?? "",
+                          }))
+                        }
+                        className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                          form.address === addr.address
+                            ? "bg-primary text-white border-primary shadow-md shadow-primary/20"
+                            : "border-border bg-muted/50 hover:bg-muted"
+                        }`}
+                      >
+                        {addr.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  {(
+                    [
+                      { key: "name", label: "Full Name", type: "text", placeholder: "John Doe" },
+                      { key: "phone", label: "Phone Number", type: "tel", placeholder: "9876543210" },
+                      { key: "address", label: "Complete Address", type: "textarea", placeholder: "House No, Street, Locality..." },
+                      { key: "landmark", label: "Landmark (optional)", type: "text", placeholder: "Near..." },
+                    ] as const
+                  ).map(({ key, label, type, placeholder }) => (
+                    <div key={key}>
+                      <label className="block text-[10px] font-black text-muted-foreground mb-1.5 uppercase tracking-widest opacity-70">
+                        {label}
+                      </label>
+                      {type === "textarea" ? (
+                        <textarea
+                          value={form[key] ?? ""}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          placeholder={placeholder}
+                          className="w-full bg-muted/30 border border-border/50 rounded-xl p-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[100px] transition-all"
+                        />
+                      ) : (
+                        <input
+                          type={type}
+                          value={form[key] ?? ""}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          placeholder={placeholder}
+                          className="w-full bg-muted/30 border border-border/50 rounded-xl p-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
+                      )}
+                    </div>
                   ))}
                 </div>
-              )}
-
-              <div className="space-y-3">
-                {(
-                  [
-                    { key: "name", label: "Full Name", type: "text" },
-                    { key: "phone", label: "Phone Number", type: "tel" },
-                    { key: "address", label: "Complete Address", type: "textarea" },
-                    { key: "landmark", label: "Landmark (optional)", type: "text" },
-                  ] as const
-                ).map(({ key, label, type }) =>
-                  type === "textarea" ? (
-                    <div key={key}>
-                      <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                        {label}
-                      </label>
-                      <textarea
-                        value={form[key] ?? ""}
-                        onChange={(e) =>
-                          setForm((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        data-testid={`input-${key}`}
-                        title={label}
-                        placeholder={label}
-                        className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
-                      />
-                    </div>
-                  ) : (
-                    <div key={key}>
-                      <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                        {label}
-                      </label>
-                      <input
-                        type={type}
-                        value={form[key] ?? ""}
-                        onChange={(e) =>
-                          setForm((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        data-testid={`input-${key}`}
-                        title={label}
-                        placeholder={label}
-                        className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                    </div>
-                  )
-                )}
               </div>
             </div>
 
             {/* Payment method */}
-            <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
-              <h2 className="font-bold text-lg mb-4">Payment Method</h2>
-              <div className="space-y-3">
-                {paymentMethods.map((method) => (
-                  <label
-                    key={method.id}
-                    data-testid={`payment-${method.id}`}
-                    className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all ${
-                      paymentMethod === method.id
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border hover:bg-muted"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="payment"
-                      value={method.id}
-                      checked={paymentMethod === method.id}
-                      onChange={() => setPaymentMethod(method.id)}
-                      className="text-primary focus:ring-primary"
-                    />
-                    <method.icon
-                      className={`h-5 w-5 ${
-                        paymentMethod === method.id
-                          ? "text-primary"
-                          : "text-muted-foreground"
-                      }`}
-                    />
-                    <span className="font-medium">{method.name}</span>
-                  </label>
-                ))}
+            <div className="bg-card rounded-2xl border border-border shadow-soft overflow-hidden">
+              <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
+                <h2 className="font-bold text-lg text-primary flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5" />
+                  Payment Method
+                </h2>
               </div>
-
-              <AnimatePresence>
-                {paymentMethod === "upi" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-4 p-4 bg-muted rounded-xl overflow-hidden"
-                  >
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                      Enter UPI ID
+              
+              <div className="p-6">
+                <div className="space-y-3">
+                  {paymentMethods.map((method) => (
+                    <label
+                      key={method.id}
+                      className={`flex items-center gap-4 p-4 border-2 rounded-2xl cursor-pointer transition-all ${
+                        paymentMethod === method.id
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-border/50 hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        paymentMethod === method.id ? "border-primary" : "border-muted-foreground/30"
+                      }`}>
+                        {paymentMethod === method.id && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                      </div>
+                      <method.icon
+                        className={`h-5 w-5 ${
+                          paymentMethod === method.id
+                            ? "text-primary"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                      <span className="font-bold text-sm">{method.name}</span>
                     </label>
-                    <input
-                      type="text"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      placeholder="username@upi"
-                      data-testid="input-upi-id"
-                      className="w-full bg-background border border-border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  ))}
+                </div>
+
+                <AnimatePresence>
+                  {paymentMethod === "upi" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-2xl"
+                    >
+                      <label className="block text-[10px] font-black text-primary/70 mb-1.5 uppercase tracking-widest">
+                        Enter UPI ID
+                      </label>
+                      <input
+                        type="text"
+                        value={upiId}
+                        onChange={(e) => setUpiId(e.target.value)}
+                        placeholder="username@upi"
+                        className="w-full bg-background border border-primary/20 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 

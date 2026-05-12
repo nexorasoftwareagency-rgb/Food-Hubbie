@@ -348,6 +348,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 case 'completeSiteRefresh': completeSiteRefresh(); break;
                 case 'toggleNotificationSheet': toggleNotificationSheet(); break;
+                case 'testNotification': {
+                    showToast("Testing Notifications...", "info");
+                    new Notification("Foodhubbie SaaS", {
+                        body: "This is a test notification from the Admin Dashboard.",
+                        icon: "icon-512.webp"
+                    });
+                    break;
+                }
                 case 'toggleSidebar': toggleSidebar(); break;
                 case 'toggleMobileCart': {
                     toggleMobileCart(true);

@@ -1,96 +1,55 @@
-# Foodhubbie — Multi-Tenant Food Ordering SaaS Platform
+# 🍕 Foodhubbie SaaS Platform
 
-> **Your Neighbourhood Food Hub** — A Zomato-style marketplace with WhatsApp bot ordering, real-time rider tracking, and multi-outlet management.
+A high-performance, multi-tenant Restaurant-as-a-Service (RaaS) platform built with true triple isolation (Firebase, GitHub, EC2).
+
+## 📂 Project Structure
+
+```text
+root/
+├── ShopAdmin/        # Restaurant Admin ERP (Vanilla JS/CSS)
+├── RiderApp/         # Delivery Rider Application (Vanilla JS/CSS)
+├── Marketplace/      # Customer-facing PWA (React/Tailwind)
+├── SuperAdmin/       # Platform Onboarding & Management
+├── bot/              # Unified WhatsApp Bot Engine (Node.js/Baileys)
+├── shared/           # Shared Business Logic & Utilities
+├── config/           # Global SaaS Configuration & Constants
+├── docs/             # Deployment & Architecture Guides
+├── scripts/          # Automation & Maintenance Scripts
+└── firebase.json     # Multi-target Hosting & Security Rules
+```
+
+## 🚀 Key Features
+
+*   **Multi-Tenancy**: Hierarchical path resolution (`businesses/{bid}/outlets/{oid}/`).
+*   **Real-time Logic**: Live order tracking, inventory deductions, and WhatsApp status updates.
+*   **Triple Isolation**: Dedicated production Firebase project, GitHub repository, and isolated EC2 environments.
+*   **Unified UI**: Shared design language across all touchpoints (Admin, Rider, Marketplace).
+
+## 🛠️ Management Commands
+
+Manage the entire platform from the root using NPM Workspaces:
+
+```bash
+# Install dependencies for all apps
+npm run install:all
+
+# Start the WhatsApp Bot
+npm run dev:bot
+
+# Start the Marketplace PWA
+npm run dev:marketplace
+
+# Deploy Hosting (Admin & Rider)
+npm run deploy:hosting
+
+# Deploy Security Rules
+npm run deploy:rules
+```
+
+## 📖 Documentation
+
+*   [Deployment Guide](docs/deployment_guide.md)
+*   [Architecture Overview](docs/architecture.md)
 
 ---
-
-## Architecture
-
-```
-Foodhubbie/
-├── config/                 # Firebase config & SaaS constants
-├── shared/                 # Multi-tenant helpers & shared utilities
-├── Marketplace/            # Customer PWA (React + Vite + Tailwind)
-├── ShopAdmin/              # Per-business admin dashboard
-├── SuperAdmin/             # Platform owner control center
-├── RiderApp/               # Rider delivery portal
-├── Bot/                    # Unified WhatsApp bot engine (Node.js)
-├── scripts/                # Migration & seed scripts
-├── database.rules.json     # Firebase security rules
-└── firebase.json           # Hosting configuration
-```
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Marketplace** | React 19, Vite 6, Tailwind CSS 4, Framer Motion, shadcn/ui |
-| **Admin/Rider** | Vanilla JS, Firebase SDK, Service Workers (PWA) |
-| **Bot Engine** | Node.js, Baileys (WhatsApp Web API), Firebase Admin SDK |
-| **Database** | Firebase Realtime Database |
-| **Hosting** | Firebase Hosting (multi-site) |
-| **Bot Server** | EC2 + PM2 |
-
-## Theme
-
-- **Primary**: Forest Green `#065F46`
-- **Secondary**: Amber/Orange `#F59E0B`
-- **Background**: Warm Cream `#FFFBEB`
-- **Typography**: Plus Jakarta Sans (body) + Syne (headings)
-- **Style**: Glassmorphism + micro-animations
-
-## Multi-Tenant Schema
-
-```
-/businesses/{businessId}/
-  /profile                    → Business metadata
-  /outlets/{outletId}/
-    /meta                     → Outlet info (name, slug, hours)
-    /menu                     → Categories & dishes
-    /orders                   → Order history
-    /inventory                → Stock tracking
-    /settings                 → Delivery fees, contact
-    /botUsers                 → WhatsApp user profiles
-/admins                       → Global admin accounts
-/riders                       → Global rider pool
-/bot/{businessId}/{outletId}/ → Bot commands & status
-```
-
-## Getting Started
-
-### Marketplace (Customer App)
-```bash
-cd Marketplace
-npm install
-npm run dev     # → http://localhost:3000
-```
-
-### Bot Engine
-```bash
-cd Bot
-npm install
-# Set environment variables:
-#   BUSINESS_ID, OUTLET_ID, FIREBASE_DATABASE_URL
-node index.js
-```
-
-## Firebase Project
-
-- **Project ID**: `food-hubbie`
-- **GitHub**: [nexorasoftwareagency-rgb/Food-Hubbie](https://github.com/nexorasoftwareagency-rgb/Food-Hubbie)
-
-## Soul Preservation
-
-The core logic from the original Roshani ERP is preserved:
-
-- ✅ WhatsApp Bot 11-step state machine
-- ✅ Real-time rider geolocation heartbeat (30s)
-- ✅ OTP-based delivery verification
-- ✅ Distance-based delivery fee (Haversine)
-- ✅ Admin → Bot command channel
-- ✅ Inventory deduction with threshold alerts
-- ✅ Stale order auto-cleanup (5hr)
-
----
-
-**Built by Nexora Software Agency** | Powered by Firebase
+Powered by **Foodhubbie SaaS Engine**

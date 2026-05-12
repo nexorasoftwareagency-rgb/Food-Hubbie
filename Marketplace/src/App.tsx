@@ -20,6 +20,7 @@ import Tracking from "@/pages/Tracking";
 import Profile from "@/pages/Profile";
 import Orders from "@/pages/Orders";
 import Login from "@/pages/Login";
+import Search from "@/pages/Search";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ function Router() {
     <AppLayout>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/search" component={Search} />
         <Route path="/outlets" component={Outlets} />
         {/* SaaS-compatible slug-based route */}
         <Route path="/store/:slug" component={OutletDetails} />
