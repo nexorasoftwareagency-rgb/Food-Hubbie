@@ -6,7 +6,8 @@
      * ============================================================
      */
 
-    // 1. MASTER AUTHORIZATION UTILITIES (REMOVED ROOT RESTRICTION FOR MARKETPLACE COMPATIBILITY)
+    // 1. MASTER AUTHORIZATION UTILITIES (GLOBAL UNLOCK FOR DISCOVERY)
+    ".read": true,
     
 
     "admins": {
