@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { Plus, Minus, Star, Store } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { ProductCustomizationModal } from "../modals/ProductCustomizationModal";
+import type { MenuItem } from "@/types";
 
 interface FoodCardProps {
-  item: any;
+  item: MenuItem;
   delay?: number;
   showOutlet?: boolean;
 }
@@ -16,6 +17,33 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
 
   const cartItem = state.items.find((i) => i.id === item.id);
   const quantity = cartItem?.quantity || 0;
+
+  // Perspective Tilt Logic
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const mouseXSpring = useSpring(x);
+  const mouseYSpring = useSpring(y);
+
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["7deg", "-7deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-7deg", "7deg"]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const xPct = mouseX / width - 0.5;
+    const yPct = mouseY / height - 0.5;
+    x.set(xPct);
+    y.set(yPct);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
 
   const handleAdd = () => {
     if (item.customizable) {
@@ -57,9 +85,19 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
         whileInView={{ y: 0, opacity: 1 }}
         viewport={{ once: true, margin: "-20px" }}
         transition={{ delay: delay * 0.05, duration: 0.4 }}
-        className="flex gap-4 p-4 bg-card rounded-2xl border border-border/50 shadow-soft hover:shadow-premium transition-all duration-300 group"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          rotateX,
+          rotateY,
+          transformStyle: "preserve-3d",
+        }}
+        className="flex gap-4 p-4 bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 group relative"
       >
-        <div className="flex-1 flex flex-col justify-between">
+        <div 
+          style={{ transform: "translateZ(20px)" }}
+          className="flex-1 flex flex-col justify-between"
+        >
           <div>
             <div className="flex items-center gap-2 mb-1.5">
               <div
@@ -109,7 +147,10 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
           </div>
         </div>
 
-        <div className="relative w-32 h-32 flex-shrink-0">
+        <div 
+          style={{ transform: "translateZ(40px)" }}
+          className="relative w-32 h-32 flex-shrink-0"
+        >
           <img
             src={item.image}
             alt={item.name}

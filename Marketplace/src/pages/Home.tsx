@@ -305,11 +305,21 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <SkeletonLoader type="list" count={8} />
           </div>
-        ) : (
+        ) : allMenuItems.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {allMenuItems.map((item, i) => (
               <FoodCard key={item.id} item={item} delay={i % 4} />
             ))}
+          </div>
+        ) : (
+          <div className="bg-muted/30 rounded-3xl p-12 text-center border-2 border-dashed border-border">
+            <div className="bg-muted h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">No items found</h3>
+            <p className="text-muted-foreground max-w-sm mx-auto">
+              We couldn't find any menu items in your area. Try refreshing or changing your location.
+            </p>
           </div>
         )}
       </section>
