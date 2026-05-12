@@ -1,0 +1,89 @@
+# ============================================================
+# FOODHUBBIE SAAS — Git Ignore
+# ============================================================
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+service-account.json
+**/service-account.json
+scripts/legacy-service-account.json
+scripts/new-service-account.json
+
+# Firebase
+.firebase/
+.firebaserc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Session data (WhatsApp bot)
+session_data/
+Bot/session_data/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Temporary
+.tmp/
+temp/
+scratch/
+
+# Legacy artifacts to prune (these should not be committed)
+Pizza-bot/
+Cake-bot/
+rider_old/
+graphify-out/
+Replit files/
+.kilo/
+.agent/
+*.txt
+!README.md
+!SAAS_LEGACY_CONTEXT.md
+
+# Debug files
+debug_test.js
+button_audit.js
+add_nilesh.js
+
+# Old documentation (replaced by new SaaS docs)
+COMPREHENSIVE_FIX_SUMMARY.md
+FINAL_CHECKLIST.md
+FINAL_DEPLOYMENT_SUMMARY.md
+FIXES_VERIFICATION.md
+RIDER_CREDENTIALS_HELP.md
+RIDER_LOGIN_FIX_SUMMARY.md
+SECURITY_FIXES_SUMMARY.md
+MASTER_ARCHITECTURE.md
+SERVER_GUIDE.md
+deployment_guide.md
+whatsapp_flow_demo.md
+
+# Old audit files
+100% Audit after update
+Admin Audit 100% + Implementation plan+Mobile Responsive implementation plan - 100%
+Rider Audit 100% + Implementation plan+Mobile Responsive implementation plan - 100%

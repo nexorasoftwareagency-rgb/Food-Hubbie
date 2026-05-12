@@ -1,0 +1,396 @@
+import { useState, useEffect } from "react";
+import { Link } from "wouter";
+import { motion } from "framer-motion";
+import {
+  Search,
+  MapPin,
+  ChevronRight,
+  Pizza,
+  Beef,
+  Coffee,
+  Cake,
+  Soup,
+  Salad,
+  Sandwich,
+  UtensilsCrossed,
+} from "lucide-react";
+import { fetchOutlets, sortByDistance } from "@/services/outletService";
+import { getBestSellers, getRecommended } from "@/services/menuService";
+import type { Outlet, MenuItem } from "@/types";
+import { OutletCard } from "@/components/cards/OutletCard";
+import { FoodCard } from "@/components/cards/FoodCard";
+import { SkeletonLoader } from "@/components/ui/SkeletonLoader";
+import { useLocationContext } from "@/context/LocationContext";
+import { heroBanner } from "@/data/mockData";
+import { mockReviews } from "@/data/mockData";
+import { Star, Quote } from "lucide-react";
+
+const categories = [
+  { name: "Pizza", icon: Pizza, color: "bg-red-100 text-red-600" },
+  { name: "Burger", icon: Beef, color: "bg-orange-100 text-orange-600" },
+  { name: "Biryani", icon: Soup, color: "bg-yellow-100 text-yellow-700" },
+  { name: "Desserts", icon: Cake, color: "bg-pink-100 text-pink-600" },
+  { name: "Drinks", icon: Coffee, color: "bg-blue-100 text-blue-600" },
+  { name: "Chinese", icon: UtensilsCrossed, color: "bg-green-100 text-green-600" },
+  { name: "Sandwich", icon: Sandwich, color: "bg-amber-100 text-amber-700" },
+  { name: "Salads", icon: Salad, color: "bg-emerald-100 text-emerald-700" },
+];
+
+export default function Home() {
+  const [loading, setLoading] = useState(true);
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
+  const [bestSellers, setBestSellers] = useState<MenuItem[]>([]);
+  const [recommended, setRecommended] = useState<MenuItem[]>([]);
+  const { state: locationState, requestLocation } = useLocationContext();
+
+  useEffect(() => {
+    fetchOutlets().then((data) => {
+      setOutlets(sortByDistance(data));
+      setBestSellers(getBestSellers(4));
+      setRecommended(getRecommended(4));
+      setLoading(false);
+    });
+  }, []);
+
+  const openOutlets = outlets.filter(
+    (o) => o.availability === "open" || o.availability === "busy"
+  );
+  const fastDelivery = [...outlets].sort((a, b) => a.deliveryTimeMin - b.deliveryTimeMin).slice(0, 4);
+  const topRated = [...outlets].sort((a, b) => b.rating - a.rating).slice(0, 4);
+
+  return (
+    <div className="pb-8">
+      {/* Mobile location banner */}
+      <div className="md:hidden bg-primary text-primary-foreground px-4 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2 truncate flex-1">
+          <MapPin className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-medium truncate">
+            {locationState.address || "Detecting location..."}
+          </span>
+        </div>
+        {locationState.permissionStatus === "prompt" && (
+          <button
+            onClick={requestLocation}
+            data-testid="btn-allow-location"
+            className="text-xs bg-primary-foreground/20 px-2.5 py-1 rounded-lg font-bold whitespace-nowrap ml-2"
+          >
+            Allow
+          </button>
+        )}
+      </div>
+
+      {/* Hero */}
+      <section className="container mx-auto px-4 pt-6 pb-8">
+        <div className="relative rounded-3xl overflow-hidden shadow-lg h-64 md:h-96">
+          {loading ? (
+            <SkeletonLoader type="banner" count={1} />
+          ) : (
+            <>
+              <img
+                src={heroBanner}
+                alt="Delicious Food"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/10 flex flex-col justify-center p-6 md:p-14">
+                <motion.h1
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-4xl md:text-6xl font-heading font-bold text-white mb-3 max-w-lg leading-tight"
+                >
+                  Cravings?{" "}
+                  <span className="text-secondary">Delivered.</span>
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="text-white/80 md:text-lg mb-8 max-w-md"
+                >
+                  The best restaurants in town — hot and fresh at your door.
+                </motion.p>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="relative max-w-md"
+                >
+                  <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
+                  <input
+                    type="search"
+                    placeholder="Search pizzas, burgers, drinks..."
+                    data-testid="input-hero-search"
+                    className="w-full bg-white rounded-xl pl-12 pr-4 py-3.5 text-sm focus:outline-none shadow-xl text-foreground font-medium"
+                  />
+                </motion.div>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Food categories */}
+      <section className="container mx-auto px-4 pb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-heading font-bold text-foreground">
+            What's on your mind?
+          </h2>
+        </div>
+        <div className="flex overflow-x-auto gap-4 pb-2 -mx-4 px-4 scrollbar-hide">
+          {categories.map((cat, i) => (
+            <motion.div
+              key={cat.name}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+              className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer group"
+              data-testid={`category-${cat.name.toLowerCase()}`}
+            >
+              <div
+                className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center ${cat.color} group-hover:scale-110 transition-transform shadow-sm`}
+              >
+                <cat.icon className="w-7 h-7 md:w-8 md:h-8" />
+              </div>
+              <span className="text-xs md:text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                {cat.name}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Popular Near You */}
+      <section className="container mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-2xl font-heading font-bold text-foreground">
+              Popular Near You
+            </h2>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {openOutlets.length} restaurants open now
+            </p>
+          </div>
+          <Link
+            href="/outlets"
+            className="text-primary font-semibold flex items-center text-sm hover:underline"
+          >
+            See all <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <SkeletonLoader count={4} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {openOutlets.slice(0, 4).map((outlet, i) => (
+              <OutletCard key={outlet.id} outlet={outlet} delay={i} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Trending Dishes */}
+      <section className="bg-muted/40 py-8">
+        <div className="container mx-auto px-4">
+          <div className="mb-5">
+            <h2 className="text-2xl font-heading font-bold text-foreground">
+              Trending Dishes
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Most ordered right now
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <SkeletonLoader type="list" count={4} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {bestSellers.map((item, i) => (
+                <FoodCard key={item.id} item={item} delay={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Fast Delivery */}
+      <section className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-2xl font-heading font-bold text-foreground">
+              Fast Delivery
+            </h2>
+            <p className="text-muted-foreground text-sm">Under 30 minutes</p>
+          </div>
+          <Link
+            href="/outlets"
+            className="text-primary font-semibold flex items-center text-sm hover:underline"
+          >
+            See all <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <SkeletonLoader count={4} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {fastDelivery.map((outlet, i) => (
+              <OutletCard key={outlet.id} outlet={outlet} delay={i} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Recommended Combos */}
+      <section className="bg-muted/40 py-8">
+        <div className="container mx-auto px-4">
+          <div className="mb-5">
+            <h2 className="text-2xl font-heading font-bold text-foreground">
+              Recommended For You
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Chef's picks across the city
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <SkeletonLoader type="list" count={4} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {recommended.map((item, i) => (
+                <FoodCard key={item.id} item={item} delay={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Top Rated */}
+      <section className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-2xl font-heading font-bold text-foreground">
+              Top Rated Outlets
+            </h2>
+            <p className="text-muted-foreground text-sm">Rated 4.5 and above</p>
+          </div>
+          <Link
+            href="/outlets"
+            className="text-primary font-semibold flex items-center text-sm hover:underline"
+          >
+            See all <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <SkeletonLoader count={4} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {topRated.map((outlet, i) => (
+              <OutletCard key={outlet.id} outlet={outlet} delay={i} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Customer Reviews */}
+      <section className="bg-muted/40 py-10">
+        <div className="container mx-auto px-4">
+          <div className="mb-6">
+            <h2 className="text-2xl font-heading font-bold text-foreground">
+              What People Say
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Real reviews from real customers
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {mockReviews.slice(0, 6).map((review, i) => (
+              <motion.div
+                key={review.id}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.07 }}
+                className="bg-card rounded-2xl p-5 border border-border shadow-sm"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={review.userAvatar}
+                      alt={review.userName}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                    <div>
+                      <p className="font-bold text-sm text-card-foreground">
+                        {review.userName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {review.outletName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 bg-secondary/10 px-2 py-1 rounded-lg">
+                    <Star className="h-3.5 w-3.5 fill-secondary text-secondary" />
+                    <span className="text-xs font-bold text-secondary">
+                      {review.rating}
+                    </span>
+                  </div>
+                </div>
+                <Quote className="h-4 w-4 text-primary/30 mb-1" />
+                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                  {review.comment}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-3">
+                  {new Date(review.date).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pro CTA banner */}
+      <section className="container mx-auto px-4 py-12">
+        <div className="bg-primary rounded-3xl p-6 md:p-10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-secondary/20 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 max-w-md text-center md:text-left">
+            <span className="bg-secondary text-secondary-foreground text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-4 inline-block">
+              Pro Member
+            </span>
+            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-2">
+              Get Free Delivery
+            </h2>
+            <p className="text-white/80">
+              Subscribe to Foodhubbie Pro for unlimited free deliveries and
+              exclusive discounts on every order.
+            </p>
+          </div>
+
+          <button
+            data-testid="btn-join-pro"
+            className="relative z-10 bg-white text-primary font-bold px-8 py-4 rounded-xl hover:bg-muted transition-colors shadow-lg whitespace-nowrap"
+          >
+            Join Now @ ₹99/mo
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
