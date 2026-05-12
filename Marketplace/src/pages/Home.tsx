@@ -15,6 +15,7 @@ import {
   UtensilsCrossed,
   Star,
   Quote,
+  Store,
 } from "lucide-react";
 import { fetchOutlets, sortByDistance } from "@/services/outletService";
 import { getGlobalBestSellers, getGlobalRecommended } from "@/services/menuService";
