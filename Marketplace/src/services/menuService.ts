@@ -206,34 +206,39 @@ export function searchMenu(items: MenuItem[], query: string): MenuItem[] {
   });
 }
 
-/** Fetch ALL menu items (for global search) */
+/** Fetch ALL menu items across all businesses and outlets (True SaaS Global Search) */
 export async function fetchAllMenuItems(): Promise<MenuItem[]> {
   try {
-    const [dishesSnap, outletsSnap] = await Promise.all([
-      get(ref(db, "dishes")),
-      get(ref(db, "outlets"))
-    ]);
+    const businessesSnap = await get(ref(db, "businesses"));
+    if (!businessesSnap.exists()) return [];
 
-    if (dishesSnap.exists()) {
-      const allDishes = dishesSnap.val();
-      const allOutlets = outletsSnap.val() || {};
-      const result: MenuItem[] = [];
-      
-      for (const id in allDishes) {
-        const dish = allDishes[id];
-        const outletId = dish.outlet || "Pizza-Shop";
-        const outletName = allOutlets[outletId]?.name || "Roshani Restaurant";
-        
-        result.push({
-          ...mapLegacyDish(id, dish, outletId, "business_roshani"),
-          outletName
-        });
+    const businesses = businessesSnap.val();
+    const result: MenuItem[] = [];
+
+    // Crawl all businesses
+    for (const bId in businesses) {
+      const business = businesses[bId];
+      const outlets = business.outlets || {};
+
+      // Crawl all outlets in this business
+      for (const oId in outlets) {
+        const outlet = outlets[oId];
+        const menu = outlet.menu || {};
+        const outletName = outlet.settings?.Store?.storeName || outlet.meta?.name || "Roshani Restaurant";
+
+        // Collect all dishes
+        for (const dId in menu) {
+          result.push({
+            ...mapLegacyDish(dId, menu[dId], oId, bId),
+            outletName
+          });
+        }
       }
-      return result;
     }
-    return [];
+    
+    return result;
   } catch (err) {
-    console.error("Fetch all menu items error:", err);
+    console.error("Global SaaS Menu Fetch Error:", err);
     return [];
   }
 }
