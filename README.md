@@ -1,10 +1,18 @@
-# 🍕 Foodhubbie SaaS Platform
+# 🚀 Foodhubbie — Enterprise Restaurant SaaS Ecosystem
 
-A high-performance, multi-tenant Restaurant-as-a-Service (RaaS) platform built with true triple isolation (Firebase, GitHub, EC2).
+A high-performance, multi-tenant platform designed for rapid restaurant scaling. Foodhubbie provides a unified experience across Marketplace, Admin ERP, WhatsApp Bot, and Rider Fleet.
+
+## 💎 Premium Experience Standard
+- **Universal Marketplace**: High-end React PWA with "Vibrant Orange" design tokens and glassmorphism.
+- **SaaS Discovery**: Exhaustive global crawler for cross-outlet dish search and restaurant branding.
+- **Unified Branding**: Absolute visual consistency across all touchpoints (Marketplace, Bot, Admin, Rider).
+
+## 🏗️ Multi-Tenant Architecture
+- **Tenant Isolation**: Dynamic `BUSINESS_ID` and `OUTLET_ID` scoping across all Firebase interactions.
+- **Shared Service Layer**: Unified helpers in `/shared` powering both Node.js (Bot) and Browser environments.
+- **Hardened Security**: Production-grade `database.rules.json` (v2.1) with granular read/write permissions.
 
 ## 📂 Project Structure
-
-```text
 root/
 ├── ShopAdmin/        # Restaurant Admin ERP (Vanilla JS/CSS)
 ├── RiderApp/         # Delivery Rider Application (Vanilla JS/CSS)
