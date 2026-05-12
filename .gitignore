@@ -21,6 +21,8 @@ service-account.json
 **/service-account.json
 scripts/legacy-service-account.json
 scripts/new-service-account.json
+food-hubbie-firebase-adminsdk-*.json
+*.json.old
 
 # Firebase
 .firebase/
