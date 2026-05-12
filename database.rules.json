@@ -6,9 +6,8 @@
      * ============================================================
      */
 
-    // 1. MASTER AUTHORIZATION UTILITIES
-    ".read": "auth.token.email == 'nexorasoftware@gmail.com'",
-    ".write": "auth.token.email == 'nexorasoftware@gmail.com'",
+    // 1. MASTER AUTHORIZATION UTILITIES (REMOVED ROOT RESTRICTION FOR MARKETPLACE COMPATIBILITY)
+    
 
     "admins": {
       ".read": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true",
@@ -41,31 +40,31 @@
 
     "businesses": {
       // Marketplace and Dashboard need to see businesses
-      ".read": "true",
+      ".read": true,
       // TEMPORARY: Allow writes for development without Auth session
-      ".write": "true",
+      ".write": true,
 
       "$bid": {
-        ".read": "true",
-        ".write": "true",
+        ".read": true,
+        ".write": true,
 
         "outlets": {
           "$oid": {
-            ".read": "true",
-            ".write": "true",
+            ".read": true,
+            ".write": true,
 
             "orders": {
-              ".read": "true",
-              ".write": "true",
+              ".read": true,
+              ".write": true,
               "$orderId": {
-                ".write": "true"
+                ".write": true
               },
               ".indexOn": ["createdAt", "status", "riderId", "phone"]
             },
             
             "inventory": {
-              ".read": "true",
-              ".write": "true"
+              ".read": true,
+              ".write": true
             }
           }
         }
@@ -74,9 +73,21 @@
 
     "slugs": {
       "outlets": {
-        ".read": "true",
+        ".read": true,
         ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
       }
+    },
+
+    "dishes": {
+      ".read": true,
+      ".write": true, // TODO: Restrict to Admin Auth in Production
+      ".indexOn": ["category", "outlet"]
+    },
+
+    "outlets": {
+      ".read": true,
+      ".write": true, // TODO: Restrict to Admin Auth in Production
+      ".indexOn": ["businessId", "name"]
     },
 
     "bot": {
