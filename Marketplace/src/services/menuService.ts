@@ -206,31 +206,51 @@ export function searchMenu(items: MenuItem[], query: string): MenuItem[] {
   });
 }
 
-/** Fetch ALL menu items across all businesses and outlets (True SaaS Global Search) */
+/** Fetch ALL menu items across all businesses and outlets (Exhaustive SaaS Global Search) */
 export async function fetchAllMenuItems(): Promise<MenuItem[]> {
   try {
     const businessesSnap = await get(ref(db, "businesses"));
-    if (!businessesSnap.exists()) return [];
-
-    const businesses = businessesSnap.val();
     const result: MenuItem[] = [];
+    const processedIds = new Set<string>();
 
-    // Crawl all businesses
-    for (const bId in businesses) {
-      const business = businesses[bId];
-      const outlets = business.outlets || {};
+    if (businessesSnap.exists()) {
+      const businesses = businessesSnap.val();
 
-      // Crawl all outlets in this business
-      for (const oId in outlets) {
-        const outlet = outlets[oId];
-        const menu = outlet.menu || {};
-        const outletName = outlet.settings?.Store?.storeName || outlet.meta?.name || "Roshani Restaurant";
+      // 1. Crawl the SaaS Hierarchy
+      for (const bId in businesses) {
+        const business = businesses[bId];
+        const outlets = business.outlets || {};
 
-        // Collect all dishes
-        for (const dId in menu) {
+        for (const oId in outlets) {
+          const outlet = outlets[oId];
+          const outletName = outlet.settings?.Store?.storeName || outlet.meta?.name || "Roshani Restaurant";
+          
+          // Exhaustive check for menu items within outlet
+          const dishes = outlet.dishes || outlet.menu || outlet.Menu || 
+                        (outlet.Menu && outlet.Menu.Items);
+
+          if (dishes) {
+            for (const dId in dishes) {
+              const mapped = mapLegacyDish(dId, dishes[dId], oId, bId);
+              result.push({ ...mapped, outletName });
+              processedIds.add(dId);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Fallback: Crawl root dishes (Legacy/Unassigned)
+    const rootSnap = await get(ref(db, "dishes"));
+    if (rootSnap.exists()) {
+      const allDishes = rootSnap.val();
+      for (const dId in allDishes) {
+        if (!processedIds.has(dId)) {
+          const dish = allDishes[dId];
+          const oId = dish.outlet || "Pizza-Shop";
           result.push({
-            ...mapLegacyDish(dId, menu[dId], oId, bId),
-            outletName
+            ...mapLegacyDish(dId, dish, oId, "business_roshani"),
+            outletName: "Roshani Restaurant"
           });
         }
       }
@@ -238,7 +258,7 @@ export async function fetchAllMenuItems(): Promise<MenuItem[]> {
     
     return result;
   } catch (err) {
-    console.error("Global SaaS Menu Fetch Error:", err);
+    console.error("Global SaaS Menu Exhaustive Fetch Error:", err);
     return [];
   }
 }
