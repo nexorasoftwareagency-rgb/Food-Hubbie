@@ -7,9 +7,10 @@ import { ProductCustomizationModal } from "../modals/ProductCustomizationModal";
 interface FoodCardProps {
   item: any;
   delay?: number;
+  showOutlet?: boolean;
 }
 
-export function FoodCard({ item, delay = 0 }: FoodCardProps) {
+export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) {
   const { state, dispatch } = useCart();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -94,6 +95,17 @@ export function FoodCard({ item, delay = 0 }: FoodCardProps) {
             <p className="text-muted-foreground text-xs mt-2.5 line-clamp-2 leading-relaxed font-medium">
               {item.description}
             </p>
+            
+            {showOutlet && item.outletName && (
+              <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Store className="h-2.5 w-2.5 text-primary" />
+                </div>
+                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tight truncate">
+                  {item.outletName}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

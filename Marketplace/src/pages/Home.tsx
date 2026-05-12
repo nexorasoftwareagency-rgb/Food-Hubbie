@@ -46,6 +46,8 @@ export default function Home() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const { state: locationState, requestLocation } = useLocationContext();
 
+  const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]);
+
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -54,15 +56,30 @@ export default function Home() {
         const sortedOutlets = sortByDistance(data, locationState.coords);
         setOutlets(sortedOutlets);
         
-        const [best, reco, revs] = await Promise.all([
+        // Fetch all items for the global menu
+        const [best, reco, revs, allItems] = await Promise.all([
           getGlobalBestSellers(4),
           getGlobalRecommended(4),
-          fetchGlobalReviews(6)
+          fetchGlobalReviews(6),
+          fetchAllMenuItems()
         ]);
         
-        setBestSellers(best);
-        setRecommended(reco);
+        // Map outlet names to items for global display
+        const mappedItems = allItems.map(item => {
+          const outlet = data.find(o => o.id === item.outletId);
+          return { ...item, outletName: outlet?.name || "Roshani Restaurant" };
+        });
+
+        // Also map for bestsellers and recommended
+        const mapWithOutlet = (list: MenuItem[]) => list.map(item => {
+          const outlet = data.find(o => o.id === item.outletId);
+          return { ...item, outletName: outlet?.name || "Roshani Restaurant" };
+        });
+
+        setBestSellers(mapWithOutlet(best));
+        setRecommended(mapWithOutlet(reco));
         setReviews(revs);
+        setAllMenuItems(mappedItems);
       } catch (error) {
         console.error("Home data load error:", error);
       } finally {
@@ -279,23 +296,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Recommended For You */}
+      {/* Universal Menu - All Items */}
       <section className="container mx-auto px-4 py-16">
-        <div className="mb-8">
-          <h2 className="text-3xl font-heading font-bold text-foreground">
-            Curated For You
-          </h2>
-          <p className="text-muted-foreground">Dishes we think you'll love</p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-3xl font-heading font-bold text-foreground">
+              Explore All Food
+            </h2>
+            <p className="text-muted-foreground">Everything delicious, all in one place</p>
+          </div>
         </div>
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <SkeletonLoader type="list" count={4} />
+            <SkeletonLoader type="list" count={8} />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {recommended.slice(4, 8).map((item, i) => (
-              <FoodCard key={item.id} item={item} delay={i} />
+            {allMenuItems.map((item, i) => (
+              <FoodCard key={item.id} item={item} delay={i % 4} />
             ))}
           </div>
         )}
