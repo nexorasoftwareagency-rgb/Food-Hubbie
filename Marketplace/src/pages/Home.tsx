@@ -64,22 +64,10 @@ export default function Home() {
           fetchAllMenuItems()
         ]);
         
-        // Map outlet names to items for global display
-        const mappedItems = allItems.map(item => {
-          const outlet = data.find(o => o.id === item.outletId);
-          return { ...item, outletName: outlet?.name || "Roshani Restaurant" };
-        });
-
-        // Also map for bestsellers and recommended
-        const mapWithOutlet = (list: MenuItem[]) => list.map(item => {
-          const outlet = data.find(o => o.id === item.outletId);
-          return { ...item, outletName: outlet?.name || "Roshani Restaurant" };
-        });
-
-        setBestSellers(mapWithOutlet(best));
-        setRecommended(mapWithOutlet(reco));
+        setBestSellers(best);
+        setRecommended(reco);
         setReviews(revs);
-        setAllMenuItems(mappedItems);
+        setAllMenuItems(allItems);
       } catch (error) {
         console.error("Home data load error:", error);
       } finally {

@@ -139,11 +139,16 @@ export async function getGlobalBestSellers(limit = 8): Promise<MenuItem[]> {
     const menuPromises = outlets.map(o => fetchMenuByOutlet(o.id, o.businessId));
     const results = await Promise.all(menuPromises);
     
-    for (const menu of results) {
-      allBestSellers = [...allBestSellers, ...menu.filter(i => i.isBestSeller && i.isAvailable)];
-    }
+    results.forEach((menu, idx) => {
+      const outlet = outlets[idx];
+      const items = menu.filter(i => i.isBestSeller && i.isAvailable).map(item => ({
+        ...item,
+        outletName: outlet.name
+      }));
+      allBestSellers = [...allBestSellers, ...items];
+    });
     
-    return allBestSellers.sort((a, b) => b.rating - a.rating).slice(0, limit);
+    return allBestSellers.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, limit);
   } catch {
     return [];
   }
@@ -158,11 +163,16 @@ export async function getGlobalRecommended(limit = 8): Promise<MenuItem[]> {
     const menuPromises = outlets.map(o => fetchMenuByOutlet(o.id, o.businessId));
     const results = await Promise.all(menuPromises);
     
-    for (const menu of results) {
-      allRecommended = [...allRecommended, ...menu.filter(i => i.isRecommended && i.isAvailable)];
-    }
+    results.forEach((menu, idx) => {
+      const outlet = outlets[idx];
+      const items = menu.slice(0, 5).map(item => ({
+        ...item,
+        outletName: outlet.name
+      }));
+      allRecommended = [...allRecommended, ...items];
+    });
     
-    return allRecommended.sort((a, b) => b.rating - a.rating).slice(0, limit);
+    return allRecommended.sort(() => Math.random() - 0.5).slice(0, limit);
   } catch {
     return [];
   }
@@ -181,26 +191,43 @@ export function getCategories(items: MenuItem[]): string[] {
   return result;
 }
 
-/** Filter menu items by search query */
+/** Filter menu items by search query - Resilient Fuzzy Search */
 export function searchMenu(items: MenuItem[], query: string): MenuItem[] {
-  const q = query.toLowerCase();
-  return items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(q) ||
-      item.description.toLowerCase().includes(q) ||
-      item.category.toLowerCase().includes(q)
-  );
+  if (!query) return items;
+  const q = query.toLowerCase().trim();
+  
+  return items.filter((item) => {
+    const name = (item.name || "").toLowerCase();
+    const desc = (item.description || "").toLowerCase();
+    const cat = (item.category || "").toLowerCase();
+    
+    // Check for exact category match or inclusion
+    return name.includes(q) || desc.includes(q) || cat.includes(q) || q.includes(cat);
+  });
 }
 
 /** Fetch ALL menu items (for global search) */
 export async function fetchAllMenuItems(): Promise<MenuItem[]> {
   try {
-    const rootSnap = await get(ref(db, "dishes"));
-    if (rootSnap.exists()) {
-      const allDishes = rootSnap.val();
+    const [dishesSnap, outletsSnap] = await Promise.all([
+      get(ref(db, "dishes")),
+      get(ref(db, "outlets"))
+    ]);
+
+    if (dishesSnap.exists()) {
+      const allDishes = dishesSnap.val();
+      const allOutlets = outletsSnap.val() || {};
       const result: MenuItem[] = [];
+      
       for (const id in allDishes) {
-        result.push(mapLegacyDish(id, allDishes[id], allDishes[id].outlet || "Pizza-Shop", "business_roshani"));
+        const dish = allDishes[id];
+        const outletId = dish.outlet || "Pizza-Shop";
+        const outletName = allOutlets[outletId]?.name || "Roshani Restaurant";
+        
+        result.push({
+          ...mapLegacyDish(id, dish, outletId, "business_roshani"),
+          outletName
+        });
       }
       return result;
     }
