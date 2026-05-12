@@ -4,23 +4,33 @@ import { useCart } from "@/context/CartContext";
 import { Plus, Minus, ArrowRight, Receipt, Trash2, Tag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { calcCartSummary } from "@/services/cartService";
-import { getOutletName } from "@/services/outletService";
+import { fetchOutletById } from "@/services/outletService";
 import { deliveryFeeLabel } from "@/lib/deliveryFee";
-import { mockOutlets } from "@/data/mockData";
+import type { Outlet } from "@/types";
+import { useEffect } from "react";
 
 export default function Cart() {
   const { state, dispatch, total, itemCount } = useCart();
+  const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [coupon, setCoupon] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponDiscount, setCouponDiscount] = useState(0);
 
+  useEffect(() => {
+    if (state.outletId) {
+      // In a real app, we might need businessId too, 
+      // but for now let's assume we search it or it's in context
+      fetchOutletById(state.outletId).then(setOutlet);
+    }
+  }, [state.outletId]);
+
   const summary = calcCartSummary(
     state.items,
-    state.outletId,
+    outlet,
     couponDiscount
   );
 
-  const outletName = state.outletId ? getOutletName(state.outletId) : "";
+  const outletName = outlet?.name || "Restaurant";
 
   const applyCoupon = () => {
     if (coupon.trim().toUpperCase() === "FIRST50") {
@@ -254,9 +264,9 @@ export default function Cart() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   Delivery Fee
-                  {state.outletId && (
+                  {outlet && (
                     <span className="text-xs ml-1 text-primary/70">
-                      ({mockOutlets.find((o) => o.id === state.outletId)?.distanceKm ?? 0} km)
+                      ({outlet.distanceKm} km)
                     </span>
                   )}
                 </span>

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foodhubbie Pro | Enterprise Control Center</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+</head>
+<body>
+    <!-- Auth Gateway -->
+    <div id="loginOverlay" class="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-logo"><i data-lucide="lock" size="48"></i></div>
+            <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 8px;">Enterprise Auth</h2>
+            <p style="color: #64748B; margin-bottom: 32px; font-size: 0.9rem;">Master Access Node Initialization Required</p>
+            <input type="password" id="passcode" class="auth-input" placeholder="••••••" maxlength="6">
+            <button class="btn-pro" style="width: 100%; justify-content: center; height: 50px; font-size: 1rem;" onclick="verifyPasscode()">
+                Initialize Session
+            </button>
+            <p id="loginError" class="hidden" style="color: #EF4444; margin-top: 16px; font-weight: 600; font-size: 0.8rem;">Access Denied: Invalid Master Key</p>
+        </div>
+    </div>
+
+    <!-- Master Layout -->
+    <div class="pro-viewport hidden" id="mainContainer">
+        <!-- Sidebar -->
+        <aside class="pro-sidebar">
+            <div class="pro-logo">
+                <i data-lucide="shield-check" color="#38BDF8"></i>
+                <span>FOODHUBBIE PRO</span>
+            </div>
+            
+            <nav>
+                <div class="nav-group-label">Ecosystem Overview</div>
+                <div class="nav-item active" data-tab="dashboard">
+                    <i data-lucide="layout-dashboard" size="18"></i>
+                    <span>Network Control</span>
+                </div>
+                <div class="nav-item" data-tab="onboarding">
+                    <i data-lucide="plus-square" size="18"></i>
+                    <span>Node Provisioning</span>
+                </div>
+                <div class="nav-item" data-tab="businesses">
+                    <i data-lucide="building-2" size="18"></i>
+                    <span>Ecosystem Partners</span>
+                </div>
+
+                <div class="nav-group-label">Logistics & Fleet</div>
+                <div class="nav-item" data-tab="riders">
+                    <i data-lucide="bike" size="18"></i>
+                    <span>Rider Management</span>
+                </div>
+                <div class="nav-item" data-tab="delivery">
+                    <i data-lucide="map" size="18"></i>
+                    <span>Service Slabs</span>
+                </div>
+
+                <div class="nav-group-label">System Core</div>
+                <div class="nav-item" data-tab="settings">
+                    <i data-lucide="cpu" size="18"></i>
+                    <span>Infrastructure</span>
+                </div>
+            </nav>
+
+            <div class="pro-profile">
+                <div style="width: 32px; height: 32px; background: #38BDF8; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem;">SA</div>
+                <div style="flex: 1;">
+                    <p style="font-weight: 700; font-size: 0.85rem;">Root Admin</p>
+                    <p style="font-size: 0.7rem; color: #94A3B8;">Master Session</p>
+                </div>
+                <i data-lucide="log-out" size="16" style="cursor: pointer; color: #94A3B8;" onclick="localStorage.clear(); location.reload();"></i>
+            </div>
+        </aside>
+
+        <!-- Main Surface -->
+        <main class="pro-main" id="mainSurface" data-theme="dashboard">
+            <header class="pro-header">
+                <div>
+                    <h1 id="tabTitle">Network Control</h1>
+                    <p id="tabSubtitle" style="color: #64748B; font-size: 0.85rem;">Real-time platform telemetry</p>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <div id="systemStatus" class="pro-badge badge-success">
+                        <i data-lucide="zap" size="12"></i> System Online
+                    </div>
+                    <button class="btn-pro-icon" onclick="location.reload()"><i data-lucide="refresh-cw" size="18"></i></button>
+                    <button class="btn-pro" onclick="showOnboarding()">
+                        <i data-lucide="plus" size="18"></i> Provision Node
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Pane -->
+            <div id="dashboard" class="tab-pane active">
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon"><i data-lucide="building"></i></div>
+                            <div class="pro-badge badge-info">Global</div>
+                        </div>
+                        <div>
+                            <div class="metric-value" id="countBusinesses">0</div>
+                            <div class="metric-label">Business Entities</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon"><i data-lucide="share-2"></i></div>
+                            <div class="pro-badge badge-success">Active</div>
+                        </div>
+                        <div>
+                            <div class="metric-value" id="countOutlets">0</div>
+                            <div class="metric-label">Operational Nodes</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon"><i data-lucide="activity"></i></div>
+                            <div class="pro-badge badge-warning">Realtime</div>
+                        </div>
+                        <div>
+                            <div class="metric-value" id="countOrdersToday">0</div>
+                            <div class="metric-label">Platform Throughput</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 style="font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="database" size="18" color="#38BDF8"></i> Business Registry
+                            </h3>
+                            <div style="font-size: 0.75rem; color: #64748B;">Last Sync: <span id="lastSyncTime">Just now</span></div>
+                        </div>
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Partner Identity</th>
+                                    <th>Admin Authority</th>
+                                    <th>Scale (Nodes)</th>
+                                    <th>Network Status</th>
+                                    <th>Operations</th>
+                                </tr>
+                            </thead>
+                            <tbody id="businessList"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onboarding -->
+            <div id="onboarding" class="tab-pane">
+                <div class="content-section" style="max-width: 800px; margin: 0 auto; padding-top: 40px;">
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 style="font-weight: 700;">Infrastructure Provisioning</h3>
+                        </div>
+                        <form id="onboardingForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                            <div style="grid-column: span 2;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Legal Business Name</label>
+                                <input type="text" id="bizName" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="e.g. Roshani Group" required>
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Global System Identifier (Slug)</label>
+                                <input type="text" id="bizId" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="e.g. business_roshani" required>
+                            </div>
+                            
+                            <div style="grid-column: span 2; border-top: 1px dashed #E2E8F0; padding-top: 24px; margin-top: 12px;">
+                                <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-bottom: 16px;">Primary Operational Node</h4>
+                            </div>
+
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Node Name</label>
+                                <input type="text" id="outletName" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="e.g. Pizza Central" required>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Node Unique ID</label>
+                                <input type="text" id="outletId" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="e.g. outlet_pizza" required>
+                            </div>
+                             <div style="grid-column: span 2;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Marketplace Routing Slug</label>
+                                <input type="text" id="outletSlug" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="e.g. roshani-pizza" required>
+                            </div>
+
+                            <div style="grid-column: span 2; border-top: 1px dashed #E2E8F0; padding-top: 24px; margin-top: 12px;">
+                                <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-bottom: 16px;">Location & Contact</h4>
+                            </div>
+
+                            <div style="grid-column: span 2;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Full Operational Address</label>
+                                <input type="text" id="outletAddress" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="Full Address with Landmark" required>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Latitude</label>
+                                <input type="text" id="outletLat" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="e.g. 25.8879" required>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Longitude</label>
+                                <input type="text" id="outletLng" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="e.g. 85.0261" required>
+                            </div>
+
+                            <div style="grid-column: span 2; border-top: 1px dashed #E2E8F0; padding-top: 24px; margin-top: 12px;">
+                                <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-bottom: 16px;">Administrative Credentials</h4>
+                            </div>
+
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Admin Email</label>
+                                <input type="email" id="adminEmail" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="admin@outlet.com" required>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Admin Mobile</label>
+                                <input type="text" id="adminPhone" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="10-digit number" required>
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Admin Password</label>
+                                <input type="password" id="adminPass" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 1rem; padding: 12px;" placeholder="Min 6 characters" required>
+                            </div>
+                            
+                            <button type="submit" class="btn-pro" style="grid-column: span 2; height: 50px; justify-content: center; font-size: 1rem;">
+                                Initialize Ecosystem Node <i data-lucide="zap" size="18"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Riders -->
+            <div id="riders" class="tab-pane">
+                <div class="content-section">
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 style="font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="users" size="18" color="#38BDF8"></i> Logistics Partner Fleet
+                            </h3>
+                            <button class="btn-pro" onclick="showRiderModal()"><i data-lucide="user-plus" size="18"></i> Add Partner</button>
+                        </div>
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Partner Identity</th>
+                                    <th>Performance Metrics</th>
+                                    <th>Verification Status</th>
+                                    <th>System Controls</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ridersListTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logistics -->
+            <div id="delivery" class="tab-pane">
+                <div class="content-section">
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 style="font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="truck" size="18" color="#38BDF8"></i> Infrastructure Flow Slabs
+                            </h3>
+                            <button class="btn-pro" onclick="saveGlobalDelivery()"><i data-lucide="save" size="18"></i> Deploy Changes</button>
+                        </div>
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Distance Parameter (Km)</th>
+                                    <th>Service Cost (₹)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deliverySlabsList"></tbody>
+                        </table>
+                        <button class="btn-pro-icon" style="margin-top: 16px;" onclick="addDeliverySlab()"><i data-lucide="plus" size="18"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Infrastructure Settings -->
+            <div id="settings" class="tab-pane">
+                <div class="content-section">
+                    <div class="pro-card" style="background: #0F172A; color: white;">
+                        <h3 style="color: white; margin-bottom: 24px;"><i data-lucide="terminal" size="18"></i> Infrastructure Registry</h3>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #10B981; line-height: 1.6; background: rgba(0,0,0,0.4); padding: 24px; border-radius: 12px;">
+                            <div>[INFO] SYSTEM KERNEL VERSION: 2.1.0-FOODHUBBIE-PRO</div>
+                            <div>[INFO] NETWORK ARCHITECTURE: MULTI-TENANT ISOLATED</div>
+                            <div>[INFO] REALTIME DATA SYNC: ACTIVE</div>
+                            <div>[INFO] ENDPOINT: https://food-hubbie-default-rtdb.firebaseio.com</div>
+                            <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 12px 0; padding-top: 12px;"></div>
+                            <div>[AUTH] PERMISSION LEVEL: ROOT_ADMIN</div>
+                            <div>[AUTH] ENCRYPTION: TLS 1.3</div>
+                            <div style="margin-top: 20px; animation: pulse 2s infinite;">>_ Waiting for next telemetry packet...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Rider Modal -->
+    <div id="riderModal" class="auth-overlay hidden" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);">
+        <div class="pro-card" style="width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto;">
+            <div class="table-header">
+                <h3 id="riderModalTitle">Logistics Partner Profile</h3>
+                <button class="btn-pro-icon" onclick="hideRiderModal()"><i data-lucide="x" size="18"></i></button>
+            </div>
+            <form id="riderForm" onsubmit="event.preventDefault(); saveRider();">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left;">
+                    
+                    <div style="grid-column: span 2; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px;">
+                        <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B;">Personal Identity</h4>
+                    </div>
+
+                    <div style="grid-column: span 2;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Full Legal Name</label>
+                        <input type="text" id="riderName" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" placeholder="As per Aadhar" required>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Father's Name</label>
+                        <input type="text" id="riderFatherName" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" placeholder="Guardian Name">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Age (Years)</label>
+                        <input type="number" id="riderAge" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" placeholder="18+">
+                    </div>
+
+                    <div style="grid-column: span 2; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px; margin-top: 10px;">
+                        <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B;">Contact & Credentials</h4>
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Email Address</label>
+                        <input type="email" id="riderEmail" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" required>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Contact Phone</label>
+                        <input type="text" id="riderPhone" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" maxlength="10" required>
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Access Passcode</label>
+                        <input type="password" id="riderPass" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" placeholder="System Entry Code">
+                    </div>
+
+                    <div style="grid-column: span 2; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px; margin-top: 10px;">
+                        <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B;">Verification & Logistics</h4>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Qualification</label>
+                            <select id="riderQual" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;">
+                                <option value="10th">10th Standard</option>
+                                <option value="12th">12th Standard</option>
+                                <option value="Graduate">Graduate</option>
+                                <option value="Post Graduate">Post Graduate</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Aadhar Number</label>
+                        <input type="text" id="riderAadhar" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" maxlength="12" required>
+                    </div>
+
+                    <div style="grid-column: span 2;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Residential Address</label>
+                        <textarea id="riderAddress" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px; height: 80px; resize: none;"></textarea>
+                    </div>
+
+                    <!-- Photo Uploads (KYC Integration) -->
+                    <div style="grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="kyc-upload-box" onclick="document.getElementById('fileProfile').click()" id="boxProfile">
+                            <input type="file" id="fileProfile" style="display: none;" accept="image/*" onchange="previewFile(this, 'boxProfile')">
+                            <i data-lucide="user" size="20" color="#94A3B8"></i>
+                            <p>Profile Photo</p>
+                        </div>
+                        <div class="kyc-upload-box" onclick="document.getElementById('fileAadhar').click()" id="boxAadhar">
+                            <input type="file" id="fileAadhar" style="display: none;" accept="image/*,application/pdf" onchange="previewFile(this, 'boxAadhar')">
+                            <i data-lucide="file-text" size="20" color="#94A3B8"></i>
+                            <p>Aadhar KYC</p>
+                        </div>
+                    </div>
+
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 32px;">
+                    <button type="submit" class="btn-pro" style="flex: 1; justify-content: center; height: 50px;">Finalize Node Integration</button>
+                    <button type="button" class="btn-pro-icon" style="height: 50px; width: 50px;" onclick="hideRiderModal()"><i data-lucide="x" size="18"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>lucide.createIcons();</script>
+    <!-- Outlet Management Modal -->
+    <div id="outletModal" class="auth-overlay hidden" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);">
+        <div class="pro-card" style="width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto;">
+            <div class="table-header">
+                <h3 id="outletModalTitle">Node Management Console</h3>
+                <button class="btn-pro-icon" onclick="hideOutletModal()"><i data-lucide="x" size="18"></i></button>
+            </div>
+            <form id="outletEditForm" onsubmit="event.preventDefault(); updateOutlet();">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left;">
+                    <div style="grid-column: span 2; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px;">
+                        <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B;">Infrastructure Meta</h4>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Shop Name</label>
+                        <input type="text" id="editOutletName" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" required>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Marketplace Slug</label>
+                        <input type="text" id="editOutletSlug" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" required>
+                    </div>
+
+                    <div style="grid-column: span 2; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px; margin-top: 10px;">
+                        <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B;">Location Intelligence</h4>
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Full Address</label>
+                        <input type="text" id="editOutletAddress" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" required>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Latitude</label>
+                        <input type="text" id="editOutletLat" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" required>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Longitude</label>
+                        <input type="text" id="editOutletLng" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" required>
+                    </div>
+
+                    <div style="grid-column: span 2; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px; margin-top: 10px;">
+                        <h4 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #64748B;">Admin Access Control</h4>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Admin Mobile</label>
+                        <input type="text" id="editAdminPhone" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" required>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">New Password (Optional)</label>
+                        <input type="password" id="editAdminPass" class="auth-input" style="letter-spacing: normal; text-align: left; margin-bottom: 0; font-size: 0.95rem; padding: 10px;" placeholder="Leave blank to keep current">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 32px;">
+                    <button type="button" class="btn-pro" style="background: #64748B; flex: 1;" onclick="hideOutletModal()">Cancel</button>
+                    <button type="submit" class="btn-pro" style="flex: 2;">Deploy Node Updates <i data-lucide="refresh-cw" size="18"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import {
   User,
   MapPin,
@@ -15,10 +16,21 @@ import { useOrderContext } from "@/context/OrderContext";
 import { motion } from "framer-motion";
 
 export default function Profile() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, authState } = useAuth();
+  const [, setLocation] = useLocation();
   const { orders } = useOrderContext();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
+
+  // Redirect if not logged in
+  if (authState === "unauthenticated") {
+    setLocation("/login");
+    return null;
+  }
+
+  if (authState === "loading") {
+    return <div className="p-8 text-center">Loading profile...</div>;
+  }
 
   const deliveredOrders = orders.filter((o) => o.status === "Delivered");
   const totalSpent = deliveredOrders.reduce((s, o) => s + o.total, 0);
@@ -59,6 +71,7 @@ export default function Profile() {
           )}
           <button
             data-testid="btn-edit-avatar"
+            title="Edit Avatar"
             className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground w-7 h-7 rounded-full flex items-center justify-center shadow-md"
           >
             <Edit3 className="h-3.5 w-3.5" />
@@ -71,6 +84,8 @@ export default function Profile() {
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                title="Profile Name"
+                placeholder="Your Name"
                 className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
                 data-testid="input-profile-name"
               />
@@ -89,6 +104,7 @@ export default function Profile() {
               <button
                 onClick={() => setIsEditingProfile(true)}
                 data-testid="btn-edit-name"
+                title="Edit Name"
                 className="p-1 hover:bg-muted rounded transition-colors shrink-0"
               >
                 <Edit3 className="h-4 w-4 text-muted-foreground" />

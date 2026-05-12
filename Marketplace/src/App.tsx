@@ -19,6 +19,7 @@ import Checkout from "@/pages/Checkout";
 import Tracking from "@/pages/Tracking";
 import Profile from "@/pages/Profile";
 import Orders from "@/pages/Orders";
+import Login from "@/pages/Login";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ function Router() {
         <Route path="/tracking/:orderId" component={Tracking} />
         <Route path="/profile" component={Profile} />
         <Route path="/orders" component={Orders} />
+        <Route path="/login" component={Login} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

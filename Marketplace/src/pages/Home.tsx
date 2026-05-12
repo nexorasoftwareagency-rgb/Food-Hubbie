@@ -13,17 +13,18 @@ import {
   Salad,
   Sandwich,
   UtensilsCrossed,
+  Star,
+  Quote,
 } from "lucide-react";
 import { fetchOutlets, sortByDistance } from "@/services/outletService";
-import { getBestSellers, getRecommended } from "@/services/menuService";
-import type { Outlet, MenuItem } from "@/types";
+import { getGlobalBestSellers, getGlobalRecommended } from "@/services/menuService";
+import { fetchGlobalReviews } from "@/services/reviewService";
+import type { Outlet, MenuItem, Review } from "@/types";
 import { OutletCard } from "@/components/cards/OutletCard";
 import { FoodCard } from "@/components/cards/FoodCard";
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader";
 import { useLocationContext } from "@/context/LocationContext";
 import { heroBanner } from "@/data/mockData";
-import { mockReviews } from "@/data/mockData";
-import { Star, Quote } from "lucide-react";
 
 const categories = [
   { name: "Pizza", icon: Pizza, color: "bg-red-100 text-red-600" },
@@ -41,16 +42,34 @@ export default function Home() {
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [bestSellers, setBestSellers] = useState<MenuItem[]>([]);
   const [recommended, setRecommended] = useState<MenuItem[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const { state: locationState, requestLocation } = useLocationContext();
 
   useEffect(() => {
-    fetchOutlets().then((data) => {
-      setOutlets(sortByDistance(data));
-      setBestSellers(getBestSellers(4));
-      setRecommended(getRecommended(4));
-      setLoading(false);
-    });
-  }, []);
+    async function loadData() {
+      setLoading(true);
+      try {
+        const data = await fetchOutlets();
+        const sortedOutlets = sortByDistance(data, locationState.coords);
+        setOutlets(sortedOutlets);
+        
+        const [best, reco, revs] = await Promise.all([
+          getGlobalBestSellers(4),
+          getGlobalRecommended(4),
+          fetchGlobalReviews(6)
+        ]);
+        
+        setBestSellers(best);
+        setRecommended(reco);
+        setReviews(revs);
+      } catch (error) {
+        console.error("Home data load error:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [locationState.coords]);
 
   const openOutlets = outlets.filter(
     (o) => o.availability === "open" || o.availability === "busy"
@@ -315,7 +334,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mockReviews.slice(0, 6).map((review, i) => (
+            {reviews.map((review, i) => (
               <motion.div
                 key={review.id}
                 initial={{ opacity: 0, y: 16 }}

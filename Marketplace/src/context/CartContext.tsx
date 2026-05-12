@@ -194,5 +194,3 @@ export function useCart() {
   if (!context) throw new Error("useCart must be used within CartProvider");
   return context;
 }
-
-export { buildCartItemId, computeUnitPrice };

@@ -1,17 +1,17 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from "react";
 import type { Order, OrderStatus } from "@/types";
 import {
-  buildOrder,
   loadOrders,
   persistOrders,
   nextStatus,
+  submitOrder,
   type PlaceOrderInput,
 } from "@/services/orderService";
 
 type OrderContextValue = {
   currentOrder: Order | null;
   orders: Order[];
-  placeOrder: (input: PlaceOrderInput) => string;
+  placeOrder: (input: PlaceOrderInput) => Promise<string>;
   updateOrderStatus: (id: string, status: OrderStatus) => void;
   advanceOrderStatus: (id: string) => void;
   getOrderById: (id: string) => Order | undefined;
@@ -23,15 +23,20 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<Order[]>(() => loadOrders());
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
-  const placeOrder = useCallback((input: PlaceOrderInput): string => {
-    const order = buildOrder(input);
-    setOrders((prev) => {
-      const updated = [order, ...prev];
-      persistOrders(updated);
-      return updated;
-    });
-    setCurrentOrder(order);
-    return order.id;
+  const placeOrder = useCallback(async (input: PlaceOrderInput): Promise<string> => {
+    try {
+      const orderId = await submitOrder(input);
+      
+      const updated = loadOrders();
+      setOrders(updated);
+      
+      const newOrder = updated.find(o => o.id === orderId) || null;
+      setCurrentOrder(newOrder);
+      return orderId;
+    } catch (err) {
+      console.error("OrderContext placeOrder error:", err);
+      throw err;
+    }
   }, []);
 
   const updateOrderStatus = useCallback(
@@ -66,7 +71,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       const order = orders.find((o) => o.id === id);
       if (!order) return;
       const next = nextStatus(order.status);
-      if (next) updateOrderStatus(id, next);
+      if (next) updateOrderStatus(id, next as any);
     },
     [orders, updateOrderStatus]
   );

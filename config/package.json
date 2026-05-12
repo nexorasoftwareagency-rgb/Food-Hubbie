@@ -1,0 +1,6 @@
+{
+  "name": "@foodhubbie/config",
+  "version": "1.0.0",
+  "description": "Global configuration and constants for Foodhubbie SaaS",
+  "main": "index.js"
+}

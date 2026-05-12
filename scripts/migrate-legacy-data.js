@@ -3,7 +3,7 @@
  * FOODHUBBIE SAAS — Real Data Migration Script
  * ============================================================
  * Migrates Roshani Pizza and Roshani Cake data from the legacy
- * project (prashant-pizza-e86e4) to the new SaaS project (food-hubbie).
+ * project (LEGACY_PROJECT) to the new SaaS project (food-hubbie).
  * 
  * RUNNING THIS:
  *   node scripts/migrate-legacy-data.js [--live]
@@ -22,7 +22,7 @@ const BUSINESS_ID = "business_roshani";
 const LEGACY_SA_PATH = path.join(__dirname, '../service-account.json');
 const NEW_SA_PATH = path.join(__dirname, '../food-hubbie-firebase-adminsdk-fbsvc-4b2c8e7f78.json');
 
-const LEGACY_DB_URL = "https://prashant-pizza-e86e4-default-rtdb.firebaseio.com";
+const LEGACY_DB_URL = ""; // Legacy URL removed
 const NEW_DB_URL = "https://food-hubbie-default-rtdb.firebaseio.com";
 
 // ─── Initialize Apps ──────────────────────────────────────

@@ -134,8 +134,11 @@ export type OrderItem = {
 export type DeliveryAddress = {
   name: string;
   phone: string;
+  email?: string;
   address: string;
   landmark?: string;
+  lat: number;
+  lng: number;
   coords?: Coordinates;
 };
 

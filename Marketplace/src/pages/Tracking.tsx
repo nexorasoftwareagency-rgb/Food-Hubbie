@@ -55,7 +55,7 @@ export default function Tracking() {
           clearInterval(advance);
           return prev;
         }
-        const nextStatus = STATUS_PIPELINE[prev + 1];
+        const nextStatus = STATUS_PIPELINE[prev + 1] as any;
         updateOrderStatus(order.id, nextStatus);
         return prev + 1;
       });
@@ -84,7 +84,7 @@ export default function Tracking() {
   }
 
   const isDelivered = order.status === "Delivered";
-  const stages = STATUS_PIPELINE.filter((s) => s !== "Cancelled");
+  const stages = STATUS_PIPELINE.filter((s: string) => s !== "Cancelled");
 
   return (
     <div className="min-h-screen bg-background">
@@ -140,7 +140,7 @@ export default function Tracking() {
         {/* Timeline */}
         <div className="bg-card rounded-3xl border border-border shadow-sm p-6">
           <div className="relative">
-            {stages.map((stage, idx) => {
+            {stages.map((stage: string, idx: number) => {
               const isCompleted = idx <= currentIdx;
               const isCurrent = idx === currentIdx;
               const isLast = idx === stages.length - 1;

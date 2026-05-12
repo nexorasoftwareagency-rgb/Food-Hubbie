@@ -1,4 +1,25 @@
 {
+  "name": "foodhubbie-saas",
+  "version": "1.0.0",
+  "description": "Foodhubbie — Multi-Tenant Restaurant SaaS Platform",
+  "private": true,
+  "workspaces": [
+    "ShopAdmin",
+    "RiderApp",
+    "Marketplace",
+    "SuperAdmin",
+    "bot",
+    "shared",
+    "config"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev:bot": "cd bot && npm run dev",
+    "dev:marketplace": "cd Marketplace && npm run dev",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:rules": "firebase deploy --only database,storage",
+    "test:path-resolution": "node scripts/test-paths.js"
+  },
   "dependencies": {
     "firebase-admin": "^13.9.0"
   }

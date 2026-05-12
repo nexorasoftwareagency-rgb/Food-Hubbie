@@ -9,6 +9,11 @@ import { calcCartSummary } from "@/services/cartService";
 import { deliveryFeeLabel } from "@/lib/deliveryFee";
 import type { PaymentMethod, DeliveryAddress } from "@/types";
 import { Link } from "wouter";
+import { useLocationContext } from "@/context/LocationContext";
+import { FcGoogle } from "react-icons/fc";
+import { fetchOutletById } from "@/services/outletService";
+import { useEffect } from "react";
+import type { Outlet } from "@/types";
 
 const paymentMethods: { id: PaymentMethod; name: string; icon: typeof ShieldCheck }[] = [
   { id: "upi", name: "UPI", icon: ShieldCheck },
@@ -20,27 +25,39 @@ const paymentMethods: { id: PaymentMethod; name: string; icon: typeof ShieldChec
 export default function Checkout() {
   const { state: cartState, dispatch: cartDispatch } = useCart();
   const { placeOrder } = useOrderContext();
-  const { user } = useAuth();
+  const { user, signInWithGoogle, authState } = useAuth();
+  const { state: locationState } = useLocationContext();
   const [, setLocation] = useLocation();
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [isProcessing, setIsProcessing] = useState(false);
   const [upiId, setUpiId] = useState("");
+  const [outlet, setOutlet] = useState<Outlet | null>(null);
+
+  useEffect(() => {
+    if (cartState.outletId) {
+       fetchOutletById(cartState.outletId).then(setOutlet);
+    }
+  }, [cartState.outletId]);
 
   const [form, setForm] = useState<DeliveryAddress>({
     name: user?.name ?? "",
     phone: user?.phone ?? "",
+    email: user?.email ?? "",
     address:
-      user?.savedAddresses.find((a) => a.isDefault)?.address ?? "",
+      user?.savedAddresses.find((a) => a.isDefault)?.address ?? locationState.address ?? "",
     landmark: user?.savedAddresses.find((a) => a.isDefault)?.landmark ?? "",
+    lat: locationState.coords?.lat ?? 0,
+    lng: locationState.coords?.lng ?? 0,
   });
 
-  const summary = calcCartSummary(cartState.items, cartState.outletId);
+  const summary = calcCartSummary(cartState.items, outlet);
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
+    if (!user) return;
     setIsProcessing(true);
-    setTimeout(() => {
-      const orderId = placeOrder({
+    try {
+      const orderId = await placeOrder({
         outletId: cartState.outletId ?? "",
         items: cartState.items,
         subtotal: summary.subtotal,
@@ -50,9 +67,15 @@ export default function Checkout() {
         paymentMethod,
         deliveryAddress: form,
       });
+      
       cartDispatch({ type: "CLEAR_CART" });
       setLocation(`/tracking/${orderId}`);
-    }, 1600);
+    } catch (err) {
+      console.error("Checkout error:", err);
+      alert("Something went wrong while placing your order. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (cartState.items.length === 0 && !isProcessing) {
@@ -61,6 +84,28 @@ export default function Checkout() {
         <p className="text-muted-foreground mb-4">No items to checkout.</p>
         <Link href="/" className="text-primary font-bold">
           Go Home
+        </Link>
+      </div>
+    );
+  }
+
+  if (authState === "unauthenticated") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6">
+          <ShieldCheck className="h-8 w-8 text-primary" />
+        </div>
+        <h2 className="text-2xl font-heading font-bold mb-2">Secure Checkout</h2>
+        <p className="text-muted-foreground mb-8 max-w-xs">Please sign in to your account to place your order securely.</p>
+        <button
+          onClick={() => signInWithGoogle()}
+          className="w-full max-w-xs bg-background border border-border py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-sm hover:bg-muted/50 transition-all"
+        >
+          <FcGoogle className="h-6 w-6" />
+          <span>Continue with Google</span>
+        </button>
+        <Link href="/cart" className="mt-6 text-sm text-muted-foreground hover:text-primary font-medium">
+          Return to Cart
         </Link>
       </div>
     );
@@ -134,6 +179,8 @@ export default function Checkout() {
                           setForm((prev) => ({ ...prev, [key]: e.target.value }))
                         }
                         data-testid={`input-${key}`}
+                        title={label}
+                        placeholder={label}
                         className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
                       />
                     </div>
@@ -149,6 +196,8 @@ export default function Checkout() {
                           setForm((prev) => ({ ...prev, [key]: e.target.value }))
                         }
                         data-testid={`input-${key}`}
+                        title={label}
+                        placeholder={label}
                         className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                     </div>

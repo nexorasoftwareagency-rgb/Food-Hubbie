@@ -29,7 +29,7 @@ export default function OutletDetails() {
   const [loading, setLoading] = useState(true);
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [activeCategory, setActiveCategory] = useState("Recommended");
+  const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function OutletDetails() {
     fetchFn.then((o) => {
       setOutlet(o);
       if (o) {
-        fetchMenuByOutlet(o.id).then((items) => {
+        fetchMenuByOutlet(o.id, o.businessId).then((items) => {
           setMenuItems(items);
           setLoading(false);
         });
@@ -53,6 +53,7 @@ export default function OutletDetails() {
   }, [identifier]);
 
   const categories = [
+    "All",
     "Recommended",
     "Best Sellers",
     ...getCategories(menuItems),

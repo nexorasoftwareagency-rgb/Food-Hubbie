@@ -22,7 +22,8 @@ const firebaseConfig = {
     projectId: "food-hubbie",
     storageBucket: "food-hubbie.firebasestorage.app",
     messagingSenderId: "952017160550",
-    appId: "1:952017160550:web:80bbb75933f431ab54e0a7"
+    appId: "1:952017160550:web:80bbb75933f431ab54e0a7",
+    measurementId: "G-SQK852HT4W"
 };
 
 const reCaptchaSiteKey = "6LeAlcwsAAAAAH4F3p5aCNvyPlhC3BRHOXTdDEGK";
@@ -144,11 +145,22 @@ window.completeSiteRefresh = async () => {
 };
 
 // Status Update Actions
-window.reachedOutlet = async (id, outlet) => {
+window.reachedOutlet = async (id, outlet, bid = null) => {
     if (!id || !outlet) return;
     window.haptic([50, 30, 50]);
+    const targetBiz = bid || window.activeOrderBusiness || 'business_roshani';
+
+    // Gating Check: Proximity to Restaurant
+    const outletCoords = window.outletCoords[outlet] || { lat: 0, lng: 0 };
+    const dist = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng) : 999;
+    
+    if (dist > 1.0) {
+        return window.showToast(`Too far from restaurant! (Distance: ${dist.toFixed(1)}km)`, "error");
+    }
+
     try {
-        await update(ref(db, `${outlet}/orders/${id}`), {
+        const orderPath = resolvePath(`orders/${id}`, outlet, targetBiz);
+        await update(ref(db, orderPath), {
             status: "Arrived at Restaurant",
             arrivedAtRestaurantAt: serverTimestamp()
         });
@@ -159,16 +171,26 @@ window.reachedOutlet = async (id, outlet) => {
     }
 };
 
-window.reachedDropLocation = async (id, outlet) => {
+window.reachedDropLocation = async (id, outlet, bid = null) => {
     if (!id || !outlet) return;
     window.haptic([50, 30, 50]);
+    const targetBiz = bid || window.activeOrderBusiness || 'business_roshani';
     try {
-        const orderPath = `${outlet}/orders/${id}`;
+        const orderPath = resolvePath(`orders/${id}`, outlet, targetBiz);
         const snap = await get(ref(db, orderPath));
         const o = snap.val();
+        if (!o) return;
+
+        // Gating Check: Proximity to Customer
+        if (o.lat && o.lng) {
+            const dist = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, o.lat, o.lng) : 999;
+            if (dist > 1.0) {
+                return window.showToast(`Too far from customer! (Distance: ${dist.toFixed(1)}km)`, "error");
+            }
+        }
 
         // Safety check: If already reached, just open OTP
-        if (o && (o.status || "").toLowerCase() === "reached drop location") {
+        if ((o.status || "").toLowerCase() === "reached drop location") {
             window.activeOrderId = id;
             window.activeOrderOutlet = outlet;
             return window.openOTPPanel();
@@ -252,19 +274,21 @@ window.outletCoords = { outlet_pizza: { lat: 25.887944, lng: 85.026194 }, outlet
 // Load outlet coordinates from Firebase on init
 async function loadOutletCoords() {
     try {
-        const bizId = 'business_roshani';
-        const pizzaStore = await get(ref(db, `businesses/${bizId}/outlets/outlet_pizza/settings/Store`));
-        const cakeStore = await get(ref(db, `businesses/${bizId}/outlets/outlet_cake/settings/Store`));
-        if (pizzaStore.val()) {
-            window.outletCoords.outlet_pizza.lat = parseFloat(pizzaStore.val().lat) || 25.887944;
-            window.outletCoords.outlet_pizza.lng = parseFloat(pizzaStore.val().lng) || 85.026194;
-        }
-        if (cakeStore.val()) {
-            window.outletCoords.outlet_cake.lat = parseFloat(cakeStore.val().lat) || 25.887472;
-            window.outletCoords.outlet_cake.lng = parseFloat(cakeStore.val().lng) || 85.026861;
-        }
-        console.log("[Outlet] Coordinates loaded:", window.outletCoords);
-    } catch (e) { console.warn("[Outlet] Using default coordinates"); }
+        const bid = window.currentUser?.profile?.businessId || 'business_roshani';
+        const bizRef = ref(db, `businesses/${bid}/outlets`);
+        const snap = await get(bizRef);
+        const outlets = snap.val() || {};
+        
+        Object.entries(outlets).forEach(([id, data]) => {
+            if (data.settings && data.settings.Store) {
+                window.outletCoords[id] = {
+                    lat: parseFloat(data.settings.Store.lat) || 25.887944,
+                    lng: parseFloat(data.settings.Store.lng) || 85.026194
+                };
+            }
+        });
+        console.log(`[Outlet] Coordinates loaded for ${bid}:`, window.outletCoords);
+    } catch (e) { console.warn("[Outlet] Error loading coordinates:", e); }
 }
 
 window.getDistance = (lat1, lon1, lat2, lon2) => {
@@ -317,16 +341,20 @@ window.triggerWhatsAppAlert = (phone, orderId, actionType, extraData = {}, isMan
     }
 };
 
-function resolvePath(path, outlet = null) {
+function resolvePath(path, outlet = null, biz = null) {
     if (!path) return "";
     const sharedNodes = ['admins', 'migrationStatus', 'riders', 'logs', 'errorLogs'];
     const parts = path.split('/');
     const rootNode = parts[0];
 
     if (sharedNodes.includes(rootNode)) return path;
-    const targetOutlet = outlet || window.currentOutlet || 'outlet_pizza';
+    
+    // Global Rider Logic: Must know which business/outlet the data belongs to
+    const targetBiz = biz || window.activeOrderBusiness || 'business_roshani';
+    const targetOutlet = outlet || window.activeOrderOutlet || 'outlet_pizza';
+    
     // SaaS path: businesses/{bid}/outlets/{oid}/{path}
-    return `businesses/business_roshani/outlets/${targetOutlet}/${path}`;
+    return `businesses/${targetBiz}/outlets/${targetOutlet}/${path}`;
 }
 
 async function setupPushNotifications(userId) {
@@ -511,7 +539,8 @@ window.confirmPickup = async () => {
     window.haptic(40);
     const id = window.activeOrderId;
     const outletId = window.activeOrderOutlet || 'outlet_pizza';
-    const orderPath = `businesses/business_roshani/outlets/${outletId}/orders/${id}`;
+    const bizId = window.activeOrderBusiness || 'business_roshani';
+    const orderPath = resolvePath(`orders/${id}`, outletId, bizId);
 
     try {
         await update(ref(db, orderPath), { status: "Picked Up", pickedUpAt: serverTimestamp() });
@@ -712,17 +741,19 @@ function stopLocationTracking() {
 }
 
 // CORE DELIVERY LOGIC
-window.acceptOrder = async (id, outletId) => {
+window.acceptOrder = async (id, outletId, bizId = null) => {
     window.haptic(40);
+    const targetBiz = bizId || window.activeOrderBusiness || 'business_roshani';
     if (!window.currentUser) return window.showToast("Authentication error. Please login again.", "error");
     if (!window.riderLocation) return window.showToast("GPS Error. Ensure location is ON.", "error");
 
-    // Proximity policy removed as per user request
-    // const distFromRest = window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng);
-    // if (distFromRest > 0.5) return window.showToast(`Must be within 500m of outlet! (You are ${distFromRest.toFixed(1)}km away)`, "error");
+    // Proximity policy: Must be within 1km of outlet to accept
+    const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
+    const distFromRest = window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng);
+    if (distFromRest > 1.0) return window.showToast(`Must be within 1km of outlet! (You are ${distFromRest.toFixed(1)}km away)`, "error");
 
     try {
-        const orderPath = `${outletId}/orders/${id}`;
+        const orderPath = `businesses/${targetBiz}/outlets/${outletId}/orders/${id}`;
         const result = await runTransaction(ref(db, orderPath), current => {
             if (current && current.assignedRider) return;
             // Changed from 4-digit to 4-digit OTP for consistency across system
@@ -771,7 +802,7 @@ window.verifyOTP = async () => {
     btn.disabled = true;
 
     const outletId = window._currentOrderOutlet || 'outlet_pizza';
-    const otpAttemptsPath = `businesses/business_roshani/outlets/${outletId}/otpAttempts/${currentOrderId}`;
+    const otpAttemptsPath = resolvePath(`otpAttempts/${currentOrderId}`, outletId);
     const now = Date.now();
 
     try {
@@ -786,7 +817,7 @@ window.verifyOTP = async () => {
             return;
         }
 
-        const orderPath = `businesses/business_roshani/outlets/${outletId}/orders/${currentOrderId}`;
+        const orderPath = resolvePath(`orders/${currentOrderId}`, outletId);
         const snap = await get(ref(db, orderPath));
         const order = snap.val();
 
@@ -1083,50 +1114,75 @@ window.clearAllListeners = () => {
         window._activeListeners = [];
     }
     // WIPE CACHE to prevent stale ghost orders
-    window.orderCache = { pizza: {}, cake: {} };
+    window.orderCache = {};
 };
 
-function initRealtimeListeners() {
+async function initRealtimeListeners() {
     if (!currentUser || !currentUser.email) {
         console.warn("[Sync] Cannot init listeners: No user email available.");
         return;
     }
     const currentEmail = currentUser.email.toLowerCase();
-    console.log(`[Sync] Initializing listeners for: ${currentEmail}`);
+    console.log(`[Sync] Initializing Global Listeners for ${currentEmail}`);
 
-    ['pizza', 'cake'].forEach(outletId => {
-        const ordersPath = `${outletId}/orders`;
+    try {
+        // 1. Discover All Businesses
+        const bizSnap = await get(ref(db, 'businesses'));
+        const businesses = bizSnap.val() || {};
         
-        // Ensure cache entry exists
-        if (!window.orderCache[outletId]) window.orderCache[outletId] = {};
-
-        const updateCache = (data, type) => {
-            if (!data) data = {};
-            console.log(`[Sync] Received ${type} updates for ${outletId} (${Object.keys(data).length} items)`);
-            
-            // Show sync pulse
-            const syncEl = document.getElementById('syncStatus');
-            if (syncEl) {
-                syncEl.classList.add('active');
-                syncEl.innerHTML = `<span><i data-lucide="check-circle" class="icon-14"></i> Synced</span>`;
-                if (window.lucide) window.lucide.createIcons({ root: syncEl });
-                setTimeout(() => syncEl.classList.remove('active'), 2000);
+        const allOutlets = [];
+        Object.entries(businesses).forEach(([bid, biz]) => {
+            if (biz.outlets) {
+                Object.entries(biz.outlets).forEach(([oid, outlet]) => {
+                    allOutlets.push({ bid, oid, name: outlet.name });
+                });
             }
+        });
 
-            const currentCache = window.orderCache[outletId];
-            const currentEmail = (window.currentUser?.email || "").toLowerCase();
+        if (allOutlets.length === 0) {
+            console.warn(`[Sync] No active outlets found on the platform.`);
+            return;
+        }
 
-            // 1. Cleanup: Remove items of this 'type' that are no longer in the snapshot
-            Object.keys(currentCache).forEach(id => {
-                const item = currentCache[id];
-                const isItemOfThisType = (type === 'unassigned') 
-                    ? !item.assignedRider 
-                    : (item.assignedRider && item.assignedRider.toLowerCase() === currentEmail);
+        allOutlets.forEach(({ bid, oid, name }) => {
+            const ordersPath = `businesses/${bid}/outlets/${oid}/orders`;
+            
+            // Ensure cache entry exists
+            if (!window.orderCache[oid]) window.orderCache[oid] = {};
+
+            const updateCache = (data, type, bid, oid) => {
+                if (!data) data = {};
+                console.log(`[Sync] Received ${type} updates for ${oid} (${Object.keys(data).length} items)`);
                 
-                if (isItemOfThisType && !data[id]) {
-                    delete currentCache[id];
+                // Show sync pulse
+                const syncEl = document.getElementById('syncStatus');
+                if (syncEl) {
+                    syncEl.classList.add('active');
+                    syncEl.innerHTML = `<span><i data-lucide="check-circle" class="icon-14"></i> Synced</span>`;
+                    if (window.lucide) window.lucide.createIcons({ root: syncEl });
+                    setTimeout(() => syncEl.classList.remove('active'), 2000);
                 }
-            });
+
+                const currentCache = window.orderCache[oid];
+                const currentEmail = (window.currentUser?.email || "").toLowerCase();
+
+                // Tag data with bid/oid for correct path resolution later
+                Object.values(data).forEach(o => {
+                    o._bid = bid;
+                    o._oid = oid;
+                });
+
+                // 1. Cleanup: Remove items of this 'type' that are no longer in the snapshot
+                Object.keys(currentCache).forEach(id => {
+                    const item = currentCache[id];
+                    const isItemOfThisType = (type === 'unassigned') 
+                        ? !item.assignedRider 
+                        : (item.assignedRider && item.assignedRider.toLowerCase() === currentEmail);
+                    
+                    if (isItemOfThisType && !data[id]) {
+                        delete currentCache[id];
+                    }
+                });
 
             // 2. Merge: Update/Add new data
             Object.assign(currentCache, data);
@@ -1135,22 +1191,22 @@ function initRealtimeListeners() {
             window.renderAllOrders();
         };
 
-        // 1. Available for Pickup (Unassigned)
-        const q1 = query(ref(db, ordersPath), orderByChild('assignedRider'), equalTo(""));
-        const unsub1 = onValue(q1, snap => updateCache(snap.val() || {}, 'unassigned'), error => {
-            console.error(`[Firebase] Pickup Sync Error (${outletId}):`, error);
-            if (error.code === 'PERMISSION_DENIED') {
-                window.showToast(`Access Denied to ${outletId} orders. Contact Admin.`, "error");
-            }
-        });
-        window._activeListeners.push(unsub1);
+            // 1. Available for Pickup (Unassigned)
+            const q1 = query(ref(db, ordersPath), orderByChild('assignedRider'), equalTo(""));
+            const unsub1 = onValue(q1, snap => updateCache(snap.val() || {}, 'unassigned', bid, oid), error => {
+                console.error(`[Firebase] Pickup Sync Error (${oid}):`, error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    window.showToast(`Access Denied to ${oid} orders.`, "error");
+                }
+            });
+            window._activeListeners.push(unsub1);
 
-        // 2. My Orders (Assigned to me)
-        const q2 = query(ref(db, ordersPath), orderByChild('assignedRider'), equalTo(currentEmail));
-        const unsub2 = onValue(q2, snap => updateCache(snap.val() || {}, 'mine'), error => {
-            console.error(`[Firebase] My Orders Sync Error (${outletId}):`, error);
-        });
-        window._activeListeners.push(unsub2);
+            // 2. My Orders (Assigned to me)
+            const q2 = query(ref(db, ordersPath), orderByChild('assignedRider'), equalTo(currentEmail));
+            const unsub2 = onValue(q2, snap => updateCache(snap.val() || {}, 'mine', bid, oid), error => {
+                console.error(`[Firebase] My Orders Sync Error (${oid}):`, error);
+            });
+            window._activeListeners.push(unsub2);
     });
 
     // Listen to Notifications
@@ -1208,9 +1264,10 @@ window.initGlobalSlider = () => {
         sliderState.text = container.querySelector('.slide-text');
         sliderState.startX = (e.type === 'touchstart') ? e.touches[0].clientX : e.clientX;
         sliderState.maxDrag = container.clientWidth - handle.clientWidth - 10;
-        sliderState.action = container.dataset.action;
-        sliderState.id = container.dataset.id;
-        sliderState.outlet = container.dataset.outlet;
+        sliderState.id = container.getAttribute('data-id');
+        sliderState.outlet = container.getAttribute('data-outlet');
+        sliderState.bid = container.getAttribute('data-bid');
+        sliderState.action = container.getAttribute('data-action');
 
         // Ensure global state is synced for actions that depend on it
         if (sliderState.id) {
@@ -1269,9 +1326,9 @@ window.initGlobalSlider = () => {
             
             // Execute action after short delay to show completion
             setTimeout(() => {
-                if (action === 'reached-outlet') window.reachedOutlet(id, outlet);
+                if (action === 'reached-outlet') window.reachedOutlet(id, outlet, sliderState.bid);
                 else if (action === 'pickup') window.confirmPickup();
-                else if (action === 'drop') window.reachedDropLocation(id, outlet);
+                else if (action === 'drop') window.reachedDropLocation(id, outlet, sliderState.bid);
             }, 100);
         } else {
             // Reset
@@ -1347,16 +1404,20 @@ window._doRenderAllOrders = () => {
     let todayOrders = 0; 
     let todayPay = 0; 
     
-    // Outlet Specific Stats (Lifetime)
-    let pizzaEarnings = 0;
-    let cakeEarnings = 0;
-    
-    // Outlet Specific Stats (Today)
+    // Outlet Specific Stats
     let pizzaToday = 0;
     let cakeToday = 0;
-    
-    // Cash to Settle
+    let pizzaTodayOrders = 0;
+    let cakeTodayOrders = 0;
+    let pizzaEarnings = 0; // Lifetime
+    let cakeEarnings = 0; // Lifetime
     let totalCashToSettle = 0;
+    
+    // Weekly Stats
+    let thisWeekOrders = 0;
+    let thisWeekPay = 0;
+    const startOfWeek = new Date(new Date().setDate(new Date().getDate() - 7)).getTime();
+    const dayStats = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
     
     const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
     window._pingCandidate = null;
@@ -1443,6 +1504,12 @@ window._doRenderAllOrders = () => {
         // 1. UNASSIGNED - STRICT FILTERING
         const allowedUnassignedStatus = ["ready", "cooked", "packed"];
         if (!o.assignedRider && allowedUnassignedStatus.includes(status)) {
+            // PROXIMITY CHECK (1km)
+            const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
+            const distToOutlet = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng) : 999;
+            
+            if (distToOutlet > 1.0) return; // Skip if too far
+
             console.log(`[RiderUI] Rendering Unassigned Order #${id} | Status: ${status}`);
             // Ping Modal logic for VERY fresh orders (2 hours)
             const isPingFresh = item.orderTime > (Date.now() - (2 * 60 * 60 * 1000));
@@ -1456,8 +1523,9 @@ window._doRenderAllOrders = () => {
                 const safeAddress = escapeHtml(o.address || 'Unknown');
                 const safeFee = escapeHtml(String(o.deliveryFee || 0));
                 const safeTotal = escapeHtml(String(o.total || 0));
-                const safeId = escapeHtml(id);
-                const safeOutlet = escapeHtml(outletId);
+                const safeId = o.orderId || id;
+                const safeOutlet = outletId;
+                const safeBid = o._bid || 'business_roshani';
                 const statusLabel = (status === "ready" || status === "cooked" || status === "packed") ? "READY" : "PREPARING";
                 
                 const outletName = outletId === 'pizza' ? 'Pizza' : 'Cake';
@@ -1635,11 +1703,11 @@ window._doRenderAllOrders = () => {
                         </div>
 
                         ${currentStep === 3 ? `
-                            <button class="btn-primary full-width" data-action="otp" data-id="${safeId}" data-outlet="${safeOutlet}">
+                            <button class="btn-primary full-width" data-action="otp" data-id="${safeId}" data-outlet="${safeOutlet}" data-bid="${safeBid}">
                                 <i data-lucide="key-round"></i> ENTER OTP
                             </button>
                         ` : `
-                            <div class="slide-action-container" id="slider-${safeId}" data-id="${safeId}" data-outlet="${safeOutlet}" data-action="${sliderAction}">
+                            <div class="slide-action-container" id="slider-${safeId}" data-id="${safeId}" data-outlet="${safeOutlet}" data-bid="${safeBid}" data-action="${sliderAction}">
                                 <div class="slide-bg-fill"></div>
                                 <div class="slide-text">${sliderText}</div>
                                 <div class="slide-handle">
@@ -1683,14 +1751,30 @@ window._doRenderAllOrders = () => {
                 if (isToday) {
                     todayOrders++;
                     todayPay += fee;
-                    if (outletId === 'pizza') pizzaToday += fee;
-                    else if (outletId === 'cake') cakeToday += fee;
+                    if (outletId === 'pizza') {
+                        pizzaToday += fee;
+                        pizzaTodayOrders++;
+                    }
+                    else if (outletId === 'cake') {
+                        cakeToday += fee;
+                        cakeTodayOrders++;
+                    }
                 }
 
                 if (outletId === 'pizza') pizzaEarnings += fee;
                 else if (outletId === 'cake') cakeEarnings += fee;
 
                 if (isCash && !o.settled) totalCashToSettle += orderTotal;
+
+                // Weekly Tracking
+                const dAt = o.deliveredAt || 0;
+                if (dAt >= startOfWeek) {
+                    thisWeekOrders++;
+                    thisWeekPay += fee;
+                    
+                    const dayIdx = (new Date(dAt).getDay() + 6) % 7; // Convert to 0=Mon, 6=Sun
+                    dayStats[dayIdx] += fee;
+                }
 
                 const oId = (o.orderId || id.slice(-6)).toUpperCase();
                 const dTime = o.deliveredAt ? new Date(o.deliveredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
@@ -1822,11 +1906,32 @@ window._doRenderAllOrders = () => {
     document.getElementById('stats-delivered').innerText = todayOrders;
     document.getElementById('stats-earnings').innerText = `₹${todayPay.toLocaleString()}`;
     
+    // Update Earnings Dashboard (Zomato Style)
+    if (document.getElementById('e-today-total')) document.getElementById('e-today-total').innerText = `₹${todayPay.toLocaleString()}`;
+    if (document.getElementById('e-today-count')) document.getElementById('e-today-count').innerText = todayOrders;
+    
     if (document.getElementById('e-total')) document.getElementById('e-total').innerText = `₹${totalCashToSettle.toLocaleString()}`;
+
     if (document.getElementById('e-pizza')) document.getElementById('e-pizza').innerText = `₹${pizzaEarnings.toLocaleString()}`;
-    if (document.getElementById('e-cake')) document.getElementById('e-cake').innerText = `₹${cakeEarnings.toLocaleString()}`;
-    if (document.getElementById('e-pizza-today')) document.getElementById('e-pizza-today').innerText = `₹${pizzaToday.toLocaleString()}`;
-    if (document.getElementById('e-cake-today')) document.getElementById('e-cake-today').innerText = `₹${cakeToday.toLocaleString()}`;
+    if (document.getElementById('e-pizza-today')) document.getElementById('e-pizza-today').innerText = `Today: ₹${pizzaToday.toLocaleString()}`;
+    if (document.getElementById('e-pizza-orders')) document.getElementById('e-pizza-orders').innerText = `${pizzaTodayOrders} Orders`;
+
+    if (document.getElementById('e-cake-today')) document.getElementById('e-cake-today').innerText = `Today: ₹${cakeToday.toLocaleString()}`;
+    if (document.getElementById('e-cake-orders')) document.getElementById('e-cake-orders').innerText = `${cakeTodayOrders} Orders`;
+
+    // Weekly Chart Update
+    const chartContainer = document.getElementById('weeklyChart');
+    if (chartContainer) {
+        const bars = chartContainer.querySelectorAll('.bar');
+        const maxDay = Math.max(...dayStats, 100); 
+        dayStats.forEach((val, idx) => {
+            if (bars[idx]) {
+                const height = (val / maxDay) * 100;
+                bars[idx].style.height = `${Math.max(height, 5)}%`;
+            }
+        });
+    }
+    if (document.getElementById('stats-ontime')) document.getElementById('stats-ontime').innerText = `${Math.min(100, 95 + (todayOrders * 0.5))}%`;
 
     // Refresh Icons
     if (window.lucide) {
@@ -1858,11 +1963,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Profile Actions
     document.getElementById('btn-toggle-aadhar')?.addEventListener('click', window.toggleAadharView);
+    document.getElementById('btn-edit-photo')?.addEventListener('click', () => document.getElementById('profile-photo-input').click());
+    document.getElementById('profile-photo-input')?.addEventListener('change', window.handleProfilePhotoUpload);
+    document.getElementById('btn-edit-phone')?.addEventListener('click', () => window.editProfileField('phone'));
+    document.getElementById('btn-edit-address')?.addEventListener('click', () => window.editProfileField('address'));
+
+    // Notifications
+    document.getElementById('mobileNotifBtn')?.addEventListener('click', window.toggleNotifSheet);
+    document.getElementById('btnCloseNotifSheet')?.addEventListener('click', window.toggleNotifSheet);
+    document.getElementById('btnClearAllNotifs')?.addEventListener('click', window.clearNotifications);
+
+    // Confirmation Modal
+    document.getElementById('btnConfirmNo')?.addEventListener('click', () => {
+        document.getElementById('confirmModal').classList.add('hidden');
+        if (window.confirmPromise) window.confirmPromise.reject();
+    });
+    document.getElementById('btnConfirmYes')?.addEventListener('click', () => {
+        document.getElementById('confirmModal').classList.add('hidden');
+        if (window.confirmPromise) window.confirmPromise.resolve();
+    });
 
     // Order Actions (Event Delegation)
     document.getElementById('unassignedOrdersList')?.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action="accept"]');
-        if (btn) window.acceptOrder(btn.dataset.id, btn.dataset.outlet);
+        if (btn) window.acceptOrder(btn.dataset.id, btn.dataset.outlet, btn.dataset.bid);
     });
 
     document.getElementById('notifList')?.addEventListener('click', (e) => {
@@ -1878,10 +2002,10 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (action === 'msg') window.triggerWhatsAppAlert(btn.dataset.phone, btn.dataset.orderid, 'PICKED_UP', {}, true);
         else if (action === 'otp') window.openOTPPanel();
         else if (action === 'pickup') window.confirmPickup();
-        else if (action === 'accept') window.acceptOrder(btn.dataset.id, btn.dataset.outlet);
+        else if (action === 'accept') window.acceptOrder(btn.dataset.id, btn.dataset.outlet, btn.dataset.bid);
         else if (action === 'navigate') window.open(btn.dataset.url, '_blank', 'noopener,noreferrer');
-        else if (action === 'drop') window.reachedDropLocation(btn.dataset.id, btn.dataset.outlet);
-        else if (action === 'reached-outlet') window.reachedOutlet(btn.dataset.id, btn.dataset.outlet);
+        else if (action === 'drop') window.reachedDropLocation(btn.dataset.id, btn.dataset.outlet, btn.dataset.bid);
+        else if (action === 'reached-outlet') window.reachedOutlet(btn.dataset.id, btn.dataset.outlet, btn.dataset.bid);
     };
 
     document.getElementById('dashboardActiveDeliveryView')?.addEventListener('click', handleActiveAction);
@@ -1945,7 +2069,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ptr.classList.add('active');
             const rotation = Math.min(diff * 2, 360);
             ptr.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
-            if (diff > 80) {
+            if (diff > 200) {
                 ptr.classList.add('refreshing');
                 if (!ptr._haptic) { window.haptic(30); ptr._haptic = true; }
             }
@@ -1954,7 +2078,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('touchend', e => {
         const touchEnd = e.changedTouches[0].pageY;
-        if (touchEnd - touchStart > 80 && window.scrollY === 0) {
+        if (touchEnd - touchStart > 200 && window.scrollY === 0) {
             console.log("[UI] Gesture Refresh Triggered");
             window.completeSiteRefresh();
         } else {

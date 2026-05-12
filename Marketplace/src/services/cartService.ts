@@ -4,7 +4,6 @@
 
 import type { CartItem, Outlet } from "@/types";
 import { calcDeliveryFee } from "@/lib/deliveryFee";
-import { mockOutlets } from "@/data/mockData";
 
 export const GST_RATE = 0.05; // 5% GST
 
@@ -19,20 +18,17 @@ export type CartSummary = {
 /** Calculate the full bill summary for the cart */
 export function calcCartSummary(
   items: CartItem[],
-  outletId: string | null,
+  outlet: Outlet | null,
   couponDiscount = 0
 ): CartSummary {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   let deliveryFee = 0;
-  if (outletId) {
-    const outlet = mockOutlets.find((o) => o.id === outletId);
-    if (outlet) {
-      deliveryFee = calcDeliveryFee(
-        outlet.distanceKm,
-        outlet.deliveryFeeStructure
-      );
-    }
+  if (outlet) {
+    deliveryFee = calcDeliveryFee(
+      outlet.distanceKm,
+      outlet.deliveryFeeStructure
+    );
   }
 
   const discountedSubtotal = Math.max(0, subtotal - couponDiscount);

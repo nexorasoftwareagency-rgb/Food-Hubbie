@@ -29,10 +29,10 @@ export default function Outlets() {
 
   useEffect(() => {
     fetchOutlets().then((data) => {
-      setOutlets(sortByDistance(data));
+      setOutlets(sortByDistance(data, locationState.coords));
       setLoading(false);
     });
-  }, []);
+  }, [locationState.coords]);
 
   const displayed = filterOutlets(outlets, searchQuery, activeFilter);
 

@@ -1,0 +1,6 @@
+{
+  "name": "@foodhubbie/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities and Firebase helpers for Foodhubbie SaaS",
+  "main": "index.js"
+}

@@ -14,7 +14,6 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "src"),
       "@config": path.resolve(import.meta.dirname, "../config"),
     },
-    dedupe: ["react", "react-dom"],
   },
   root: path.resolve(import.meta.dirname),
   build: {

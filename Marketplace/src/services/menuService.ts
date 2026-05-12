@@ -2,45 +2,45 @@
 // Backed by Firebase Realtime Database.
 // Automatically maps legacy Roshani dishes to SaaS MenuItem structure.
 
-import { db, ref, get, child } from "@/lib/firebase";
+import { db, ref, get } from "@/lib/firebase";
 import type { MenuItem, MenuItemSize, MenuItemAddon } from "@/types";
-import { mockMenuItems } from "@/data/mockData";
+import { fetchOutlets } from "./outletService";
 
 /** 
  * Map legacy dish format to SaaS MenuItem
  */
-function mapLegacyDish(id: string, dish: any, outletId: string): MenuItem {
-  // Extract sizes from sizes object or use default price
+function mapLegacyDish(id: string, dish: any, outletId: string, businessId: string): MenuItem {
   const sizes: MenuItemSize[] = [];
   if (dish.sizes) {
-    Object.entries(dish.sizes).forEach(([sId, sData]: [string, any]) => {
+    for (const sId in dish.sizes) {
+      const sData = dish.sizes[sId];
       sizes.push({
         id: sId,
         name: sData.name || sId,
         price: sData.price || 0
       });
-    });
+    }
   }
 
-  // Extract addons
   const addons: MenuItemAddon[] = [];
   if (dish.addons) {
-    Object.entries(dish.addons).forEach(([aId, aData]: [string, any]) => {
+    for (const aId in dish.addons) {
+      const aData = dish.addons[aId];
       addons.push({
         id: aId,
         name: aData.name || aId,
         price: aData.price || 0
       });
-    });
+    }
   }
 
   return {
     id: id,
     outletId: outletId,
-    businessId: "business_roshani",
+    businessId: businessId,
     name: dish.name || "Unknown Dish",
     description: dish.description || dish.name || "",
-    image: dish.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591", // fallback
+    image: dish.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591",
     category: dish.category || "General",
     isVeg: dish.isVeg !== undefined ? dish.isVeg : true,
     price: dish.price || (sizes.length > 0 ? sizes[0].price : 0),
@@ -60,37 +60,115 @@ function mapLegacyDish(id: string, dish: any, outletId: string): MenuItem {
 }
 
 /** Fetch all menu items for a given outlet */
-export async function fetchMenuByOutlet(outletId: string): Promise<MenuItem[]> {
+export async function fetchMenuByOutlet(outletId: string, businessId: string = "business_roshani"): Promise<MenuItem[]> {
   try {
-    // Try to fetch from real Firebase first
-    const path = `businesses/business_roshani/outlets/${outletId}/dishes`;
-    const snapshot = await get(ref(db, path));
-    
-    if (snapshot.exists()) {
-      const dishes = snapshot.val();
-      return Object.entries(dishes).map(([id, dish]) => mapLegacyDish(id, dish, outletId));
+    // Try multiple paths for flexibility (SaaS structure can vary)
+    const paths = [
+      `businesses/${businessId}/outlets/${outletId}`,
+      `outlets/${outletId}`,
+      `Pizza-Shop`, // Legacy Fallback
+      `Cake-Shop`   // Legacy Fallback
+    ];
+
+    for (const path of paths) {
+      const snap = await get(ref(db, path));
+      if (snap.exists()) {
+        const data = snap.val();
+        // Potential item nodes: dishes, menu/items, Menu/Items
+        const dishes = data.dishes || 
+                       (data.menu && data.menu.items) || 
+                       (data.Menu && data.Menu.Items);
+        
+        if (dishes) {
+          const result: MenuItem[] = [];
+          for (const id in dishes) {
+            result.push(mapLegacyDish(id, dishes[id], outletId, businessId));
+          }
+          if (result.length > 0) return result;
+        }
+      }
     }
     
-    // Fallback to mock data if not found in Firebase
-    console.warn(`⚠️ No live dishes found for ${outletId} at ${path}. Falling back to mock data.`);
-    return mockMenuItems
-      .filter((i) => i.outletId === outletId)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+    // Final fallback: Check root dishes (Oldest legacy)
+    const rootSnap = await get(ref(db, "dishes"));
+    if (rootSnap.exists()) {
+       const allDishes = rootSnap.val();
+       const result: MenuItem[] = [];
+       for (const id in allDishes) {
+         const dish = allDishes[id];
+         // Only include if it belongs to this outlet or is generic
+         if (!dish.outlet || dish.outlet.toLowerCase() === outletId.toLowerCase() || 
+             dish.outlet.toLowerCase().includes(outletId.toLowerCase())) {
+           result.push(mapLegacyDish(id, dish, outletId, businessId));
+         }
+       }
+       return result;
+    }
+
+    return [];
   } catch (err) {
-    console.error("Firebase fetch error:", err);
-    return mockMenuItems.filter((i) => i.outletId === outletId);
+    console.error("Firebase menu fetch error:", err);
+    return [];
   }
 }
 
-/** Fetch a single menu item by id */
-export async function fetchMenuItemById(id: string): Promise<MenuItem | null> {
-  // Simplified for now: fetch full menu and find. 
-  // In production: fetch by specific ID or keep a cache.
-  const allItems = await fetchMenuByOutlet("outlet_pizza");
-  return allItems.find(i => i.id === id) || null;
+/** Fetch a single menu item by id (across all outlets if needed) */
+export async function fetchMenuItemById(id: string, outletId?: string, businessId?: string): Promise<MenuItem | null> {
+  if (outletId && businessId) {
+    const items = await fetchMenuByOutlet(outletId, businessId);
+    return items.find(i => i.id === id) || null;
+  }
+  
+  // fallback search (slow)
+  const allOutlets = await fetchOutlets();
+  for (const outlet of allOutlets) {
+     const items = await fetchMenuByOutlet(outlet.id, outlet.businessId);
+     const found = items.find(i => i.id === id);
+     if (found) return found;
+  }
+  return null;
 }
 
-/** Get all unique categories for an outlet's menu (ordered by first appearance) */
+/** Get all best-seller items globally */
+export async function getGlobalBestSellers(limit = 8): Promise<MenuItem[]> {
+  try {
+    const outlets = await fetchOutlets();
+    let allBestSellers: MenuItem[] = [];
+    
+    // Fetch in parallel for performance
+    const menuPromises = outlets.map(o => fetchMenuByOutlet(o.id, o.businessId));
+    const results = await Promise.all(menuPromises);
+    
+    for (const menu of results) {
+      allBestSellers = [...allBestSellers, ...menu.filter(i => i.isBestSeller && i.isAvailable)];
+    }
+    
+    return allBestSellers.sort((a, b) => b.rating - a.rating).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/** Get recommended items globally */
+export async function getGlobalRecommended(limit = 8): Promise<MenuItem[]> {
+  try {
+    const outlets = await fetchOutlets();
+    let allRecommended: MenuItem[] = [];
+    
+    const menuPromises = outlets.map(o => fetchMenuByOutlet(o.id, o.businessId));
+    const results = await Promise.all(menuPromises);
+    
+    for (const menu of results) {
+      allRecommended = [...allRecommended, ...menu.filter(i => i.isRecommended && i.isAvailable)];
+    }
+    
+    return allRecommended.sort((a, b) => b.rating - a.rating).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/** Get unique categories for an outlet's menu */
 export function getCategories(items: MenuItem[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -115,31 +193,12 @@ export function searchMenu(items: MenuItem[], query: string): MenuItem[] {
   );
 }
 
-/** Filter menu items by category (special keys: "All", "Recommended", "Best Sellers") */
+/** Filter menu items by category */
 export function filterByCategory(items: MenuItem[], category: string): MenuItem[] {
   switch (category) {
-    case "All":
-      return items;
-    case "Recommended":
-      return items.filter((i) => i.isRecommended);
-    case "Best Sellers":
-      return items.filter((i) => i.isBestSeller);
-    default:
-      return items.filter((i) => i.category === category);
+    case "All": return items;
+    case "Recommended": return items.filter((i) => i.isRecommended);
+    case "Best Sellers": return items.filter((i) => i.isBestSeller);
+    default: return items.filter((i) => i.category === category);
   }
-}
-
-/** Get best-seller items across all outlets (for Home page) */
-export function getBestSellers(limit = 6): MenuItem[] {
-  // This is a global call. For now, using mock for global trending.
-  return mockMenuItems
-    .filter((i) => i.isBestSeller && i.isAvailable)
-    .slice(0, limit);
-}
-
-/** Get recommended items across all outlets */
-export function getRecommended(limit = 6): MenuItem[] {
-  return mockMenuItems
-    .filter((i) => i.isRecommended && i.isAvailable)
-    .slice(0, limit);
 }
