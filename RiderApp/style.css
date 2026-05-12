@@ -3,26 +3,26 @@
 /* -------------------------------------------------------------------------- */
 :root {
     --primary: #FF5200;
-    --primary-glow: rgba(255, 82, 0, 0.4);
+    --primary-glow: rgba(255, 82, 0, 0.15);
     --primary-dark: #E64A00;
-    --primary-light: rgba(255, 82, 0, 0.1);
-    --bg-app: #0A0F1E;
-    --bg-surface: rgba(30, 41, 59, 0.8);
-    --bg-glass: rgba(15, 23, 42, 0.7);
+    --primary-light: #FFF5F1;
+    --bg-app: #F4F6F8;
+    --bg-surface: #FFFFFF;
+    --bg-glass: rgba(255, 255, 255, 0.9);
 
-    --text-main: #F8FAFC;
-    --text-muted: #94A3B8;
-    --text-danger: #FF4D4D;
+    --text-main: #1E293B;
+    --text-muted: #64748B;
+    --text-danger: #EF4444;
 
-    --success: #00E676;
-    --info: #00B0FF;
-    --warning: #FFD600;
-    --danger: #FF1744;
+    --success: #10B981;
+    --info: #3B82F6;
+    --warning: #F59E0B;
+    --danger: #EF4444;
 
-    --shadow-pro: 0 12px 40px rgba(0, 0, 0, 0.6);
-    --glass-blur: blur(12px) saturate(160%);
+    --shadow-pro: 0 10px 30px rgba(0, 0, 0, 0.05);
+    --glass-blur: blur(12px);
     --radius-premium: 24px;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -321,11 +321,9 @@ body {
     left: 0;
     right: 0;
     height: var(--header-height);
-    background: var(--bg-glass);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    background: white;
     z-index: 2000;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     display: flex;
     align-items: center;
     padding: 0 1.5rem;
@@ -459,20 +457,17 @@ body {
 /* -------------------------------------------------------------------------- */
 .bottom-nav {
     position: fixed;
-    bottom: 20px;
-    left: 20px;
-    right: 20px;
-    height: var(--bottom-nav-height);
-    background: var(--bg-glass);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+    background: white;
     display: flex;
     justify-content: space-around;
     padding-bottom: env(safe-area-inset-bottom);
-    box-shadow: var(--shadow-pro);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.05);
     z-index: 2000;
-    border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .nav-item {
@@ -604,13 +599,11 @@ body {
 /* -------------------------------------------------------------------------- */
 .premium-dashboard-card,
 .order-card-premium {
-    background: var(--bg-glass);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    background: var(--bg-surface);
     border-radius: var(--radius-premium);
     padding: 24px;
     box-shadow: var(--shadow-pro);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.04);
     margin-bottom: 20px;
     transition: var(--transition);
 }
@@ -2331,16 +2324,14 @@ body {
 
 /* Auth Polish */
 .auth-page {
-    background: radial-gradient(circle at 50% 50%, #1E293B 0%, #0A0F1E 100%);
+    background: white;
 }
 
 .login-card {
-    background: var(--bg-glass);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    background: white;
     padding: 40px;
     border-radius: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.05);
     box-shadow: var(--shadow-pro);
     width: 90%;
     max-width: 400px;

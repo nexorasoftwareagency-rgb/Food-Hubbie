@@ -9,21 +9,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  --pro-navy: #050810;
-  --pro-deep: #0D111C;
-  --pro-card: rgba(21, 27, 41, 0.7);
-  --pro-accent: #00F5FF;
-  --pro-glow: rgba(0, 245, 255, 0.3);
-  --pro-violet: #C084FC;
-  --pro-indigo: #818CF8;
-  --pro-bg: #02040A;
-  --pro-border: rgba(255, 255, 255, 0.08);
-  --pro-text: #F8FAFC;
-  --pro-muted: #94A3B8;
+  --pro-primary: #FF5200;
+  --pro-primary-light: #FFF5F1;
+  --pro-bg: #F8FAFC;
+  --pro-sidebar: #FFFFFF;
+  --pro-card: #FFFFFF;
+  --pro-border: #E2E8F0;
+  --pro-text: #0F172A;
+  --pro-muted: #64748B;
+  --pro-accent: #FF5200;
   
-  --shadow-pro: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-  --glass-bg: blur(16px) saturate(180%);
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.03);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.04);
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -47,7 +46,7 @@ body {
 .auth-overlay {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 50% 50%, #0D111C 0%, #050810 100%);
+  background: white;
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -55,56 +54,37 @@ body {
   justify-content: center;
 }
 
-.auth-overlay::before {
-  content: '';
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background-image: url("https://www.transparenttextures.com/patterns/carbon-fibre.png");
-  opacity: 0.05;
-  pointer-events: none;
-}
-
 .auth-card {
   width: 100%;
   max-width: 420px;
-  background: var(--pro-card);
-  backdrop-filter: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-bg);
+  background: white;
   padding: 48px;
-  border-radius: 28px;
-  border: 1px solid var(--pro-border);
-  box-shadow: var(--shadow-pro);
+  border-radius: 32px;
+  box-shadow: var(--shadow-lg);
   text-align: center;
-  z-index: 10;
-}
-
-.auth-logo {
-  color: var(--pro-accent);
-  margin-bottom: 24px;
+  border: 1px solid var(--pro-border);
 }
 
 .auth-input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 16px;
-  border: 1px solid var(--pro-border);
-  border-radius: 14px;
-  color: var(--pro-accent);
-  font-size: 1.5rem;
+  background: #F1F5F9;
+  padding: 18px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  color: var(--pro-text);
+  font-size: 1.75rem;
   font-weight: 800;
   text-align: center;
-  letter-spacing: 8px;
+  letter-spacing: 6px;
   margin-bottom: 28px;
   transition: var(--transition);
-  text-shadow: 0 0 10px var(--pro-glow);
 }
 
 .auth-input:focus {
   outline: none;
-  border-color: var(--pro-accent);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 0 20px var(--pro-glow);
+  background: white;
+  border-color: var(--pro-primary);
+  box-shadow: 0 0 0 4px rgba(255, 82, 0, 0.1);
 }
 
 /* Master Layout */
@@ -120,9 +100,7 @@ body {
 
 .pro-sidebar {
   width: 280px;
-  background: rgba(13, 17, 28, 0.8);
-  backdrop-filter: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-bg);
+  background: var(--pro-sidebar);
   border-right: 1px solid var(--pro-border);
   display: flex;
   flex-direction: column;
@@ -142,8 +120,7 @@ body {
 }
 
 .sidebar-logo i {
-  color: var(--pro-accent);
-  filter: drop-shadow(0 0 8px var(--pro-glow));
+  color: var(--pro-primary);
 }
 
 .nav-group {
@@ -174,22 +151,19 @@ body {
 }
 
 .nav-link:hover, .nav-link.active {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--pro-accent);
+  background: var(--pro-primary-light);
+  color: var(--pro-primary);
 }
 
 .nav-link.active {
-  background: rgba(0, 245, 255, 0.1);
-  box-shadow: inset 0 0 10px rgba(0, 245, 255, 0.05);
+  background: var(--pro-primary-light);
 }
 
-/* Modals - Cyber Pro */
+/* Modals */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 4, 10, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -197,14 +171,12 @@ body {
 }
 
 .modal-card {
-  background: var(--pro-card);
-  backdrop-filter: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-bg);
+  background: white;
   width: 100%;
   max-width: 600px;
-  border-radius: 28px;
+  border-radius: 32px;
   border: 1px solid var(--pro-border);
-  box-shadow: var(--shadow-pro);
+  box-shadow: var(--shadow-lg);
   padding: 40px;
 }
 
@@ -217,7 +189,7 @@ body {
 .modal-header h2 {
   font-size: 1.5rem;
   font-weight: 800;
-  color: var(--pro-accent);
+  color: var(--pro-text);
   letter-spacing: -0.5px;
 }
 
@@ -237,7 +209,7 @@ body {
 
 .pro-input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.03);
+  background: #F8FAFC;
   border: 1px solid var(--pro-border);
   border-radius: 14px;
   padding: 16px;
@@ -249,14 +221,14 @@ body {
 
 .pro-input:focus {
   outline: none;
-  border-color: var(--pro-accent);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 0 20px var(--pro-glow);
+  border-color: var(--pro-primary);
+  background: white;
+  box-shadow: 0 0 0 4px rgba(255, 82, 0, 0.05);
 }
 
 .btn-pro {
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-violet) 100%);
-  color: #000;
+  background: var(--pro-primary);
+  color: white;
   font-weight: 800;
   padding: 16px 32px;
   border-radius: 14px;
@@ -269,7 +241,7 @@ body {
 
 .btn-pro:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 25px var(--pro-glow);
+  box-shadow: 0 8px 20px rgba(255, 82, 0, 0.2);
 }
 
 .pro-main {
@@ -386,13 +358,12 @@ body {
 .trend-down { color: #F43F5E; }
 
 .pro-card {
-  background: var(--pro-card);
-  backdrop-filter: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-bg);
+  background: white;
   border-radius: 24px;
   border: 1px solid var(--pro-border);
   padding: 32px;
   margin-bottom: 32px;
+  box-shadow: var(--shadow-md);
 }
 
 .pro-table-wrapper {
@@ -417,7 +388,7 @@ body {
 }
 
 .pro-table tr {
-  background: rgba(255, 255, 255, 0.02);
+  background: white;
   transition: var(--transition);
 }
 
@@ -440,8 +411,7 @@ body {
 }
 
 .pro-table tr:hover {
-  background: rgba(255, 255, 255, 0.05);
-  transform: scale(1.005);
+  background: var(--pro-bg);
 }
 
 /* Dynamic Themes */
