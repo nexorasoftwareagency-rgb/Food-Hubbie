@@ -18,8 +18,13 @@ import {
   Store,
 } from "lucide-react";
 import { fetchOutlets, sortByDistance } from "@/services/outletService";
-import { getGlobalBestSellers, getGlobalRecommended } from "@/services/menuService";
+import { 
+  getGlobalBestSellers, 
+  getGlobalRecommended, 
+  fetchAllMenuItems 
+} from "@/services/menuService";
 import { fetchGlobalReviews } from "@/services/reviewService";
+import { useLocation } from "wouter";
 import type { Outlet, MenuItem, Review } from "@/types";
 import { OutletCard } from "@/components/cards/OutletCard";
 import { FoodCard } from "@/components/cards/FoodCard";
@@ -39,6 +44,7 @@ const categories = [
 ];
 
 export default function Home() {
+  const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(true);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [bestSellers, setBestSellers] = useState<MenuItem[]>([]);

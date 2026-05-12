@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Minus, Star } from "lucide-react";
+import { Plus, Minus, Star, Store } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { ProductCustomizationModal } from "../modals/ProductCustomizationModal";
 
