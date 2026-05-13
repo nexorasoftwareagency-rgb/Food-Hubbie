@@ -1,6 +1,8 @@
-import { ReactNode, createContext, useContext, useReducer, useState } from "react";
+import { ReactNode, createContext, useContext, useReducer, useState, useEffect, useRef } from "react";
 import type { CartItem } from "@/types";
 import { buildCartItemId, computeUnitPrice } from "@/services/cartService";
+import { useAuth } from "./AuthContext";
+import { db, ref, get, set } from "@/lib/firebase";
 
 type CartState = {
   items: CartItem[];
@@ -14,7 +16,8 @@ type CartAction =
   | { type: "UPDATE_QUANTITY"; payload: { id: string; quantity: number } }
   | { type: "CLEAR_CART" }
   | { type: "SET_PENDING"; payload: CartItem | null }
-  | { type: "CONFIRM_SWITCH_OUTLET" };
+  | { type: "CONFIRM_SWITCH_OUTLET" }
+  | { type: "SYNC_FROM_DB"; payload: { items: CartItem[]; outletId: string | null } };
 
 const initialState: CartState = {
   items: [],
@@ -98,6 +101,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     case "CLEAR_CART":
       return initialState;
 
+    case "SYNC_FROM_DB":
+      return {
+        ...state,
+        items: action.payload.items,
+        outletId: action.payload.outletId,
+      };
+
     default:
       return state;
   }
@@ -115,11 +125,69 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, authState } = useAuth();
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const { total, itemCount } = calcDerived(state.items);
+  const isInitialMount = useRef(true);
+  const isSyncingFromDB = useRef(false);
 
   const confirmSwitchOutlet = () => dispatch({ type: "CONFIRM_SWITCH_OUTLET" });
   const cancelSwitchOutlet = () => dispatch({ type: "SET_PENDING", payload: null });
+
+  // 1. Restore Cart from Firebase on Login
+  useEffect(() => {
+    if (authState === "authenticated" && user) {
+      const fetchSavedCart = async () => {
+        try {
+          isSyncingFromDB.current = true;
+          const cartRef = ref(db, `customers/${user.uid}/cart`);
+          const snapshot = await get(cartRef);
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            dispatch({ 
+              type: "SYNC_FROM_DB", 
+              payload: { 
+                items: data.items || [], 
+                outletId: data.outletId || null 
+              } 
+            });
+          }
+        } catch (err) {
+          console.error("Failed to fetch saved cart:", err);
+        } finally {
+          isSyncingFromDB.current = false;
+        }
+      };
+      fetchSavedCart();
+    }
+  }, [authState, user]);
+
+  // 2. Persist Cart to Firebase on Changes
+  useEffect(() => {
+    // Skip if it's the first mount or if we just synced FROM the database
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    if (isSyncingFromDB.current) return;
+
+    if (authState === "authenticated" && user) {
+      const persistCart = async () => {
+        try {
+          const cartRef = ref(db, `customers/${user.uid}/cart`);
+          await set(cartRef, {
+            items: state.items,
+            outletId: state.outletId,
+            updatedAt: Date.now()
+          });
+        } catch (err) {
+          console.error("Failed to persist cart:", err);
+        }
+      };
+      persistCart();
+    }
+  }, [state.items, state.outletId, authState, user]);
 
   return (
     <CartContext.Provider
