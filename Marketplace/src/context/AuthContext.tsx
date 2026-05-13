@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { User } from "@/types";
-import { subscribeToAuthChanges, signOut as authSignOut, updateProfile, signInWithGoogle as googleSignIn } from "@/services/authService";
+import { subscribeToAuthChanges, signOut as authSignOut, updateProfile, signInWithGoogle as googleSignIn, handleRedirectResult } from "@/services/authService";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated";
 
