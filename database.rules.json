@@ -81,6 +81,23 @@
         ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)",
         ".write": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)"
       }
+    },
+    
+    "customers": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+
+    "Pizza-Shop": {
+      ".read": true,
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
+    },
+
+    "Cake-Shop": {
+      ".read": true,
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
     }
   }
 }
