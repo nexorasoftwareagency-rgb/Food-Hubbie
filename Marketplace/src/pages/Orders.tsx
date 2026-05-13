@@ -50,10 +50,10 @@ export default function Orders() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <h1 className="text-3xl font-heading font-bold mb-8">Your Orders</h1>
+    <div className="container mx-auto px-4 py-8 max-w-4xl pb-24">
+      <h1 className="text-3xl font-heading font-black mb-8">My Orders</h1>
 
-      {orders.length === 0 ? (
+      {(orders || []).length === 0 ? (
         <div className="text-center py-20 bg-card rounded-3xl border border-border shadow-sm">
           <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-lg font-bold text-foreground mb-2">
@@ -72,7 +72,7 @@ export default function Orders() {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order, i) => (
+          {(orders || []).map((order, i) => (
             <motion.div
               key={order.id}
               initial={{ opacity: 0, y: 12 }}
@@ -110,8 +110,8 @@ export default function Orders() {
                 </span>
               </div>
 
-              <div className="space-y-1.5 mb-4 text-sm">
-                {order.items.map((item, idx) => (
+              <div className="space-y-3 mb-4">
+                {(order.items || []).map((item, idx) => (
                   <div key={idx} className="flex justify-between text-muted-foreground">
                     <span>
                       {item.quantity}x {item.name}

@@ -137,9 +137,9 @@ export default function Checkout() {
 
               <div className="p-6">
                 {/* Saved addresses quick-pick */}
-                {user?.savedAddresses && user.savedAddresses.length > 0 && (
+                {user?.savedAddresses && (user.savedAddresses || []).length > 0 && (
                   <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-                    {user.savedAddresses.map((addr) => (
+                    {(user.savedAddresses || []).map((addr) => (
                       <button
                         key={addr.id}
                         onClick={() =>
@@ -211,7 +211,7 @@ export default function Checkout() {
               
               <div className="p-6">
                 <div className="space-y-3">
-                  {paymentMethods.map((method) => (
+                  {(paymentMethods || []).map((method) => (
                     <label
                       key={method.id}
                       className={`flex items-center gap-4 p-4 border-2 rounded-2xl cursor-pointer transition-all ${
@@ -268,7 +268,7 @@ export default function Checkout() {
               <h2 className="font-bold text-lg mb-4">Order Summary</h2>
 
               <div className="space-y-3 mb-4 border-b border-border pb-4">
-                {cartState.items.map((item) => (
+                {(cartState.items || []).map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       {item.quantity}x {item.name}
