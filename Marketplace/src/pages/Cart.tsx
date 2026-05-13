@@ -42,7 +42,7 @@ export default function Cart() {
     }
   };
 
-  if (state.items.length === 0) {
+  if (!Array.isArray(state.items) || state.items.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16 flex flex-col items-center justify-center text-center">
         <div className="bg-muted w-32 h-32 rounded-full flex items-center justify-center mb-6">
@@ -91,7 +91,7 @@ export default function Cart() {
           {/* Items */}
           <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
             <AnimatePresence>
-              {state.items.map((item, i) => (
+              {(Array.isArray(state.items) ? state.items : []).map((item, i) => (
                 <motion.div
                   key={item.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -113,20 +113,20 @@ export default function Cart() {
                         <h3 className="font-bold text-card-foreground">
                           {item.name}
                         </h3>
-                        {item.customization.size && (
+                        {item.customization?.size && (
                           <p className="text-xs text-muted-foreground">
                             Size: {item.customization.size.name}
                           </p>
                         )}
-                        {item.customization.addons.length > 0 && (
+                        {Array.isArray(item.customization?.addons) && item.customization.addons.length > 0 && (
                           <p className="text-xs text-muted-foreground">
                             Extras:{" "}
                             {item.customization.addons
-                              .map((a) => a.name)
+                              .map((a: any) => a.name)
                               .join(", ")}
                           </p>
                         )}
-                        {item.customization.instructions && (
+                        {item.customization?.instructions && (
                           <p className="text-xs text-muted-foreground italic">
                             "{item.customization.instructions}"
                           </p>
