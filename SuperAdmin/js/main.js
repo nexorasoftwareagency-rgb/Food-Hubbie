@@ -94,6 +94,7 @@ tabs.forEach(tab => {
         if (target === 'delivery') loadGlobalDelivery();
         if (target === 'riders') loadRiders();
         if (target === 'promotions') loadPromotions();
+        if (target === 'reports') loadReports();
     });
 });
 
@@ -784,6 +785,98 @@ window.deleteCoupon = async function(id) {
         alert("❌ Deletion failed.");
     }
 };
+
+// --- Reports & Analytics ---
+async function loadReports() {
+    console.log("Loading Ecosystem Intelligence...");
+    const snap = await db.ref('businesses').get();
+    const businesses = snap.val() || {};
+
+    let globalRevenue = 0;
+    let globalOrdersCount = 0;
+    const businessStats = [];
+    const outletStats = [];
+
+    for (const bid in businesses) {
+        const biz = businesses[bid];
+        let bizRevenue = 0;
+        let bizOrders = 0;
+
+        if (biz.outlets) {
+            for (const oid in biz.outlets) {
+                const outlet = biz.outlets[oid];
+                let outletRevenue = 0;
+                let outletOrders = 0;
+
+                if (outlet.orders) {
+                    Object.values(outlet.orders).forEach(order => {
+                        const total = parseFloat(order.total || 0);
+                        outletRevenue += total;
+                        outletOrders += 1;
+                    });
+                }
+
+                bizRevenue += outletRevenue;
+                bizOrders += outletOrders;
+
+                outletStats.push({
+                    name: outlet.name || oid,
+                    revenue: outletRevenue,
+                    orders: outletOrders,
+                    rating: outlet.rating || 5.0
+                });
+            }
+        }
+
+        globalRevenue += bizRevenue;
+        globalOrdersCount += bizOrders;
+
+        businessStats.push({
+            name: biz.name || bid,
+            revenue: bizRevenue,
+            orders: bizOrders
+        });
+    }
+
+    // Update Global Metrics
+    document.getElementById('reportGlobalSales').innerText = `₹${globalRevenue.toLocaleString()}`;
+    document.getElementById('reportGlobalOrders').innerText = globalOrdersCount.toLocaleString();
+    const aov = globalOrdersCount > 0 ? (globalRevenue / globalOrdersCount).toFixed(2) : 0;
+    document.getElementById('reportAvgOrderValue').innerText = `₹${aov}`;
+
+    // Render Business Leaderboard
+    const bizBody = document.getElementById('reportBusinessLeaderboard');
+    if (bizBody) {
+        businessStats.sort((a, b) => b.revenue - a.revenue);
+        bizBody.innerHTML = businessStats.map(b => `
+            <tr>
+                <td><div style="font-weight: 700;">${b.name}</div></td>
+                <td><div style="font-weight: 700; color: #10B981;">₹${b.revenue.toLocaleString()}</div></td>
+                <td><div style="font-size: 11px; color: #64748B;">${b.orders} Orders</div></td>
+            </tr>
+        `).join('');
+    }
+
+    // Render Outlet Rankings
+    const outletBody = document.getElementById('reportOutletLeaderboard');
+    if (outletBody) {
+        outletStats.sort((a, b) => b.revenue - a.revenue);
+        outletBody.innerHTML = outletStats.slice(0, 10).map(o => `
+            <tr>
+                <td>
+                    <div style="font-weight: 700;">${o.name}</div>
+                    <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: #FACC15;">
+                        <i data-lucide="star" size="10" fill="currentColor"></i> ${o.rating}
+                    </div>
+                </td>
+                <td><div style="font-weight: 700; color: #38BDF8;">₹${o.revenue.toLocaleString()}</div></td>
+                <td><div style="font-size: 11px; color: #64748B;">${o.orders} Sales</div></td>
+            </tr>
+        `).join('');
+    }
+
+    lucide.createIcons();
+}
 
 // Initialize
 checkAuth();
