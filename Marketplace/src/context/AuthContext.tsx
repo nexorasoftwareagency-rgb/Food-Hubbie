@@ -19,9 +19,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>("loading");
 
   useEffect(() => {
+    // 1. Process redirect result first
+    const processRedirect = async () => {
+      try {
+        const redirectUser = await handleRedirectResult();
+        if (redirectUser) {
+          setUser(redirectUser);
+          setAuthState("authenticated");
+        }
+      } catch (err) {
+        console.error("Redirect processing failed:", err);
+      }
+    };
+
+    processRedirect();
+
+    // 2. Subscribe to standard auth changes
     const unsubscribe = subscribeToAuthChanges((u) => {
-      setUser(u);
-      setAuthState(u ? "authenticated" : "unauthenticated");
+      if (u) {
+        setUser(u);
+        setAuthState("authenticated");
+      } else {
+        // Only set to unauthenticated if we're not still checking redirect
+        // We give onAuthStateChanged a moment to settle
+        setUser(null);
+        setAuthState("unauthenticated");
+      }
     });
     return () => unsubscribe();
   }, []);

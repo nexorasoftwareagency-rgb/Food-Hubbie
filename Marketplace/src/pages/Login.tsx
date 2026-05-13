@@ -20,7 +20,7 @@ export default function Login() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      setLocation("/profile");
+      // No setLocation here! The browser will redirect.
     } catch (err) {
       console.error(err);
     } finally {
