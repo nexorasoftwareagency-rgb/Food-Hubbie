@@ -28,11 +28,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      const u = await googleSignIn();
-      setUser(u);
-      setAuthState("authenticated");
+      setAuthState("loading");
+      await googleSignIn();
+      // Browser will redirect, so we don't need to do anything else here
     } catch (err) {
       console.error("Google sign in failed:", err);
+      setAuthState("unauthenticated");
     }
   };
 

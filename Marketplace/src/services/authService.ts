@@ -1,7 +1,7 @@
 // ─── Auth Service ─────────────────────────────────────────────────────────────
 // Real Firebase Authentication Integration.
 
-import { auth, googleProvider, signInWithPopup, firebaseSignOut, onAuthStateChanged } from "@/lib/firebase";
+import { auth, googleProvider, signInWithRedirect, getRedirectResult, firebaseSignOut, onAuthStateChanged } from "@/lib/firebase";
 import type { User } from "@/types";
 
 /** 
@@ -31,10 +31,18 @@ export function subscribeToAuthChanges(callback: (user: User | null) => void) {
   });
 }
 
-/** Sign in with Google */
-export async function signInWithGoogle(): Promise<User> {
-  const result = await signInWithPopup(auth, googleProvider);
-  return mapFirebaseUser(result.user);
+/** Sign in with Google (Redirect) */
+export async function signInWithGoogle(): Promise<void> {
+  return signInWithRedirect(auth, googleProvider);
+}
+
+/** Handle the redirect result and return the mapped user */
+export async function handleRedirectResult(): Promise<User | null> {
+  const result = await getRedirectResult(auth);
+  if (result?.user) {
+    return mapFirebaseUser(result.user);
+  }
+  return null;
 }
 
 /** Sign out */

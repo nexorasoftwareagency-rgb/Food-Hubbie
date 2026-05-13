@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getDatabase, ref, get, child, query, orderByChild, equalTo, push, set } from "firebase/database";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { FOODHUBBIE_FIREBASE_CONFIG } from "@config/firebase-config";
 
 // Initialize Firebase
@@ -18,6 +18,8 @@ export {
   auth, 
   googleProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   onAuthStateChanged,
   firebaseSignOut,
   ref, 
