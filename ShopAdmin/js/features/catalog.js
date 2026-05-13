@@ -41,6 +41,9 @@ export function loadCategories() {
                     </div>
                 </div>
                 <div class="action-group-v4">
+                    <button data-action="editCategory" data-id="${cat.id}" class="btn-action-v4" title="Edit Category">
+                         <i data-lucide="edit-3" style="width:12px;"></i>
+                    </button>
                     <button data-action="deleteCategory" data-id="${cat.id}" class="btn-action-v4 danger" title="Delete Category">
                          <i data-lucide="trash-2" style="width:12px;"></i>
                     </button>
@@ -48,6 +51,7 @@ export function loadCategories() {
             `;
             container.appendChild(div);
         });
+        if (window.lucide) window.lucide.createIcons({ root: container });
         updateActiveDishModalCategories();
     });
 }
@@ -61,11 +65,13 @@ export async function addCategory() {
 
     const fileInput = document.getElementById('catFile');
     const previewImg = document.getElementById('catPreview');
-    let imageUrl = "";
+    const orderInput = document.getElementById('newCatOrder');
+    const btn = document.getElementById('btnAddCategory');
+    
+    let imageUrl = previewImg.src.startsWith('http') ? previewImg.src : "";
 
     try {
         isProcessingCategory = true;
-        const btn = document.getElementById('btnAddCategory');
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-sm"></span> Processing...';
@@ -84,37 +90,84 @@ export async function addCategory() {
             }
         });
 
-        const orderInput = document.getElementById('newCatOrder');
         const order = parseInt(orderInput?.value) || 0;
 
-        await Outlet.ref('categories').push({
+        const data = {
             name: name,
             image: imageUrl,
             order: order,
             outlet: (window.currentOutlet || 'outlet_pizza').toLowerCase(),
             addons: Object.keys(addons).length > 0 ? addons : null
-        });
+        };
 
+        if (state.editingCategoryId) {
+            await Outlet.ref(`categories/${state.editingCategoryId}`).update(data);
+            showToast('Category updated successfully!', 'success');
+            logAudit("Catalog", `Updated Category: ${name}`, state.editingCategoryId);
+            state.editingCategoryId = null;
+        } else {
+            await Outlet.ref('categories').push(data);
+            showToast('Category added successfully!', 'success');
+            logAudit("Catalog", `Added Category: ${name}`, "Global");
+        }
+
+        // Reset Form
         const addonsList = document.getElementById('categoryAddonsList');
         if (addonsList) addonsList.innerHTML = "";
 
         nameInput.value = "";
         if (orderInput) orderInput.value = "";
         fileInput.value = "";
-        if (previewImg) previewImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='100%25' height='100%25' fill='%23eee'/%3E%3C/svg%3E";
-        showToast('Category added successfully!', 'success');
-        logAudit("Catalog", `Added Category: ${name}`, "Global");
+        if (previewImg) previewImg.src = "https://placehold.co/100/orange/white?text=Category";
+        if (btn) btn.innerHTML = "🚀 Add Category";
+        
+        const formTitle = document.querySelector('#tab-categories h4');
+        if (formTitle) formTitle.innerText = "✨ Create New Category";
+
     } catch (err) {
         console.error(err);
         showToast('Operation failed: ' + err.message, 'error');
     } finally {
         isProcessingCategory = false;
-        const btn = document.getElementById('btnAddCategory');
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '🚀 Add Category';
+            if (!state.editingCategoryId) btn.innerHTML = '🚀 Add Category';
         }
     }
+}
+
+export function editCategory(id) {
+    console.log("[Catalog] Editing category:", id);
+    const cat = state.categories.find(c => c.id === id);
+    if (!cat) return showToast("Category not found", "error");
+
+    state.editingCategoryId = id;
+
+    // Populate Form
+    document.getElementById('newCatName').value = cat.name || '';
+    document.getElementById('newCatOrder').value = cat.order || 0;
+    const previewImg = document.getElementById('catPreview');
+    if (previewImg) previewImg.src = cat.image || "https://placehold.co/100/orange/white?text=Category";
+
+    const addonsList = document.getElementById('categoryAddonsList');
+    if (addonsList) {
+        addonsList.innerHTML = "";
+        if (cat.addons) {
+            Object.entries(cat.addons).forEach(([name, price]) => {
+                addCategoryAddonField(name, price);
+            });
+        }
+    }
+
+    // Update UI
+    const btn = document.getElementById('btnAddCategory');
+    if (btn) btn.innerHTML = "💾 Update Category";
+    
+    const formTitle = document.querySelector('#tab-categories h4');
+    if (formTitle) formTitle.innerText = "✏️ Edit Category: " + cat.name;
+
+    // Scroll to form
+    document.getElementById('newCatName').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 export async function deleteCategory(id) {

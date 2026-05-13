@@ -949,6 +949,20 @@ export async function updateStatus(id, status) {
     }
 
     try {
+        // Prepare Status History Entry
+        const historyEntry = {
+            status: status,
+            timestamp: ServerValue.TIMESTAMP,
+            updatedBy: auth.currentUser?.email || 'admin'
+        };
+
+        // Initialize statusHistory if it doesn't exist
+        const currentHistory = Array.isArray(order.statusHistory) ? order.statusHistory : [];
+        const newHistory = [...currentHistory, historyEntry];
+
+        updates.statusHistory = newHistory;
+        updates.updatedAt = ServerValue.TIMESTAMP;
+
         await Outlet.ref(`orders/${id}`).update(updates);
         logAudit("Orders", `Updated Status: #${id.slice(-5)} -> ${status}`, id);
         showToast(`Order status updated to ${status}`, "success");

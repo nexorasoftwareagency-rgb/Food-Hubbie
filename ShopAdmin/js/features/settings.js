@@ -103,9 +103,11 @@ export async function loadStoreSettings() {
         document.getElementById('displayCoords').innerText = `${s.lat || '25.887444'}, ${s.lng || '85.026889'}`;
 
         // 2. Delivery & Security
+        const s_info = store || {};
+        document.getElementById('settingDevPhone').value = s_info.devPhone || '';
+        document.getElementById('settingReportPhone').value = s_info.reportPhone || '';
+        
         const d = del || {};
-        document.getElementById('settingDevPhone').value = d.developerPhone || '';
-        document.getElementById('settingReportPhone').value = d.reportPhone || '';
         document.getElementById('settingAdminPhone').value = d.notifyPhone || '';
         document.getElementById('settingDeliveryBackupCode').value = d.backupCode || '';
 
@@ -226,14 +228,14 @@ export async function saveStoreSettings() {
             instagram: document.getElementById('settingInstagram').value,
             facebook: document.getElementById('settingFacebook').value,
             reviewUrl: document.getElementById('settingReviewUrl').value,
+            devPhone: document.getElementById('settingDevPhone').value,
+            reportPhone: document.getElementById('settingReportPhone').value,
             lat, lng,
             paymentQR: document.getElementById('settingQRUrl').value,
             updatedAt: new Date().toISOString()
         };
 
         const deliveryData = {
-            developerPhone: document.getElementById('settingDevPhone').value,
-            reportPhone: document.getElementById('settingReportPhone').value,
             notifyPhone: document.getElementById('settingAdminPhone').value,
             backupCode: document.getElementById('settingDeliveryBackupCode').value,
             slabs: getSlabsFromTable()

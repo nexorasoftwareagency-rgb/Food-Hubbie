@@ -55,54 +55,54 @@ export function ProductCustomizationModal({ item, isOpen, onClose }: ProductCust
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[999] flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm p-4 sm:p-0">
         <motion.div
           initial={{ y: "100%", opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: "100%", opacity: 0 }}
-          transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          className="bg-card w-full max-w-md rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl border border-border mb-20 sm:mb-0"
         >
           <div className="relative">
-            <img src={item.image} alt={item.name} className="w-full h-48 object-cover" />
+            <img src={item.image} alt={item.name} className="w-full h-32 object-cover" />
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 bg-background/80 backdrop-blur text-foreground p-2 rounded-full hover:bg-background transition-colors"
+              className="absolute top-3 right-3 bg-background/80 backdrop-blur text-foreground p-1.5 rounded-full hover:bg-background transition-colors z-10 shadow-lg"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="p-5 overflow-y-auto flex-1 pb-32">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="p-4 overflow-y-auto flex-1">
+            <div className="flex items-center gap-2 mb-1.5">
               <div
-                className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
+                className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${
                   item.isVeg ? "border-green-600" : "border-red-600"
                 }`}
               >
-                <div className={`w-2 h-2 rounded-full ${item.isVeg ? "bg-green-600" : "bg-red-600"}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${item.isVeg ? "bg-green-600" : "bg-red-600"}`} />
               </div>
-              <h2 className="text-xl font-heading font-bold text-card-foreground">{item.name}</h2>
+              <h2 className="text-lg font-heading font-bold text-card-foreground line-clamp-1">{item.name}</h2>
             </div>
-            <p className="text-muted-foreground text-sm mb-6">{item.description}</p>
+            <p className="text-muted-foreground text-xs mb-4 line-clamp-2">{item.description}</p>
 
             {item.sizes && item.sizes.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-bold mb-3 text-card-foreground">Size</h3>
-                <div className="space-y-2">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold mb-2 text-card-foreground">Size</h3>
+                <div className="grid grid-cols-2 gap-2">
                   {item.sizes.map((size: any) => (
-                    <label key={size.name} className="flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
+                    <label key={size.name} className={`flex items-center justify-between p-2.5 border rounded-xl cursor-pointer transition-all ${selectedSize?.name === size.name ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}>
+                      <div className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="size"
                           checked={selectedSize?.name === size.name}
                           onChange={() => setSelectedSize(size)}
-                          className="text-primary focus:ring-primary h-4 w-4"
+                          className="text-primary focus:ring-primary h-3.5 w-3.5"
                         />
-                        <span className="font-medium text-sm">{size.name}</span>
+                        <span className="font-medium text-xs">{size.name}</span>
                       </div>
-                      <span className="text-sm font-medium">₹{size.price}</span>
+                      <span className="text-xs font-bold">₹{size.price}</span>
                     </label>
                   ))}
                 </div>
@@ -110,62 +110,62 @@ export function ProductCustomizationModal({ item, isOpen, onClose }: ProductCust
             )}
 
             {item.addons && item.addons.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-bold mb-3 text-card-foreground">Add-ons</h3>
-                <div className="space-y-2">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold mb-2 text-card-foreground">Add-ons</h3>
+                <div className="space-y-1.5">
                   {item.addons.map((addon: any) => (
-                    <label key={addon.name} className="flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
+                    <label key={addon.name} className={`flex items-center justify-between p-2.5 border rounded-xl cursor-pointer transition-all ${selectedAddons.find((a) => a.name === addon.name) ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}>
+                      <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
                           checked={!!selectedAddons.find((a) => a.name === addon.name)}
                           onChange={() => handleAddonToggle(addon)}
-                          className="text-primary focus:ring-primary h-4 w-4 rounded"
+                          className="text-primary focus:ring-primary h-3.5 w-3.5 rounded"
                         />
-                        <span className="font-medium text-sm">{addon.name}</span>
+                        <span className="font-medium text-xs">{addon.name}</span>
                       </div>
-                      <span className="text-sm font-medium text-muted-foreground">+₹{addon.price}</span>
+                      <span className="text-xs font-medium text-muted-foreground">+₹{addon.price}</span>
                     </label>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="mb-6">
-              <h3 className="font-bold mb-3 text-card-foreground">Special Instructions</h3>
+            <div className="mb-2">
+              <h3 className="text-sm font-bold mb-2 text-card-foreground">Special Instructions</h3>
               <textarea
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
-                placeholder="E.g. Make it spicy, no onions..."
-                className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
+                placeholder="E.g. Make it spicy..."
+                className="w-full bg-background border border-border rounded-xl p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[60px] resize-none"
               />
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t border-border shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4 bg-muted p-2 rounded-xl">
+          <div className="p-4 bg-background border-t border-border shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 bg-muted p-1.5 rounded-xl">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="p-1 bg-background rounded hover:bg-primary hover:text-primary-foreground transition-colors"
+                  className="p-1 bg-background rounded shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors"
                 >
-                  <Minus className="h-5 w-5" />
+                  <Minus className="h-4 w-4" />
                 </button>
-                <span className="font-bold w-4 text-center">{quantity}</span>
+                <span className="font-bold text-sm w-4 text-center">{quantity}</span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  className="p-1 bg-background rounded hover:bg-primary hover:text-primary-foreground transition-colors"
+                  className="p-1 bg-background rounded shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-4 w-4" />
                 </button>
               </div>
 
               <button
                 onClick={handleAddToCart}
-                className="flex-1 bg-primary text-primary-foreground py-3.5 px-4 rounded-xl font-bold flex items-center justify-between hover:bg-primary/90 transition-colors shadow-md"
+                className="flex-1 bg-primary text-primary-foreground py-3 px-4 rounded-xl font-bold flex items-center justify-between hover:bg-primary/90 transition-colors shadow-lg active:scale-[0.98]"
               >
-                <span>Add Item</span>
-                <span>₹{totalPrice}</span>
+                <span className="text-sm">Add Item</span>
+                <span className="text-sm">₹{totalPrice}</span>
               </button>
             </div>
           </div>

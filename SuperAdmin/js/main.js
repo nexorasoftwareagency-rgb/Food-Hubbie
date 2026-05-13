@@ -175,6 +175,7 @@ if (onboardingForm) {
     onboardingForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        const bizName = document.getElementById('bizName').value;
         const bizId = document.getElementById('bizId').value;
         const outletName = document.getElementById('outletName').value;
         const outletId = document.getElementById('outletId').value;
@@ -186,7 +187,7 @@ if (onboardingForm) {
         const adminPhone = document.getElementById('adminPhone').value;
         const adminPass = document.getElementById('adminPass').value;
 
-        const submitBtn = onboardingForm.querySelector('.btn-submit');
+        const submitBtn = onboardingForm.querySelector('.btn-submit') || onboardingForm.querySelector('button[type="submit"]');
         submitBtn.innerText = "Provisioning...";
         submitBtn.disabled = true;
 

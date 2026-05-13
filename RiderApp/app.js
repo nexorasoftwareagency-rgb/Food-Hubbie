@@ -897,7 +897,10 @@ window.finalizeDeliverySequence = async (orderPath, matchesFallback, order, paym
     
     const riderId = window.currentUser.profile.id;
     const commission = Number(order.deliveryFee || 0);
-    const outletId = orderPath.split('/')[0] || 'pizza';
+    const pathParts = orderPath.split('/');
+    // SaaS Path: businesses/{bid}/outlets/{oid}/orders/{id} -> oid is at index 3
+    // Legacy Path: {oid}/orders/{id} -> oid is at index 0
+    const outletId = pathParts.includes('outlets') ? pathParts[3] : (pathParts[0] || 'outlet_pizza');
     
     await runTransaction(ref(db, resolvePath(`riderStats/${riderId}`, outletId)), (current) => {
         if (!current) return { totalOrders: 1, totalEarnings: commission };
@@ -937,7 +940,7 @@ window.emergencyOverride = async () => {
     if (!currentUser || !currentUser.profile || !currentUser.profile.isAdmin) return window.showToast("Unauthorized access.", "error");
     if (confirm("FORCE COMPLETE: Bypass customer OTP?")) {
         window.haptic([50, 50, 50]);
-        const orderPath = `${window._currentOrderOutlet || 'pizza'}/orders/${currentOrderId}`;
+        const orderPath = resolvePath(`orders/${currentOrderId}`, window._currentOrderOutlet || 'outlet_pizza');
         const snap = await get(ref(db, orderPath));
         const order = snap.val();
         
@@ -962,7 +965,7 @@ window.regenerateOTP = async () => {
     }
 
     try {
-        const orderPath = `${outletId}/orders/${currentOrderId}`;
+        const orderPath = resolvePath(`orders/${currentOrderId}`, outletId);
         // Generate 4-digit OTP for consistency with bot
         const newOTP = Math.floor(1000 + Math.random() * 9000).toString();
         await update(ref(db, orderPath), { deliveryOTP: newOTP, otp: newOTP });
@@ -980,7 +983,7 @@ window.regenerateOTP = async () => {
 window.startNavigation = async (id, outletId) => {
     window.haptic(20);
     try {
-        const orderPath = `${outletId}/orders/${id}`;
+        const orderPath = resolvePath(`orders/${id}`, outletId);
         
         // Update status to "Out for Delivery" if it's currently "Picked Up"
         const currentSnap = await get(ref(db, orderPath));

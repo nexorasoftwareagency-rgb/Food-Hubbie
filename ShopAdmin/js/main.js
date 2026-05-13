@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateLabel = reportDate ? reportDate : "Today";
                 
                 showToast(`Requesting WhatsApp Report for ${dateLabel}...`, "info");
-                const cmdRef = db.ref(`bot/${state.currentOutlet}/commands`).push();
+                const cmdRef = Outlet.ref("botCommands").push();
                 await cmdRef.set({
                     action: "SEND_DAILY_REPORT",
                     targetDate: reportDate || null, // Bot will default to IST today if null

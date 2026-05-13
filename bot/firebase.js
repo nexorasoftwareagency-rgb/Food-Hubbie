@@ -72,38 +72,38 @@ const db = admin.database();
 // Create tenant-scoped operations using shared helper factory
 const ops = createFirebaseOps(db);
 
-// ─── Convenience Wrappers (bound to this bot's outlet) ─────
+// ─── Convenience Wrappers (bound to this bot's outlet OR dynamic outlet) ─────
 
 /**
- * All data operations are pre-scoped to this bot instance's
- * BUSINESS_ID and OUTLET_ID. No more hardcoded 'pizza'/'cake'.
+ * All data operations are pre-scoped. 
+ * Supports session-based outlet dynamic switching if outletOverride is provided.
  */
-async function getData(path) {
-  return ops.getData(path, BUSINESS_ID, OUTLET_ID);
+async function getData(path, outletOverride = null) {
+  return ops.getData(path, BUSINESS_ID, outletOverride || OUTLET_ID);
 }
 
-async function setData(path, data) {
-  return ops.setData(path, data, BUSINESS_ID, OUTLET_ID);
+async function setData(path, data, outletOverride = null) {
+  return ops.setData(path, data, BUSINESS_ID, outletOverride || OUTLET_ID);
 }
 
-async function updateData(path, data) {
-  return ops.updateData(path, data, BUSINESS_ID, OUTLET_ID);
+async function updateData(path, data, outletOverride = null) {
+  return ops.updateData(path, data, BUSINESS_ID, outletOverride || OUTLET_ID);
 }
 
-async function pushData(path, data) {
-  return ops.pushData(path, data, BUSINESS_ID, OUTLET_ID);
+async function pushData(path, data, outletOverride = null) {
+  return ops.pushData(path, data, BUSINESS_ID, outletOverride || OUTLET_ID);
 }
 
-async function deleteData(path) {
-  return ops.deleteData(path, BUSINESS_ID, OUTLET_ID);
+async function deleteData(path, outletOverride = null) {
+  return ops.deleteData(path, BUSINESS_ID, outletOverride || OUTLET_ID);
 }
 
-async function getUserProfile(jid) {
-  return ops.getUserProfile(jid, BUSINESS_ID, OUTLET_ID);
+async function getUserProfile(jid, outletOverride = null) {
+  return ops.getUserProfile(jid, BUSINESS_ID, outletOverride || OUTLET_ID);
 }
 
-async function saveUserProfile(jid, data) {
-  return ops.saveUserProfile(jid, data, BUSINESS_ID, OUTLET_ID);
+async function saveUserProfile(jid, data, outletOverride = null) {
+  return ops.saveUserProfile(jid, data, BUSINESS_ID, outletOverride || OUTLET_ID);
 }
 
 /**

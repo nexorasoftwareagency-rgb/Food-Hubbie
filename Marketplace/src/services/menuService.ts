@@ -209,36 +209,27 @@ export function searchMenu(items: MenuItem[], query: string): MenuItem[] {
 /** Fetch ALL menu items across all businesses and outlets (Exhaustive SaaS Global Search) */
 export async function fetchAllMenuItems(): Promise<MenuItem[]> {
   try {
-    const businessesSnap = await get(ref(db, "businesses"));
+    const outlets = await fetchOutlets();
     const result: MenuItem[] = [];
     const processedIds = new Set<string>();
 
-    if (businessesSnap.exists()) {
-      const businesses = businessesSnap.val();
+    // 1. Fetch from each identified outlet in parallel
+    const menuPromises = outlets.map(o => fetchMenuByOutlet(o.id, o.businessId));
+    const results = await Promise.all(menuPromises);
 
-      // 1. Crawl the SaaS Hierarchy
-      for (const bId in businesses) {
-        const business = businesses[bId];
-        const outlets = business.outlets || {};
-
-        for (const oId in outlets) {
-          const outlet = outlets[oId];
-          const outletName = outlet.settings?.Store?.storeName || outlet.meta?.name || "Roshani Restaurant";
-          
-          // Exhaustive check for menu items within outlet
-          const dishes = outlet.dishes || outlet.menu || outlet.Menu || 
-                        (outlet.Menu && outlet.Menu.Items);
-
-          if (dishes) {
-            for (const dId in dishes) {
-              const mapped = mapLegacyDish(dId, dishes[dId], oId, bId);
-              result.push({ ...mapped, outletName });
-              processedIds.add(dId);
-            }
-          }
+    results.forEach((menu, idx) => {
+      const outlet = outlets[idx];
+      menu.forEach(item => {
+        const globalId = `${outlet.id}_${item.id}`;
+        if (!processedIds.has(globalId)) {
+          result.push({
+            ...item,
+            outletName: outlet.name
+          });
+          processedIds.add(globalId);
         }
-      }
-    }
+      });
+    });
 
     // 2. Fallback: Crawl root dishes (Legacy/Unassigned)
     const rootSnap = await get(ref(db, "dishes"));
@@ -248,10 +239,12 @@ export async function fetchAllMenuItems(): Promise<MenuItem[]> {
         if (!processedIds.has(dId)) {
           const dish = allDishes[dId];
           const oId = dish.outlet || "Pizza-Shop";
+          const mapped = mapLegacyDish(dId, dish, oId, "business_roshani");
           result.push({
-            ...mapLegacyDish(dId, dish, oId, "business_roshani"),
+            ...mapped,
             outletName: "Roshani Restaurant"
           });
+          processedIds.add(dId);
         }
       }
     }

@@ -2,11 +2,11 @@
  * ============================================================
  * FOODHUBBIE SAAS — WhatsApp State Machine Engine
  * ============================================================
- * Implements the 11-step interactive ordering flow.
+ * Implements the interactive ordering flow with Global Discovery.
  */
 
-const { getData, saveUserProfile, getUserProfile, setData, updateData, pushData, BUSINESS_ID, OUTLET_ID } = require('./firebase');
-const { formatJid, isShopOpen, calculateDistance, calculateDeliveryFee, generateOTP, formatCurrency } = require('../shared/utils');
+const { getData, saveUserProfile, getUserProfile, setData, updateData, pushData, getGlobalData, BUSINESS_ID, OUTLET_ID } = require('./firebase');
+const { formatJid, isShopOpen, calculateDistance, calculateDeliveryFee, generateOTP } = require('../shared/utils');
 
 // In-memory sessions
 const sessions = {};
@@ -30,6 +30,8 @@ async function handleIncomingMessage(sock, m) {
       step: 'START',
       cart: [],
       current: {},
+      activeOutlet: OUTLET_ID === 'GLOBAL' ? null : OUTLET_ID,
+      activeBid: BUSINESS_ID,
       lastActivity: Date.now(),
       profile: profile || null,
       name: profile?.name || null,
@@ -41,11 +43,12 @@ async function handleIncomingMessage(sock, m) {
   const user = sessions[senderJid];
   user.lastActivity = Date.now();
 
-  // Rate limiting & duplicate handling (managed by index.js usually, but here for safety)
+  // Rate limiting & reset handling
   if (text.toLowerCase() === 'reset' || text.toLowerCase() === 'menu') {
     user.step = 'START';
     user.cart = [];
     user.current = {};
+    if (OUTLET_ID === 'GLOBAL') user.activeOutlet = null;
     await sock.sendMessage(senderJid, { text: "🔄 *System Reset.* Reply with any message to start again." });
     return;
   }
@@ -54,6 +57,18 @@ async function handleIncomingMessage(sock, m) {
     switch (user.step) {
       case 'START':
         await handleStart(sock, senderJid, user);
+        break;
+
+      case 'DISCOVERY_LOCATION':
+        await handleDiscoveryLocation(sock, senderJid, user, location);
+        break;
+
+      case 'DISCOVERY_CATEGORY':
+        await handleDiscoveryCategorySelection(sock, senderJid, user, text);
+        break;
+
+      case 'SELECT_OUTLET':
+        await handleOutletSelection(sock, senderJid, user, text);
         break;
 
       case 'CATEGORY':
@@ -114,18 +129,124 @@ async function handleIncomingMessage(sock, m) {
 // ─── Step Handlers ───────────────────────────────────────────
 
 async function handleStart(sock, jid, user) {
-  const store = await getData('settings/Store');
-  const botSettings = await getData('settings/Bot') || {};
+  if (OUTLET_ID === 'GLOBAL' && !user.activeOutlet) {
+    user.step = 'DISCOVERY_LOCATION';
+    let msg = `✨ *WELCOME TO FOODHUBBIE* ✨\n\n`;
+    msg += `Find the best flavors near you! 🍕🍰\n\n`;
+    msg += `🌐 *BROWSE ONLINE:* https://foodhubbie.com\n`;
+    msg += `_(Search all 20+ shops instantly!)_\n\n`;
+    msg += `📍 *SHARE YOUR LOCATION* to find nearby outlets via Chat:\n\n`;
+    msg += `1️⃣ Click 📎 or +\n2️⃣ Select 'Location'\n3️⃣ 'Send Current Location'`;
+    return sock.sendMessage(jid, { text: msg });
+  }
+  
+  // Single Outlet Mode or Outlet Already Selected
+  await showMenu(sock, jid, user);
+}
+
+async function handleDiscoveryLocation(sock, jid, user, location) {
+  if (!location) return sock.sendMessage(jid, { text: "⚠️ Please share your location using the WhatsApp location feature to find nearby shops." });
+
+  const lat = location.degreesLatitude;
+  const lng = location.degreesLongitude;
+  user.location = { lat, lng };
+
+  // Discover All Outlets within 10km and aggregate categories
+  const businesses = await getGlobalData('businesses') || {};
+  const nearbyOutlets = [];
+  const categoryMap = {}; // { CategoryName: [OutletDetails] }
+  
+  Object.entries(businesses).forEach(([bid, biz]) => {
+    if (biz.outlets) {
+      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
+        const store = outlet.settings?.Store || {};
+        const dist = calculateDistance(lat, lng, parseFloat(store.lat || 0), parseFloat(store.lng || 0));
+        
+        if (dist <= 10) {
+          const outletInfo = { bid, oid, name: store.storeName || outlet.name, dist };
+          nearbyOutlets.push(outletInfo);
+          
+          // Extract categories from this outlet
+          const cats = outlet.categories || {};
+          Object.values(cats).forEach(c => {
+            if (c.name) {
+              if (!categoryMap[c.name]) categoryMap[c.name] = [];
+              categoryMap[c.name].push(outletInfo);
+            }
+          });
+        }
+      });
+    }
+  });
+
+  if (nearbyOutlets.length === 0) {
+    return sock.sendMessage(jid, { text: "❌ No outlets found within 10 kms of your location. Please try a different location!" });
+  }
+
+  // Store discovery data in session
+  user.discoveryCategories = Object.keys(categoryMap).sort();
+  user.categoryMap = categoryMap;
+
+  let msg = `🤔 *WHAT WOULD YOU LIKE TO ORDER?*\n\n`;
+  user.discoveryCategories.forEach((cat, i) => {
+    msg += `${i + 1}️⃣  ${cat}\n`;
+  });
+  msg += `\n_Reply with a number to see shops_`;
+
+  user.step = 'DISCOVERY_CATEGORY';
+  await sock.sendMessage(jid, { text: msg });
+}
+
+async function handleDiscoveryCategorySelection(sock, jid, user, text) {
+  const idx = parseInt(text) - 1;
+  const selectedCat = user.discoveryCategories ? user.discoveryCategories[idx] : null;
+  
+  if (!selectedCat) return sock.sendMessage(jid, { text: "⚠️ Invalid selection. Please reply with a number from the list." });
+
+  const outlets = user.categoryMap[selectedCat] || [];
+  user.discoveryList = outlets.sort((a, b) => a.dist - b.dist);
+
+  let msg = `📍 *SHOPS SERVING ${selectedCat.toUpperCase()}* 🏘️\n\n`;
+  user.discoveryList.forEach((o, i) => {
+    msg += `${i + 1}️⃣  *${o.name}* (${o.dist.toFixed(1)} km)\n`;
+  });
+  msg += `\n_Select a shop to view its menu_`;
+
+  user.step = 'SELECT_OUTLET';
+  await sock.sendMessage(jid, { text: msg });
+}
+
+async function handleOutletSelection(sock, jid, user, text) {
+  const idx = parseInt(text) - 1;
+  const selected = user.discoveryList ? user.discoveryList[idx] : null;
+  
+  if (!selected) return sock.sendMessage(jid, { text: "⚠️ Invalid selection. Please reply with a number from the list." });
+
+  user.activeOutlet = selected.oid;
+  user.activeBid = selected.bid;
+  
+  await sock.sendMessage(jid, { text: `✨ Entering *${selected.name}*...` });
+  await showMenu(sock, jid, user);
+}
+
+async function showMenu(sock, jid, user) {
+  const oid = user.activeOutlet;
+  const store = await getData('settings/Store', oid);
+  const botSettings = await getData('settings/Bot', oid) || {};
   
   if (store && !isShopOpen(store.shopOpenTime, store.shopCloseTime)) {
+    user.activeOutlet = null; // Reset for global mode
+    user.step = 'START';
     return sock.sendMessage(jid, { 
-      text: `🌙 *${(store.storeName || 'Shop').toUpperCase()} IS CLOSED*\n\nHours: ${store.shopOpenTime || 'N/A'} - ${store.shopCloseTime || 'N/A'}\n\nSee you later! 👋` 
+      text: `🌙 *${(store.storeName || 'Shop').toUpperCase()} IS CLOSED*\n\nHours: ${store.shopOpenTime || 'N/A'} - ${store.shopCloseTime || 'N/A'}\n\nType any message to find other open shops! 👋` 
     });
   }
 
-  // Send Categories
-  const categories = await getData('categories');
-  if (!categories) return sock.sendMessage(jid, { text: "❌ No categories available." });
+  const categories = await getData('categories', oid);
+  if (!categories) {
+    user.step = 'START';
+    return sock.sendMessage(jid, { text: "❌ This shop has no menu items available yet." });
+  }
 
   user.categoryList = Object.entries(categories)
     .map(([id, val]) => ({ id, ...val }))
@@ -133,13 +254,14 @@ async function handleStart(sock, jid, user) {
 
   const storeName = store.storeName || "Foodhubbie";
   let msg = `✨ *${storeName.toUpperCase()}* ✨\n`;
+  msg += `🌐 *Order Online:* https://foodhubbie.com\n\n`;
   msg += `🍽️ *SELECT CATEGORY*\n\n`;
 
   user.categoryList.forEach((c, i) => {
     msg += `${i + 1}️⃣  ${c.name}\n`;
   });
 
-  msg += `\n🛒 *9* View Cart\n_Reply with a number to browse_`;
+  msg += `\n🛒 *9* View Cart\n${OUTLET_ID === 'GLOBAL' ? '0️⃣ *Change Shop* 🏘️' : ''}\n_Reply with a number to browse_`;
 
   user.step = 'CATEGORY';
   const menuImg = botSettings.menuImage || store.bannerImage;
@@ -147,7 +269,9 @@ async function handleStart(sock, jid, user) {
 }
 
 async function handleCategorySelection(sock, jid, user, text) {
+  const oid = user.activeOutlet;
   if (text === "0") {
+    user.activeOutlet = null;
     user.step = 'START';
     return handleStart(sock, jid, user);
   }
@@ -157,8 +281,8 @@ async function handleCategorySelection(sock, jid, user, text) {
   const cat = user.categoryList[idx];
   if (!cat) return sock.sendMessage(jid, { text: "⚠️ Invalid category. Please reply with a number from the list." });
 
-  const dishes = await getData('dishes') || {};
-  const inventory = await getData('inventory') || {};
+  const dishes = await getData('dishes', oid) || {};
+  const inventory = await getData('inventory', oid) || {};
 
   user.dishList = Object.entries(dishes)
     .filter(([id, d]) => d.category === cat.name && d.available !== false)
@@ -183,8 +307,7 @@ async function handleCategorySelection(sock, jid, user, text) {
 
 async function handleDishSelection(sock, jid, user, text) {
   if (text === "0") {
-    user.step = 'START';
-    return handleStart(sock, jid, user);
+    return showMenu(sock, jid, user);
   }
   if (text === "9") return sendCartView(sock, jid, user);
 
@@ -212,7 +335,7 @@ async function handleDishSelection(sock, jid, user, text) {
 
 async function handleSizeSelection(sock, jid, user, text) {
   if (text === "0") {
-    user.step = 'CATEGORY'; // Simplified back logic
+    user.step = 'CATEGORY';
     return sock.sendMessage(jid, { text: "🔙 Going back. Please reply with any message to see categories." });
   }
 
@@ -250,7 +373,8 @@ async function handleQuantitySelection(sock, jid, user, text) {
     unitPrice: user.current.unitPrice,
     addons: [],
     quantity: qty,
-    total: user.current.unitPrice * qty
+    total: user.current.unitPrice * qty,
+    outletId: user.activeOutlet // Track which outlet this item belongs to
   });
 
   await sendCartView(sock, jid, user, true);
@@ -259,7 +383,7 @@ async function handleQuantitySelection(sock, jid, user, text) {
 async function sendCartView(sock, jid, user, isAdded = false) {
   if (!user.cart || user.cart.length === 0) {
     let msg = `🛒 *YOUR CART IS EMPTY*\n\n1️⃣  *Browse Menu* 🍽️\n0️⃣  *Main Menu*`;
-    user.step = "START";
+    user.step = "CATEGORY"; // Go back to browsing the active shop
     return sock.sendMessage(jid, { text: msg });
   }
 
@@ -284,8 +408,7 @@ async function sendCartView(sock, jid, user, isAdded = false) {
 
 async function handleCartAction(sock, jid, user, text) {
   if (text === "1") {
-    user.step = 'START';
-    return handleStart(sock, jid, user);
+    return showMenu(sock, jid, user);
   }
   if (text === "2") {
     if (user.profile && user.profile.name) {
@@ -303,12 +426,10 @@ async function handleCartAction(sock, jid, user, text) {
   }
   if (text === "3") {
     user.cart = [];
-    user.step = 'START';
-    return sock.sendMessage(jid, { text: "🗑️ Cart cleared. Reply with any message to start again." });
+    return showMenu(sock, jid, user);
   }
   if (text === "0") {
-    user.step = 'START';
-    return handleStart(sock, jid, user);
+    return showMenu(sock, jid, user);
   }
 }
 
@@ -353,25 +474,24 @@ async function sendLocationRequest(sock, jid, user) {
 async function handleLocationReceived(sock, jid, user, location, text) {
   if (!location) return sock.sendMessage(jid, { text: "⚠️ Please share your location using the WhatsApp location feature." });
 
+  const oid = user.activeOutlet;
   user.location = { lat: location.degreesLatitude, lng: location.degreesLongitude };
   
   // Calculate delivery fee
-  const store = await getData('settings/Store') || {};
-  const delSettings = await getData('settings/Delivery') || {};
+  const store = await getData('settings/Store', oid) || {};
+  const delSettings = await getData('settings/Delivery', oid) || {};
   
   const outletCoords = {
-    lat: parseFloat(store.lat || 25.887944),
-    lng: parseFloat(store.lng || 85.026194)
+    lat: parseFloat(store.lat || 0),
+    lng: parseFloat(store.lng || 0)
   };
 
   const dist = calculateDistance(user.location.lat, user.location.lng, outletCoords.lat, outletCoords.lng);
   
-  // Tiered Resolution: Outlet -> Global -> Default
   let slabs = delSettings.slabs;
   if (!slabs || slabs.length === 0) {
-    const globalSlabs = await require('./firebase').getGlobalData('system/settings/delivery/slabs');
+    const globalSlabs = await getGlobalData('system/settings/delivery/slabs');
     if (globalSlabs && globalSlabs.length > 0) {
-      // Map 'upToKm' from SuperAdmin to 'km' for bot/shared logic compatibility
       slabs = globalSlabs.map(s => ({ km: s.upToKm, fee: s.fee }));
     }
   }
@@ -400,9 +520,11 @@ async function handleLocationReceived(sock, jid, user, location, text) {
 }
 
 async function handleFinalCheckout(sock, jid, user, text) {
+  const oid = user.activeOutlet;
+  const bid = user.activeBid || BUSINESS_ID;
+
   if (text === "2") {
-    user.step = 'START';
-    return sock.sendMessage(jid, { text: "❌ Order Cancelled. Type any message to start again." });
+    return showMenu(sock, jid, user);
   }
 
   if (text === "1") {
@@ -426,12 +548,12 @@ async function handleFinalCheckout(sock, jid, user, text) {
       paymentStatus: "Pending",
       createdAt: new Date().toISOString(),
       items: user.cart,
-      businessId: BUSINESS_ID,
-      outletId: OUTLET_ID
+      businessId: bid,
+      outletId: oid
     };
 
     // Save order
-    await setData(`orders/${orderId}`, finalOrder);
+    await setData(`orders/${orderId}`, finalOrder, oid);
     
     // Update user profile
     await saveUserProfile(jid, {
@@ -439,13 +561,13 @@ async function handleFinalCheckout(sock, jid, user, text) {
       phone: user.phone,
       address: user.address,
       location: user.location
-    });
+    }, oid);
 
     let success = `🎉 *ORDER PLACED!* 🎉\n━━━━━━━━━━━━━━━━━━━━\n🆔 *Order ID:* #${orderId}\n🚚 *Status:* Placed\n💰 *Total:* ₹${total}\n━━━━━━━━━━━━━━━━━━━━\n_We will notify you once confirmed!_`;
     
     await sock.sendMessage(jid, { text: success });
     user.cart = [];
-    user.step = 'START';
+    user.step = 'CATEGORY'; // Back to shop menu
   }
 }
 
