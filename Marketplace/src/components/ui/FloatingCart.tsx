@@ -1,14 +1,18 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { ChevronRight } from "lucide-react";
 
 export function FloatingCart() {
   const { state, itemCount, total } = useCart();
+  const [location] = useLocation();
+
+  // Hide floating cart if user is already on the cart page
+  const isCartPage = location === "/cart";
 
   return (
     <AnimatePresence>
-      {itemCount > 0 && (
+      {itemCount > 0 && !isCartPage && (
         <motion.div
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
