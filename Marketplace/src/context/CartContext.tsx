@@ -140,7 +140,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const fetchSavedCart = async () => {
         try {
           isSyncingFromDB.current = true;
-          const cartRef = ref(db, `customers/${user.uid}/cart`);
+          const cartRef = ref(db, `customers/${user.id}/cart`);
           const snapshot = await get(cartRef);
           if (snapshot.exists()) {
             const data = snapshot.val();
@@ -175,7 +175,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (authState === "authenticated" && user) {
       const persistCart = async () => {
         try {
-          const cartRef = ref(db, `customers/${user.uid}/cart`);
+          const cartRef = ref(db, `customers/${user.id}/cart`);
           await set(cartRef, {
             items: state.items,
             outletId: state.outletId,
