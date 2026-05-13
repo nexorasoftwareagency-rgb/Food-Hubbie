@@ -22,7 +22,7 @@ import { motion } from "framer-motion";
 export default function Profile() {
   const { user, signOut, authState, updateUser } = useAuth();
   const [, setLocation] = useLocation();
-  const { orders } = useOrderContext();
+  const { orders = [] } = useOrderContext();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
   const [isSaving, setIsSaving] = useState(false);
@@ -42,7 +42,7 @@ export default function Profile() {
     );
   }
 
-  const deliveredOrders = orders.filter((o) => o.status === "Delivered");
+  const deliveredOrders = (orders || []).filter((o) => o.status === "Delivered");
 
   const handleSaveName = async () => {
     if (!name.trim()) return;
