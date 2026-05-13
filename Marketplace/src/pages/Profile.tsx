@@ -190,7 +190,7 @@ export default function Profile() {
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         {[
-          { label: "Orders", value: orders.length, color: "text-blue-600" },
+          { label: "Orders", value: (orders || []).length, color: "text-blue-600" },
           { label: "Points", value: user?.loyaltyPoints ?? 0, color: "text-amber-600" },
           { label: "Savings", value: "₹450", color: "text-emerald-600" },
         ].map((stat, idx) => (
