@@ -147,22 +147,25 @@ export default function Profile() {
       </div>
 
       <div className="space-y-3">
-        {[
-          { type: "Home", address: "H.No 123, Green Valley, Phase 2, New Delhi - 110001", icon: Home, color: "text-blue-500 bg-blue-50" },
-          { type: "Office", address: "Tech Hub Tower, Cyber City, Gurgaon - 122002", icon: Briefcase, color: "text-purple-500 bg-purple-50" },
-          { type: "Parents House", address: "Sector 15, Rohini, Near Metro Station, Delhi", icon: MapPin, color: "text-emerald-500 bg-emerald-50" },
-        ].map((addr, i) => (
-          <div key={i} className="bg-card border border-border rounded-3xl p-5 flex gap-4 hover:shadow-md transition-all group cursor-pointer">
-            <div className={`p-3 rounded-2xl ${addr.color} h-fit`}>
-              <addr.icon className="h-5 w-5" />
+        {(Array.isArray(user?.savedAddresses) && user.savedAddresses.length > 0) ? (
+          user.savedAddresses.map((addr, i) => (
+            <div key={i} className="bg-card border border-border rounded-3xl p-5 flex gap-4 hover:shadow-md transition-all group cursor-pointer">
+              <div className={`p-3 rounded-2xl text-primary bg-primary/10 h-fit`}>
+                <MapPin className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground">Address {i + 1}</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{addr}</p>
+              </div>
+              <Edit3 className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-foreground">{addr.type}</h3>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{addr.address}</p>
-            </div>
-            <Edit3 className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+          ))
+        ) : (
+          <div className="bg-muted/30 rounded-[2rem] p-10 text-center border-2 border-dashed border-border">
+            <MapPin className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-bold text-muted-foreground">No saved addresses yet</p>
           </div>
-        ))}
+        )}
         
         <button className="w-full py-5 border-2 border-dashed border-border rounded-3xl text-muted-foreground font-bold text-sm flex items-center justify-center gap-2 hover:border-primary/30 hover:text-primary hover:bg-primary/5 transition-all">
           <Plus className="h-5 w-5" />
@@ -211,10 +214,6 @@ export default function Profile() {
           </div>
         ))}
       </div>
-      
-      <p className="px-4 text-[10px] text-muted-foreground leading-relaxed uppercase tracking-widest font-bold">
-        Personalizing your experience ensures you get the best out of Foodhubbie Premium services.
-      </p>
     </motion.div>
   );
 
@@ -236,7 +235,7 @@ export default function Profile() {
         <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 p-6 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-white/10 transition-all" />
           <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-60 mb-1">Foodhubbie Wallet</p>
-          <p className="text-3xl font-black font-heading tracking-tight">₹1,240.50</p>
+          <p className="text-3xl font-black font-heading tracking-tight">₹0.00</p>
           <div className="mt-6 flex justify-between items-center">
             <span className="text-[10px] font-black uppercase tracking-widest bg-white/10 px-3 py-1 rounded-full">Active</span>
             <button className="text-xs font-bold text-primary hover:underline">Add Money</button>
@@ -244,22 +243,9 @@ export default function Profile() {
         </div>
 
         <h3 className="px-4 text-xs font-black text-muted-foreground uppercase tracking-widest mt-6">Saved Payment Methods</h3>
-        <div className="bg-card rounded-[2rem] border border-border overflow-hidden divide-y divide-border">
-          {[
-            { title: "Google Pay", desc: "rishi****@okaxis", icon: Smartphone, color: "text-blue-500" },
-            { title: "HDFC Debit Card", desc: "Ending in 4202", icon: CreditCard, color: "text-zinc-600" },
-          ].map((pay, i) => (
-            <div key={i} className="p-5 flex items-center gap-4">
-              <div className="p-3 bg-muted rounded-2xl">
-                <pay.icon className={`h-5 w-5 ${pay.color}`} />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-sm text-foreground">{pay.title}</h3>
-                <p className="text-[11px] text-muted-foreground">{pay.desc}</p>
-              </div>
-              <div className="text-[10px] font-black text-primary uppercase tracking-widest">Primary</div>
-            </div>
-          ))}
+        <div className="bg-muted/30 rounded-[2rem] p-10 text-center border-2 border-dashed border-border">
+          <CreditCard className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm font-bold text-muted-foreground">No saved cards yet</p>
         </div>
       </div>
     </motion.div>
@@ -345,11 +331,11 @@ export default function Profile() {
               {(Array.isArray(orders) ? [
                 { label: "Orders", value: orders.length, color: "text-blue-600" },
                 { label: "Points", value: user?.loyaltyPoints ?? 0, color: "text-amber-600" },
-                { label: "Savings", value: "₹450", color: "text-emerald-600" },
+                { label: "Savings", value: "₹0", color: "text-emerald-600" },
               ] : [
                 { label: "Orders", value: 0, color: "text-blue-600" },
                 { label: "Points", value: user?.loyaltyPoints ?? 0, color: "text-amber-600" },
-                { label: "Savings", value: "₹450", color: "text-emerald-600" },
+                { label: "Savings", value: "₹0", color: "text-emerald-600" },
               ]).map((stat, idx) => (
                 <motion.div
                   key={stat.label}

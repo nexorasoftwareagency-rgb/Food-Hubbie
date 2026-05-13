@@ -140,11 +140,14 @@ export default function Tracking() {
         {/* Timeline */}
         <div className="bg-card rounded-3xl border border-border shadow-sm p-6">
           <div className="relative">
-            {stages.map((stage: string, idx: number) => {
+            {(Array.isArray(stages) ? stages : []).map((stage: string, idx: number) => {
               const isCompleted = idx <= currentIdx;
               const isCurrent = idx === currentIdx;
-              const isLast = idx === stages.length - 1;
+              const isLast = idx === (Array.isArray(stages) ? stages.length : 0) - 1;
               const Icon = stageIcons[stage as OrderStatus] ?? CheckCircle2;
+              const historyItem = Array.isArray(order.statusHistory) 
+                ? order.statusHistory.find((h) => h.status === stage) 
+                : null;
 
               return (
                 <div
@@ -199,12 +202,9 @@ export default function Tracking() {
                         </motion.p>
                       )}
                     </AnimatePresence>
-                    {order.statusHistory.find((h) => h.status === stage) && (
+                    {historyItem && (
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {new Date(
-                          order.statusHistory.find((h) => h.status === stage)!
-                            .timestamp
-                        ).toLocaleTimeString("en-IN", {
+                        {new Date(historyItem.timestamp).toLocaleTimeString("en-IN", {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -227,7 +227,7 @@ export default function Tracking() {
               className="bg-primary/5 border border-primary/20 rounded-3xl p-5 flex items-center gap-4"
             >
               <img
-                src="https://picsum.photos/id/1005/100/100"
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(order.riderName || "Rider")}&background=random&color=fff`}
                 alt="Rider"
                 className="w-16 h-16 rounded-2xl object-cover shadow-sm"
               />
