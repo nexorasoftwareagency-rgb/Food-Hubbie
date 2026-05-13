@@ -67,6 +67,7 @@ const tabMap = {
     'businesses': 'Enterprise ecosystem partners',
     'riders': 'Fleet logistics & operational partners',
     'delivery': 'Infrastructure flow configuration',
+    'promotions': 'Ecosystem economic controls',
     'settings': 'System kernel parameters'
 };
 
@@ -92,6 +93,7 @@ tabs.forEach(tab => {
         if (typeof lucide !== 'undefined') lucide.createIcons();
         if (target === 'delivery') loadGlobalDelivery();
         if (target === 'riders') loadRiders();
+        if (target === 'promotions') loadPromotions();
     });
 });
 
@@ -625,6 +627,161 @@ window.deleteRider = async function(id) {
         alert("✅ Partner node decommissioned.");
     } catch (err) {
         alert("❌ Error: " + err.message);
+    }
+};
+
+// --- Promotions Management ---
+let allCoupons = {};
+
+async function loadPromotions() {
+    // 1. Load Surge
+    db.ref('system/promotions/surge').on('value', (snap) => {
+        const surge = snap.val() || { multiplier: 1.0, isActive: false, reason: '' };
+        document.getElementById('surgeMultiplier').value = surge.multiplier;
+        document.getElementById('surgeReason').value = surge.reason;
+        const statusEl = document.getElementById('surgeStatus');
+        if (surge.isActive && surge.multiplier > 1) {
+            statusEl.innerText = "Active";
+            statusEl.className = "pro-badge badge-warning";
+        } else {
+            statusEl.innerText = "Inactive";
+            statusEl.className = "pro-badge badge-info";
+        }
+    });
+
+    // 2. Load Global Discount
+    db.ref('system/promotions/globalDiscount').on('value', (snap) => {
+        const discount = snap.val() || { type: 'percent', value: 0, isActive: false };
+        document.getElementById('globalDiscountValue').value = discount.value;
+        document.getElementById('globalDiscountType').value = discount.type;
+        const statusEl = document.getElementById('discountStatus');
+        if (discount.isActive && discount.value > 0) {
+            statusEl.innerText = "Active";
+            statusEl.className = "pro-badge badge-success";
+        } else {
+            statusEl.innerText = "Inactive";
+            statusEl.className = "pro-badge badge-info";
+        }
+    });
+
+    // 3. Load Coupons
+    db.ref('system/promotions/coupons').on('value', (snap) => {
+        allCoupons = snap.val() || {};
+        renderCoupons();
+    });
+}
+
+function renderCoupons() {
+    const tbody = document.getElementById('couponsListTable');
+    if (!tbody) return;
+
+    if (Object.keys(allCoupons).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 48px; color: #64748B;">No promo codes currently in registry.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = Object.entries(allCoupons).map(([id, c]) => `
+        <tr>
+            <td>
+                <div style="font-weight: 800; color: #0F172A; letter-spacing: 1px;">${c.code}</div>
+            </td>
+            <td>
+                <div style="font-weight: 700; color: #10B981;">
+                    ${c.type === 'percent' ? `${c.value}% Off` : `₹${c.value} Flat Off`}
+                </div>
+            </td>
+            <td>
+                <div style="font-size: 11px; color: #64748B;">Min Order: ₹${c.minOrder || 0}</div>
+            </td>
+            <td>
+                <span class="pro-badge ${c.active ? 'badge-success' : 'badge-warning'}">
+                    ${c.active ? 'Active' : 'Paused'}
+                </span>
+            </td>
+            <td>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-pro-icon" title="Toggle Status" onclick="toggleCoupon('${id}')">
+                        <i data-lucide="${c.active ? 'pause' : 'play'}" size="16"></i>
+                    </button>
+                    <button class="btn-pro-icon text-danger" title="Delete" onclick="deleteCoupon('${id}')">
+                        <i data-lucide="trash-2" size="16"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+    lucide.createIcons();
+}
+
+window.saveSurge = async function() {
+    const multiplier = parseFloat(document.getElementById('surgeMultiplier').value);
+    const reason = document.getElementById('surgeReason').value;
+    const isActive = multiplier > 1;
+
+    try {
+        await db.ref('system/promotions/surge').set({ multiplier, reason, isActive });
+        alert("✅ Surge configuration deployed.");
+    } catch (err) {
+        alert("❌ Error: " + err.message);
+    }
+};
+
+window.saveGlobalDiscount = async function() {
+    const value = parseFloat(document.getElementById('globalDiscountValue').value);
+    const type = document.getElementById('globalDiscountType').value;
+    const isActive = value > 0;
+
+    try {
+        await db.ref('system/promotions/globalDiscount').set({ value, type, isActive });
+        alert("✅ Ecosystem discount synchronized.");
+    } catch (err) {
+        alert("❌ Error: " + err.message);
+    }
+};
+
+window.showCouponModal = function() {
+    document.getElementById('couponForm').reset();
+    document.getElementById('couponModal').classList.remove('hidden');
+    lucide.createIcons();
+};
+
+window.hideCouponModal = function() {
+    document.getElementById('couponModal').classList.add('hidden');
+};
+
+window.saveCoupon = async function() {
+    const code = document.getElementById('couponCode').value.toUpperCase();
+    const type = document.getElementById('couponType').value;
+    const value = parseFloat(document.getElementById('couponValue').value);
+    const minOrder = parseFloat(document.getElementById('couponMinOrder').value);
+    const active = document.getElementById('couponActive').checked;
+
+    try {
+        const newRef = db.ref('system/promotions/coupons').push();
+        await newRef.set({ code, type, value, minOrder, active, createdAt: firebase.database.ServerValue.TIMESTAMP });
+        alert(`✅ Promo Code ${code} is now live!`);
+        hideCouponModal();
+    } catch (err) {
+        alert("❌ Failed to save coupon: " + err.message);
+    }
+};
+
+window.toggleCoupon = async function(id) {
+    const current = allCoupons[id];
+    if (!current) return;
+    try {
+        await db.ref(`system/promotions/coupons/${id}/active`).set(!current.active);
+    } catch (err) {
+        alert("❌ Status sync failed.");
+    }
+};
+
+window.deleteCoupon = async function(id) {
+    if (!confirm("Are you sure you want to permanently delete this promo code?")) return;
+    try {
+        await db.ref(`system/promotions/coupons/${id}`).remove();
+    } catch (err) {
+        alert("❌ Deletion failed.");
     }
 };
 

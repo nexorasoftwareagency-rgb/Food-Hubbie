@@ -49,6 +49,10 @@
                     <i data-lucide="building-2" size="18"></i>
                     <span>Ecosystem Partners</span>
                 </div>
+                <div class="nav-item" data-tab="promotions">
+                    <i data-lucide="ticket" size="18"></i>
+                    <span>Promotions Center</span>
+                </div>
 
                 <div class="nav-group-label">Logistics & Fleet</div>
                 <div class="nav-item" data-tab="riders">
@@ -298,6 +302,81 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Promotions Center -->
+            <div id="promotions" class="tab-pane">
+                <div class="content-section">
+                    <!-- Top Controls: Surge & Global Discount -->
+                    <div class="metric-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 32px;">
+                        <!-- Surge Pricing Card -->
+                        <div class="pro-card" style="margin-bottom: 0;">
+                            <div class="table-header">
+                                <h3 style="font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                    <i data-lucide="zap" size="18" color="#FACC15"></i> Surge Pricing Engine
+                                </h3>
+                                <div class="pro-badge badge-warning" id="surgeStatus">Inactive</div>
+                            </div>
+                            <div style="display: flex; gap: 16px; align-items: center; margin-top: 16px;">
+                                <div style="flex: 1;">
+                                    <label style="display: block; font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Multiplier</label>
+                                    <input type="number" id="surgeMultiplier" class="auth-input" style="margin-bottom: 0; padding: 10px; font-size: 1.2rem; font-weight: 800;" placeholder="1.0" step="0.1">
+                                </div>
+                                <div style="flex: 2;">
+                                    <label style="display: block; font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Reason / Label</label>
+                                    <input type="text" id="surgeReason" class="auth-input" style="margin-bottom: 0; padding: 10px;" placeholder="e.g. Heavy Rain">
+                                </div>
+                                <button class="btn-pro" style="margin-top: 18px;" onclick="saveSurge()">Apply</button>
+                            </div>
+                        </div>
+
+                        <!-- Global Discount Card -->
+                        <div class="pro-card" style="margin-bottom: 0;">
+                            <div class="table-header">
+                                <h3 style="font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                    <i data-lucide="percent" size="18" color="#10B981"></i> Ecosystem Discount
+                                </h3>
+                                <div class="pro-badge badge-success" id="discountStatus">Inactive</div>
+                            </div>
+                            <div style="display: flex; gap: 16px; align-items: center; margin-top: 16px;">
+                                <div style="flex: 1;">
+                                    <label style="display: block; font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Value</label>
+                                    <input type="number" id="globalDiscountValue" class="auth-input" style="margin-bottom: 0; padding: 10px; font-size: 1.2rem; font-weight: 800;" placeholder="0">
+                                </div>
+                                <div style="flex: 2;">
+                                    <label style="display: block; font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Type</label>
+                                    <select id="globalDiscountType" class="auth-input" style="margin-bottom: 0; padding: 10px;">
+                                        <option value="percent">Percentage Off (%)</option>
+                                        <option value="fixed">Fixed Amount (₹)</option>
+                                    </select>
+                                </div>
+                                <button class="btn-pro" style="margin-top: 18px;" onclick="saveGlobalDiscount()">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Coupons Management -->
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 style="font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="tags" size="18" color="#38BDF8"></i> Master Coupons Registry
+                            </h3>
+                            <button class="btn-pro" onclick="showCouponModal()"><i data-lucide="plus" size="18"></i> Generate Code</button>
+                        </div>
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Promo Code</th>
+                                    <th>Benefit Configuration</th>
+                                    <th>Usage Constraints</th>
+                                    <th>Current Status</th>
+                                    <th>Operations</th>
+                                </tr>
+                            </thead>
+                            <tbody id="couponsListTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -447,6 +526,51 @@
                 <div style="display: flex; gap: 12px; margin-top: 32px;">
                     <button type="button" class="btn-pro" style="background: #64748B; flex: 1;" onclick="hideOutletModal()">Cancel</button>
                     <button type="submit" class="btn-pro" style="flex: 2;">Deploy Node Updates <i data-lucide="refresh-cw" size="18"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Master Coupon Generator Modal -->
+    <div id="couponModal" class="auth-overlay hidden" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);">
+        <div class="pro-card" style="width: 100%; max-width: 500px;">
+            <div class="table-header">
+                <h3>Master Coupon Generator</h3>
+                <button class="btn-pro-icon" onclick="hideCouponModal()"><i data-lucide="x" size="18"></i></button>
+            </div>
+            <form id="couponForm" onsubmit="event.preventDefault(); saveCoupon();">
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Promo Code (Caps Only)</label>
+                        <input type="text" id="couponCode" class="auth-input" style="letter-spacing: 2px; text-transform: uppercase; text-align: center; font-size: 1.2rem; font-weight: 800; padding: 12px;" placeholder="SAVE50" required>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Discount Type</label>
+                            <select id="couponType" class="auth-input" style="padding: 10px; margin-bottom: 0;">
+                                <option value="percent">Percentage (%)</option>
+                                <option value="fixed">Fixed (₹)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Discount Value</label>
+                            <input type="number" id="couponValue" class="auth-input" style="padding: 10px; margin-bottom: 0;" placeholder="50" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569;">Minimum Order Value (₹)</label>
+                        <input type="number" id="couponMinOrder" class="auth-input" style="padding: 10px;" placeholder="199" required>
+                    </div>
+
+                    <div style="display: flex; items-center; gap: 10px;">
+                        <input type="checkbox" id="couponActive" checked style="width: 20px; h: 20px; cursor: pointer;">
+                        <label for="couponActive" style="font-weight: 600; font-size: 0.9rem; cursor: pointer;">Enable Immediately</label>
+                    </div>
+
+                    <button type="submit" class="btn-pro" style="height: 50px; justify-content: center; font-size: 1rem; margin-top: 10px;">
+                        Deploy Promo Code <i data-lucide="zap" size="18"></i>
+                    </button>
                 </div>
             </form>
         </div>
