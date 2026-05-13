@@ -20,6 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isRedirecting = true;
+    let lastUser: User | null = null;
+    let hasStateChanged = false;
 
     const initAuth = async () => {
       try {
@@ -32,12 +34,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Redirect processing failed:", err);
       } finally {
         isRedirecting = false;
+        // If onAuthStateChanged already fired with null, and we're not authenticated via redirect
+        if (!lastUser && hasStateChanged && !user) {
+          setAuthState("unauthenticated");
+        }
       }
     };
 
     initAuth();
 
     const unsubscribe = subscribeToAuthChanges((u) => {
+      lastUser = u;
+      hasStateChanged = true;
       if (u) {
         setUser(u);
         setAuthState("authenticated");
