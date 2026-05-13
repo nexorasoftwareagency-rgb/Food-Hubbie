@@ -189,11 +189,15 @@ export default function Profile() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3 mb-8">
-        {[
-          { label: "Orders", value: (orders || []).length, color: "text-blue-600" },
+        {(Array.isArray(orders) ? [
+          { label: "Orders", value: orders.length, color: "text-blue-600" },
           { label: "Points", value: user?.loyaltyPoints ?? 0, color: "text-amber-600" },
           { label: "Savings", value: "₹450", color: "text-emerald-600" },
-        ].map((stat, idx) => (
+        ] : [
+          { label: "Orders", value: 0, color: "text-blue-600" },
+          { label: "Points", value: user?.loyaltyPoints ?? 0, color: "text-amber-600" },
+          { label: "Savings", value: "₹450", color: "text-emerald-600" },
+        ]).map((stat, idx) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, scale: 0.9 }}
@@ -211,13 +215,13 @@ export default function Profile() {
 
       {/* Menu Sections */}
       <div className="space-y-8 mb-8">
-        {menuSections.map((section, sIdx) => (
+        {(Array.isArray(menuSections) ? menuSections : []).map((section, sIdx) => (
           <div key={section.title} className="animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${sIdx * 100}ms` }}>
             <h2 className="px-4 mb-4 text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">
               {section.title}
             </h2>
             <div className="bg-card rounded-[2rem] border border-border shadow-sm overflow-hidden divide-y divide-border">
-              {section.items.map((item) => (
+              {(Array.isArray(section.items) ? section.items : []).map((item) => (
                 <motion.button
                   key={item.title}
                   whileHover={{ backgroundColor: "rgba(var(--muted), 0.5)" }}
