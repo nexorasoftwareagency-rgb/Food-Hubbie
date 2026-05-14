@@ -14,7 +14,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-import { db } from "@/firebase";
+import { db } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
