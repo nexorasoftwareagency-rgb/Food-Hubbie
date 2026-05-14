@@ -61,6 +61,7 @@ export default function Search() {
           <button 
             onClick={() => window.history.back()}
             className="p-2 hover:bg-muted rounded-full transition-colors"
+            title="Go Back"
           >
             <ArrowLeft className="h-6 w-6" />
           </button>

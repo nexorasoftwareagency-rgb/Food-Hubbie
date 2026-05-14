@@ -98,6 +98,10 @@
     "Cake-Shop": {
       ".read": true,
       ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
+    },
+    "system": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.email == 'nexorasoftware@gmail.com' || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
     }
   }
 }

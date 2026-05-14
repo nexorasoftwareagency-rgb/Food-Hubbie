@@ -246,6 +246,7 @@ export default function Tracking() {
                 href={`tel:${order.riderPhone}`}
                 className="bg-primary text-primary-foreground h-12 w-12 rounded-full flex items-center justify-center shadow-md"
                 data-testid="btn-call-rider"
+                title="Call Rider"
               >
                 <Phone className="h-5 w-5" />
               </a>

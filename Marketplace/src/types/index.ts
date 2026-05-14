@@ -176,6 +176,15 @@ export type UserAddress = {
   isDefault: boolean;
 };
 
+export type WalletTransaction = {
+  id: string;
+  amount: number;
+  type: "credit" | "debit";
+  description: string;
+  orderId?: string;
+  createdAt: string;
+};
+
 export type User = {
   id: string;
   name: string;
@@ -183,6 +192,8 @@ export type User = {
   email?: string;
   avatar?: string;
   loyaltyPoints: number;
+  walletBalance: number;
+  walletHistory: WalletTransaction[];
   savedAddresses: UserAddress[];
   createdAt: string;
 };

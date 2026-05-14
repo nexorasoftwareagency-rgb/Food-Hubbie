@@ -1191,7 +1191,20 @@ export async function openOrderDrawer(id) {
 
             <div class="drawer-section mb-24 p-20 br-16" style="background: var(--dark); color: white;">
                 <div class="flex-between mb-8"><span class="text-white-50 fs-13">Subtotal</span><span class="fs-13">₹${order.subtotal || 0}</span></div>
-                <div class="flex-between mb-8"><span class="text-white-50 fs-13">Discount</span><span class="text-success fs-13">-₹${order.discount || 0}</span></div>
+                
+                ${order.globalDiscount ? `
+                    <div class="flex-between mb-8"><span class="text-white-50 fs-13">Ecosystem Discount</span><span class="text-success fs-13">-₹${order.globalDiscount}</span></div>
+                ` : ''}
+
+                ${order.couponCode ? `
+                    <div class="flex-between mb-8">
+                        <span class="text-white-50 fs-13">Coupon (${escapeHtml(order.couponCode)})</span>
+                        <span class="text-success fs-13">-₹${order.couponDiscount || (order.discount - (order.globalDiscount || 0))}</span>
+                    </div>
+                ` : (order.discount && !order.globalDiscount ? `
+                    <div class="flex-between mb-8"><span class="text-white-50 fs-13">Discount</span><span class="text-success fs-13">-₹${order.discount}</span></div>
+                ` : '')}
+
                 <div class="flex-between mb-12"><span class="text-white-50 fs-13">Delivery Fee</span><span class="fs-13">₹${order.deliveryFee || 0}</span></div>
                 <div class="border-t-white-10 pt-12 flex-between flex-center">
                     <span class="font-600 fs-14">Grand Total</span>

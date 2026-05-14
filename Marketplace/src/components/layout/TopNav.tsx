@@ -1,12 +1,15 @@
 import { Link, useLocation } from "wouter";
 import { Search, ShoppingBag, User } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { useLocationContext } from "@/context/LocationContext";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { Wallet } from "lucide-react";
 
 export function TopNav() {
   const { itemCount } = useCart();
+  const { user } = useAuth();
   const { state: locationState } = useLocationContext();
   const [location, setLocation] = useLocation();
   const [query, setQuery] = useState("");
@@ -54,6 +57,13 @@ export function TopNav() {
                 className="w-32 md:w-64 bg-muted/50 border-none rounded-full pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:w-48 md:focus:w-80"
               />
             </form>
+
+            {user && (
+              <Link href="/profile" className="hidden lg:flex items-center gap-2 px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full hover:bg-primary/20 transition-all group">
+                <Wallet className="h-4 w-4 text-primary group-hover:rotate-12 transition-transform" />
+                <span className="text-sm font-black text-primary">₹{user.walletBalance || 0}</span>
+              </Link>
+            )}
 
             <Link href="/cart" className="relative p-2.5 text-foreground hover:bg-primary/10 rounded-full transition-all group">
               <ShoppingBag className="h-5 w-5 group-hover:scale-110 transition-transform" />

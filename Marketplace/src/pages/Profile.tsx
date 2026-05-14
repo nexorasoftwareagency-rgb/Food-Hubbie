@@ -140,7 +140,7 @@ export default function Profile() {
       className="space-y-4"
     >
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => setActiveView("main")} className="p-2 bg-muted rounded-full hover:bg-muted/80 transition-colors">
+        <button onClick={() => setActiveView("main")} className="p-2 bg-muted rounded-full hover:bg-muted/80 transition-colors" title="Back to Profile">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h2 className="text-xl font-black font-heading">Saved Addresses</h2>
@@ -183,7 +183,7 @@ export default function Profile() {
       className="space-y-4"
     >
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => setActiveView("main")} className="p-2 bg-muted rounded-full hover:bg-muted/80 transition-colors">
+        <button onClick={() => setActiveView("main")} className="p-2 bg-muted rounded-full hover:bg-muted/80 transition-colors" title="Back to Profile">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h2 className="text-xl font-black font-heading">Account Settings</h2>
@@ -225,7 +225,7 @@ export default function Profile() {
       className="space-y-4"
     >
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => setActiveView("main")} className="p-2 bg-muted rounded-full hover:bg-muted/80 transition-colors">
+        <button onClick={() => setActiveView("main")} className="p-2 bg-muted rounded-full hover:bg-muted/80 transition-colors" title="Back to Profile">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h2 className="text-xl font-black font-heading">Payments & Wallets</h2>
@@ -235,7 +235,7 @@ export default function Profile() {
         <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 p-6 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-white/10 transition-all" />
           <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-60 mb-1">Foodhubbie Wallet</p>
-          <p className="text-3xl font-black font-heading tracking-tight">₹0.00</p>
+          <p className="text-3xl font-black font-heading tracking-tight">₹{(user?.walletBalance ?? 0).toLocaleString()}</p>
           <div className="mt-6 flex justify-between items-center">
             <span className="text-[10px] font-black uppercase tracking-widest bg-white/10 px-3 py-1 rounded-full">Active</span>
             <button className="text-xs font-bold text-primary hover:underline">Add Money</button>
@@ -284,7 +284,7 @@ export default function Profile() {
                       <User className="h-12 w-12 text-primary" />
                     </div>
                   )}
-                  <button className="absolute bottom-1 right-1 bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 border-2 border-background">
+                  <button className="absolute bottom-1 right-1 bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 border-2 border-background" title="Edit Avatar">
                     <Edit3 className="h-4 w-4" />
                   </button>
                 </div>
@@ -330,12 +330,12 @@ export default function Profile() {
             <div className="grid grid-cols-3 gap-3 mb-8">
               {(Array.isArray(orders) ? [
                 { label: "Orders", value: orders.length, color: "text-blue-600" },
+                { label: "Wallet", value: `₹${(user?.walletBalance ?? 0).toLocaleString()}`, color: "text-emerald-600" },
                 { label: "Points", value: user?.loyaltyPoints ?? 0, color: "text-amber-600" },
-                { label: "Savings", value: "₹0", color: "text-emerald-600" },
               ] : [
                 { label: "Orders", value: 0, color: "text-blue-600" },
+                { label: "Wallet", value: `₹${(user?.walletBalance ?? 0).toLocaleString()}`, color: "text-emerald-600" },
                 { label: "Points", value: user?.loyaltyPoints ?? 0, color: "text-amber-600" },
-                { label: "Savings", value: "₹0", color: "text-emerald-600" },
               ]).map((stat, idx) => (
                 <motion.div
                   key={stat.label}

@@ -167,11 +167,11 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
               </button>
             ) : (
               <div className="flex items-center justify-between w-full bg-primary text-primary-foreground font-black py-2 px-2.5 rounded-xl shadow-lg text-sm transition-all animate-in zoom-in-95 duration-200">
-                <button onClick={handleDecrement} className="p-0.5 hover:bg-white/20 rounded-md transition-colors">
+                <button onClick={handleDecrement} className="p-0.5 hover:bg-white/20 rounded-md transition-colors" title="Decrease Quantity">
                   <Minus className="h-4 w-4" />
                 </button>
                 <span className="tabular-nums">{quantity}</span>
-                <button onClick={handleIncrement} className="p-0.5 hover:bg-white/20 rounded-md transition-colors">
+                <button onClick={handleIncrement} className="p-0.5 hover:bg-white/20 rounded-md transition-colors" title="Increase Quantity">
                   <Plus className="h-4 w-4" />
                 </button>
               </div>

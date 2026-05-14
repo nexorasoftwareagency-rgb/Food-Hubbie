@@ -34,6 +34,11 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
     deliveryFee: input.deliveryFee,
     taxes: input.taxes,
     discount: input.discount || 0,
+    couponCode: input.couponCode || null,
+    couponDiscount: input.couponDiscount || 0,
+    globalDiscount: input.globalDiscountAmount || 0,
+    platformFee: input.platformFee || 0,
+    cashbackBonus: input.cashbackBonus || 0,
     paymentMethod: input.paymentMethod,
     status: "Placed",
     type: "Online",
@@ -53,6 +58,20 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
     const path = `businesses/${bid}/outlets/${input.outletId}/orders`;
     const newOrderRef = push(ref(db, path));
     await set(newOrderRef, orderData);
+
+    // Increment Coupon usage if applied
+    if (input.couponCode) {
+      try {
+        const couponRef = ref(db, `system/promotions/coupons/${input.couponCode.toUpperCase()}`);
+        const couponSnap = await get(couponRef);
+        if (couponSnap.exists()) {
+          const cData = couponSnap.val();
+          await set(ref(db, `system/promotions/coupons/${input.couponCode.toUpperCase()}/usedCount`), (cData.usedCount || 0) + 1);
+        }
+      } catch (cErr) {
+        console.error("Failed to increment coupon usedCount:", cErr);
+      }
+    }
 
     const finalOrder: Order = {
       id: newOrderRef.key || "unknown",
@@ -117,6 +136,10 @@ export type PlaceOrderInput = {
   deliveryAddress: DeliveryAddress;
   couponCode?: string;
   discount?: number;
+  couponDiscount?: number;
+  globalDiscountAmount?: number;
+  platformFee?: number;
+  cashbackBonus?: number;
 };
 
 export function nextStatus(current: string): string | null {

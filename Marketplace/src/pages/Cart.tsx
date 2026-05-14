@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useCart } from "@/context/CartContext";
-import { Plus, Minus, ArrowRight, Receipt, Trash2, Tag } from "lucide-react";
+import { Plus, Minus, ArrowRight, Receipt, Trash2, Tag, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { calcCartSummary } from "@/services/cartService";
 import { fetchOutletById } from "@/services/outletService";
@@ -10,7 +10,7 @@ import type { Outlet } from "@/types";
 import { useEffect } from "react";
 
 export default function Cart() {
-  const { state, dispatch, total, itemCount } = useCart();
+  const { state, dispatch, total, itemCount, platformFee } = useCart();
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [coupon, setCoupon] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
@@ -27,8 +27,11 @@ export default function Cart() {
   const summary = calcCartSummary(
     state.items,
     outlet,
-    couponDiscount
+    { couponDiscount, platformFee }
   );
+  
+  // Projected Cashback (2% of net food value)
+  const projectedBonus = Math.round((summary.subtotal - couponDiscount) * 0.02);
 
   const outletName = outlet?.name || "Restaurant";
 
@@ -148,6 +151,7 @@ export default function Cart() {
                           }
                           data-testid={`btn-decrease-${item.id}`}
                           className="p-1 hover:bg-background rounded transition-colors"
+                          title="Decrease Quantity"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
@@ -163,6 +167,7 @@ export default function Cart() {
                           }
                           data-testid={`btn-increase-${item.id}`}
                           className="p-1 hover:bg-background rounded transition-colors"
+                          title="Increase Quantity"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
@@ -177,6 +182,7 @@ export default function Cart() {
                         }
                         data-testid={`btn-remove-${item.id}`}
                         className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                        title="Remove Item"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -284,6 +290,21 @@ export default function Cart() {
                 <span className="text-muted-foreground">GST (5%)</span>
                 <span className="font-medium">₹{summary.taxes}</span>
               </div>
+              {summary.platformFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Platform Fee</span>
+                  <span className="font-medium">₹{summary.platformFee}</span>
+                </div>
+              )}
+              
+              {projectedBonus > 0 && (
+                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 mt-4">
+                  <div className="flex items-center gap-2 text-emerald-700">
+                    <Star className="h-4 w-4 fill-emerald-500" />
+                    <span className="text-[11px] font-bold">Earn ₹{projectedBonus} in credits!</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-border border-dashed pt-4 flex justify-between items-center mb-6">

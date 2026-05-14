@@ -11,6 +11,7 @@ export type CartSummary = {
   subtotal: number;
   deliveryFee: number;
   taxes: number;
+  platformFee: number;
   total: number;
   savings: number;
 };
@@ -19,10 +20,30 @@ export type CartSummary = {
 export function calcCartSummary(
   items: CartItem[],
   outlet: Outlet | null,
-  couponDiscount = 0
+  promotions: {
+    couponDiscount?: number;
+    surgeMultiplier?: number;
+    globalDiscount?: { type: 'percent' | 'fixed', value: number };
+    platformFee?: number;
+  } = {}
 ): CartSummary {
-  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  let subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const { couponDiscount = 0, surgeMultiplier = 1, globalDiscount, platformFee = 0 } = promotions;
 
+  // 1. Apply Global Discount first
+  let globalSavings = 0;
+  if (globalDiscount) {
+    if (globalDiscount.type === 'percent') {
+      globalSavings = Math.round(subtotal * (globalDiscount.value / 100));
+    } else {
+      globalSavings = globalDiscount.value;
+    }
+  }
+
+  const baseSubtotal = Math.max(0, subtotal - globalSavings);
+  const afterCouponSubtotal = Math.max(0, baseSubtotal - couponDiscount);
+
+  // 2. Delivery Fee calculation
   let deliveryFee = 0;
   if (outlet) {
     deliveryFee = calcDeliveryFee(
@@ -31,12 +52,21 @@ export function calcCartSummary(
     );
   }
 
-  const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
-  const taxes = Math.round(discountedSubtotal * GST_RATE);
-  const total = discountedSubtotal + deliveryFee + taxes;
-  const savings = couponDiscount;
+  // 3. Apply Surge Pricing to delivery (Standard Industry Practice)
+  const finalDeliveryFee = Math.round(deliveryFee * surgeMultiplier);
 
-  return { subtotal, deliveryFee, taxes, total, savings };
+  const taxes = Math.round(afterCouponSubtotal * GST_RATE);
+  const total = afterCouponSubtotal + finalDeliveryFee + taxes + platformFee;
+  const savings = globalSavings + couponDiscount;
+
+  return { 
+    subtotal: subtotal, 
+    deliveryFee: finalDeliveryFee, 
+    taxes, 
+    platformFee,
+    total, 
+    savings 
+  };
 }
 
 /** Check if an item from a different outlet would conflict with the current cart */

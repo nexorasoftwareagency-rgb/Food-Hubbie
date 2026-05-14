@@ -1685,6 +1685,29 @@ window._doRenderAllOrders = () => {
                             </div>
                         </div>
 
+                        <div class="billing-summary-box mb-15 p-12 br-12" style="background:rgba(0,0,0,0.03); border:1px dashed rgba(0,0,0,0.1);">
+                            <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Subtotal</span><span class="font-bold">₹${o.subtotal || 0}</span></div>
+                            
+                            ${o.globalDiscount ? `
+                                <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Ecosystem Discount</span><span class="text-success font-bold">-₹${o.globalDiscount}</span></div>
+                            ` : ''}
+
+                            ${o.couponCode ? `
+                                <div class="flex-between mb-4" style="font-size:12px;">
+                                    <span class="text-muted">Coupon (${escapeHtml(o.couponCode)})</span>
+                                    <span class="text-success font-bold">-₹${o.couponDiscount || (o.discount - (o.globalDiscount || 0))}</span>
+                                </div>
+                            ` : (o.discount && !o.globalDiscount ? `
+                                <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Discount</span><span class="text-success font-bold">-₹${o.discount}</span></div>
+                            ` : '')}
+
+                            <div class="flex-between mb-8" style="font-size:12px;"><span class="text-muted">Delivery Fee</span><span class="font-bold">₹${o.deliveryFee || 0}</span></div>
+                            <div class="flex-between pt-8 border-t" style="border-top:1px solid rgba(0,0,0,0.1);">
+                                <span class="font-bold fs-14">To Collect</span>
+                                <span class="fs-18 font-900 color-primary">₹${o.total || 0}</span>
+                            </div>
+                        </div>
+
                         ${currentStep === 1 ? `
                         <div class="item-checklist">
                             <div class="checklist-title">Verify Items</div>

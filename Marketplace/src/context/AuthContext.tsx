@@ -14,6 +14,9 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+import { db } from "@/firebase";
+import { ref, onValue } from "firebase/database";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authState, setAuthState] = useState<AuthState>("loading");
@@ -34,7 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Redirect processing failed:", err);
       } finally {
         isRedirecting = false;
-        // If onAuthStateChanged already fired with null, and we're not authenticated via redirect
         if (!lastUser && hasStateChanged && !user) {
           setAuthState("unauthenticated");
         }
@@ -57,6 +59,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     return () => unsubscribe();
   }, []);
+
+  // Sync profile data from Realtime Database
+  useEffect(() => {
+    if (authState === "authenticated" && user?.id) {
+      const userRef = ref(db, `users/${user.id}`);
+      const unsubscribe = onValue(userRef, (snap) => {
+        const dbData = snap.val();
+        if (dbData) {
+          setUser(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              name: dbData.name || prev.name,
+              phone: dbData.phone || prev.phone,
+              walletBalance: dbData.wallet?.balance || 0,
+              walletHistory: Object.entries(dbData.wallet?.history || {})
+                .map(([tid, t]: [string, any]) => ({ id: tid, ...t }))
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+              loyaltyPoints: dbData.loyaltyPoints || 0,
+              savedAddresses: dbData.savedAddresses || []
+            };
+          });
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [authState, user?.id]);
 
   const signInWithGoogle = async () => {
     try {

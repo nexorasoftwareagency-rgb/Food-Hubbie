@@ -3,11 +3,13 @@ import type { CartItem } from "@/types";
 import { buildCartItemId, computeUnitPrice } from "@/services/cartService";
 import { useAuth } from "./AuthContext";
 import { db, ref, get, set } from "@/lib/firebase";
+import type { Coupon } from "@/services/promotionService";
 
 type CartState = {
   items: CartItem[];
   outletId: string | null;
   pendingItem: CartItem | null;
+  appliedCoupon: Coupon | null;
 };
 
 type CartAction =
@@ -17,12 +19,15 @@ type CartAction =
   | { type: "CLEAR_CART" }
   | { type: "SET_PENDING"; payload: CartItem | null }
   | { type: "CONFIRM_SWITCH_OUTLET" }
-  | { type: "SYNC_FROM_DB"; payload: { items: CartItem[]; outletId: string | null } };
+  | { type: "SYNC_FROM_DB"; payload: { items: CartItem[]; outletId: string | null; appliedCoupon?: Coupon | null } }
+  | { type: "APPLY_COUPON"; payload: Coupon }
+  | { type: "REMOVE_COUPON" };
 
 const initialState: CartState = {
   items: [],
   outletId: null,
   pendingItem: null,
+  appliedCoupon: null,
 };
 
 function calcDerived(items: CartItem[]) {
@@ -106,7 +111,14 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: action.payload.items,
         outletId: action.payload.outletId,
+        appliedCoupon: action.payload.appliedCoupon || null,
       };
+
+    case "APPLY_COUPON":
+      return { ...state, appliedCoupon: action.payload };
+
+    case "REMOVE_COUPON":
+      return { ...state, appliedCoupon: null };
 
     default:
       return state;
@@ -118,6 +130,7 @@ type CartContextValue = {
   dispatch: React.Dispatch<CartAction>;
   total: number;
   itemCount: number;
+  platformFee: number;
   confirmSwitchOutlet: () => void;
   cancelSwitchOutlet: () => void;
 };
@@ -127,12 +140,29 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, authState } = useAuth();
   const [state, dispatch] = useReducer(cartReducer, initialState);
+  const [platformFee, setPlatformFee] = useState(5); // Default to 5
   const { total, itemCount } = calcDerived(state.items);
   const isInitialMount = useRef(true);
   const isSyncingFromDB = useRef(false);
 
   const confirmSwitchOutlet = () => dispatch({ type: "CONFIRM_SWITCH_OUTLET" });
   const cancelSwitchOutlet = () => dispatch({ type: "SET_PENDING", payload: null });
+
+  // 0. Fetch Global Platform Fee
+  useEffect(() => {
+    const fetchFee = async () => {
+      try {
+        const feeRef = ref(db, "system/config/platformFee/amount");
+        const snapshot = await get(feeRef);
+        if (snapshot.exists()) {
+          setPlatformFee(Number(snapshot.val()));
+        }
+      } catch (err) {
+        console.error("Failed to fetch platform fee:", err);
+      }
+    };
+    fetchFee();
+  }, []);
 
   // 1. Restore Cart from Firebase on Login
   useEffect(() => {
@@ -148,7 +178,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
               type: "SYNC_FROM_DB", 
               payload: { 
                 items: data.items || [], 
-                outletId: data.outletId || null 
+                outletId: data.outletId || null,
+                appliedCoupon: data.appliedCoupon || null
               } 
             });
           }
@@ -179,6 +210,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           await set(cartRef, {
             items: state.items,
             outletId: state.outletId,
+            appliedCoupon: state.appliedCoupon,
             updatedAt: Date.now()
           });
         } catch (err) {
@@ -191,7 +223,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ state, dispatch, total, itemCount, confirmSwitchOutlet, cancelSwitchOutlet }}
+      value={{ state, dispatch, total, itemCount, platformFee, confirmSwitchOutlet, cancelSwitchOutlet }}
     >
       {children}
 

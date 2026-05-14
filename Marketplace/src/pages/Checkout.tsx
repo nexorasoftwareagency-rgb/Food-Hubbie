@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useCart } from "@/context/CartContext";
 import { useOrderContext } from "@/context/OrderContext";
@@ -12,8 +12,9 @@ import { Link } from "wouter";
 import { useLocationContext } from "@/context/LocationContext";
 import { FcGoogle } from "react-icons/fc";
 import { fetchOutletById } from "@/services/outletService";
-import { useEffect } from "react";
 import type { Outlet } from "@/types";
+import { fetchSurgeConfig, fetchGlobalDiscount, validateCoupon, type SurgeConfig, type GlobalDiscount } from "@/services/promotionService";
+import { Tag, X, Loader2, Star } from "lucide-react";
 
 const paymentMethods: { id: PaymentMethod; name: string; icon: typeof ShieldCheck }[] = [
   { id: "upi", name: "UPI", icon: ShieldCheck },
@@ -22,8 +23,10 @@ const paymentMethods: { id: PaymentMethod; name: string; icon: typeof ShieldChec
   { id: "cod", name: "Cash on Delivery", icon: Banknote },
 ];
 
+import { walletService } from "@/services/walletService";
+
 export default function Checkout() {
-  const { state: cartState, dispatch: cartDispatch } = useCart();
+  const { state: cartState, dispatch: cartDispatch, platformFee } = useCart();
   const { placeOrder } = useOrderContext();
   const { user, signInWithGoogle, authState } = useAuth();
   const { state: locationState } = useLocationContext();
@@ -33,11 +36,22 @@ export default function Checkout() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [upiId, setUpiId] = useState("");
   const [outlet, setOutlet] = useState<Outlet | null>(null);
+  const [surge, setSurge] = useState<SurgeConfig | null>(null);
+  const [globalDiscount, setGlobalDiscount] = useState<GlobalDiscount | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   useEffect(() => {
     if (cartState.outletId) {
        fetchOutletById(cartState.outletId).then(setOutlet);
     }
+    // Fetch Promotions
+    fetchSurgeConfig().then(config => {
+      if (config?.isActive) setSurge(config);
+    });
+    fetchGlobalDiscount().then(config => {
+      if (config?.isActive) setGlobalDiscount(config);
+    });
   }, [cartState.outletId]);
 
   const [form, setForm] = useState<DeliveryAddress>({
@@ -51,12 +65,62 @@ export default function Checkout() {
     lng: locationState.coords?.lng ?? 0,
   });
 
-  const summary = calcCartSummary(cartState.items, outlet);
+  const summary = calcCartSummary(cartState.items, outlet, {
+    surgeMultiplier: surge?.multiplier || 1,
+    globalDiscount: globalDiscount ? { type: globalDiscount.type, value: globalDiscount.value } : undefined,
+    couponDiscount: cartState.appliedCoupon ? (cartState.appliedCoupon.type === 'percent' ? Math.round(cartState.items.reduce((s, i) => s + i.price * i.quantity, 0) * (cartState.appliedCoupon.value / 100)) : cartState.appliedCoupon.value) : 0,
+    platformFee
+  });
+  
+  // Projected Cashback (2% of net food value)
+  const projectedBonus = Math.round((summary.subtotal - summary.savings) * 0.02);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setIsValidatingCoupon(true);
+    try {
+      const coupon = await validateCoupon(couponCode);
+      if (coupon) {
+        // Check min order
+        const subtotal = cartState.items.reduce((s, i) => s + i.price * i.quantity, 0);
+        if (coupon.minOrder && subtotal < coupon.minOrder) {
+          alert(`Minimum order of ₹${coupon.minOrder} required for this coupon.`);
+          return;
+        }
+        cartDispatch({ type: "APPLY_COUPON", payload: coupon });
+        setCouponCode("");
+      } else {
+        alert("Invalid or expired promo code.");
+      }
+    } catch (err) {
+      console.error("Coupon validation error:", err);
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (!user) return;
+
+    // 1. Validate wallet balance if selected
+    if (paymentMethod === "wallet") {
+      if ((user.walletBalance || 0) < summary.total) {
+        alert("Insufficient wallet balance. Please choose another payment method.");
+        return;
+      }
+    }
+
     setIsProcessing(true);
     try {
+      const subtotal = cartState.items.reduce((s, i) => s + i.price * i.quantity, 0);
+      const globalDiscountAmount = globalDiscount ? (globalDiscount.type === 'percent' ? Math.round(subtotal * (globalDiscount.value / 100)) : globalDiscount.value) : 0;
+      const couponDiscount = cartState.appliedCoupon ? (cartState.appliedCoupon.type === 'percent' ? Math.round(subtotal * (cartState.appliedCoupon.value / 100)) : cartState.appliedCoupon.value) : 0;
+
+      // 2. Calculate Bonus (2% of net food value - excluding delivery and taxes)
+      const netFoodValue = summary.subtotal - summary.savings;
+      const bonusAmount = Math.round(netFoodValue * 0.02);
+
+      // 3. Place the order in database
       const orderId = await placeOrder({
         outletId: cartState.outletId ?? "",
         items: cartState.items,
@@ -64,9 +128,43 @@ export default function Checkout() {
         deliveryFee: summary.deliveryFee,
         taxes: summary.taxes,
         total: summary.total,
+        discount: summary.savings,
+        couponCode: cartState.appliedCoupon?.code,
+        couponDiscount,
+        globalDiscountAmount,
         paymentMethod,
         deliveryAddress: form,
+        platformFee: summary.platformFee,
+        cashbackBonus: bonusAmount, // Log for transparency
       });
+
+      // 4. Deduct from wallet if payment method is wallet
+      if (paymentMethod === "wallet") {
+        try {
+          await walletService.debitWallet(
+            user.id,
+            summary.total,
+            `Paid for Order #${orderId.slice(-6).toUpperCase()}`,
+            orderId
+          );
+        } catch (walletErr) {
+          console.error("Wallet debit failed after order placement:", walletErr);
+        }
+      }
+
+      // 5. Credit Cashback Bonus (Loyalty Reward)
+      if (bonusAmount > 0) {
+        try {
+          await walletService.creditWallet(
+            user.id,
+            bonusAmount,
+            `2% Order Cashback Reward (#${orderId.slice(-6).toUpperCase()})`,
+            orderId
+          );
+        } catch (bonusErr) {
+          console.error("Bonus credit failed:", bonusErr);
+        }
+      }
       
       cartDispatch({ type: "CLEAR_CART" });
       setLocation(`/tracking/${orderId}`);
@@ -233,6 +331,11 @@ export default function Checkout() {
                         }`}
                       />
                       <span className="font-bold text-sm">{method.name}</span>
+                      {method.id === "wallet" && (
+                        <span className="ml-auto text-xs font-black text-primary bg-primary/10 px-2 py-1 rounded-lg border border-primary/20">
+                          Balance: ₹{user?.walletBalance || 0}
+                        </span>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -258,6 +361,55 @@ export default function Checkout() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Coupons Section */}
+            <div className="bg-card rounded-2xl border border-border shadow-soft overflow-hidden">
+               <div className="bg-secondary/5 px-6 py-4 border-b border-border/50">
+                <h2 className="font-bold text-lg text-secondary flex items-center gap-2">
+                  <Tag className="h-5 w-5" />
+                  Apply Promotions
+                </h2>
+              </div>
+              <div className="p-6">
+                {cartState.appliedCoupon ? (
+                  <div className="flex items-center justify-between p-4 bg-green-500/10 border border-green-500/20 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                        <Tag className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-green-700">{cartState.appliedCoupon.code}</p>
+                        <p className="text-xs text-green-600/80">Coupon applied successfully</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => cartDispatch({ type: "REMOVE_COUPON" })}
+                      className="p-2 hover:bg-green-500/20 rounded-full transition-colors"
+                      title="Remove Coupon"
+                    >
+                      <X className="h-5 w-5 text-green-600" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="ENTER PROMO CODE"
+                      className="flex-1 bg-muted/30 border border-border/50 rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    />
+                    <button 
+                      onClick={handleApplyCoupon}
+                      disabled={isValidatingCoupon || !couponCode.trim()}
+                      className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold shadow-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center"
+                    >
+                      {isValidatingCoupon ? <Loader2 className="h-5 w-5 animate-spin" /> : "Apply"}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -295,6 +447,48 @@ export default function Checkout() {
                   <span className="text-muted-foreground">GST (5%)</span>
                   <span className="font-medium">₹{summary.taxes}</span>
                 </div>
+                {summary.platformFee > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Platform Fee</span>
+                    <span className="font-medium">₹{summary.platformFee}</span>
+                  </div>
+                )}
+                
+                {surge && (
+                  <div className="flex justify-between text-secondary font-bold animate-pulse">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="h-3 w-3" />
+                      Surge: {surge.reason}
+                    </span>
+                    <span>x{surge.multiplier}</span>
+                  </div>
+                )}
+
+                {summary.savings > 0 && (
+                  <div className="flex flex-col gap-1 py-2 border-t border-border/50 mt-2">
+                    {globalDiscount && (
+                       <div className="flex justify-between text-green-600 text-xs font-bold">
+                        <span>Ecosystem Discount</span>
+                        <span>-₹{summary.savings - (cartState.appliedCoupon ? (cartState.appliedCoupon.type === 'percent' ? Math.round(cartState.items.reduce((s, i) => s + i.price * i.quantity, 0) * (cartState.appliedCoupon.value / 100)) : cartState.appliedCoupon.value) : 0)}</span>
+                      </div>
+                    )}
+                    {cartState.appliedCoupon && (
+                       <div className="flex justify-between text-green-600 text-xs font-bold">
+                        <span>Coupon ({cartState.appliedCoupon.code})</span>
+                        <span>-₹{cartState.appliedCoupon.type === 'percent' ? Math.round(cartState.items.reduce((s, i) => s + i.price * i.quantity, 0) * (cartState.appliedCoupon.value / 100)) : cartState.appliedCoupon.value}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {projectedBonus > 0 && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 mt-4 animate-in slide-in-from-bottom-2">
+                    <div className="flex items-center gap-2 text-emerald-700">
+                      <Star className="h-4 w-4 fill-emerald-500" />
+                      <span className="text-xs font-bold">You will earn ₹{projectedBonus} credits!</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-border pt-4 mb-6 flex justify-between items-center">

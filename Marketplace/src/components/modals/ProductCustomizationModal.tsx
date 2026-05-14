@@ -68,6 +68,7 @@ export function ProductCustomizationModal({ item, isOpen, onClose }: ProductCust
             <button
               onClick={onClose}
               className="absolute top-3 right-3 bg-background/80 backdrop-blur text-foreground p-1.5 rounded-full hover:bg-background transition-colors z-10 shadow-lg"
+              title="Close Modal"
             >
               <X className="h-4 w-4" />
             </button>
@@ -148,6 +149,7 @@ export function ProductCustomizationModal({ item, isOpen, onClose }: ProductCust
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   className="p-1 bg-background rounded shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors"
+                  title="Decrease Quantity"
                 >
                   <Minus className="h-4 w-4" />
                 </button>
@@ -155,6 +157,7 @@ export function ProductCustomizationModal({ item, isOpen, onClose }: ProductCust
                 <button
                   onClick={() => setQuantity(quantity + 1)}
                   className="p-1 bg-background rounded shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors"
+                  title="Increase Quantity"
                 >
                   <Plus className="h-4 w-4" />
                 </button>

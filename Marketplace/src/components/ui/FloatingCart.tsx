@@ -27,8 +27,10 @@ export function FloatingCart() {
               <div className="font-bold text-sm">
                 {itemCount} {itemCount === 1 ? "Item" : "Items"}
               </div>
-              <div className="text-primary-foreground/80 text-xs mt-0.5">
-                Extra charges may apply
+              <div className="text-primary-foreground/90 text-xs mt-0.5 font-medium">
+                {state.appliedCoupon 
+                  ? `Promo: ${state.appliedCoupon.code} Applied ✨` 
+                  : "Extra charges may apply"}
               </div>
             </div>
             
