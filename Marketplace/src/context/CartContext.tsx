@@ -73,6 +73,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         items: [state.pendingItem],
         outletId: state.pendingItem.outletId,
         pendingItem: null,
+        appliedCoupon: null,
       };
     }
 

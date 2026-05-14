@@ -14,8 +14,10 @@ function mapFirebaseUser(fbUser: any): User {
     email: fbUser.email || "",
     avatar: fbUser.photoURL || "",
     phone: fbUser.phoneNumber || "",
-    savedAddresses: [], 
+    savedAddresses: [],
     loyaltyPoints: 0,
+    walletBalance: 0,
+    walletHistory: [],
     createdAt: fbUser.metadata.creationTime || new Date().toISOString()
   };
 }

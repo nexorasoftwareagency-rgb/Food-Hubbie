@@ -9,7 +9,7 @@ import { fetchOutlets } from "./outletService";
 /** 
  * Map legacy dish format to SaaS MenuItem
  */
-function mapLegacyDish(id: string, dish: any, outletId: string, businessId: string): MenuItem {
+function mapLegacyDish(id: string, dish: any, outletId: string, businessId: string, outletName: string): MenuItem {
   const sizes: MenuItemSize[] = [];
   if (dish.sizes) {
     for (const sId in dish.sizes) {
@@ -38,6 +38,7 @@ function mapLegacyDish(id: string, dish: any, outletId: string, businessId: stri
     id: id,
     outletId: outletId,
     businessId: businessId,
+    outletName: outletName,
     name: dish.name || "Unknown Dish",
     description: dish.description || dish.name || "",
     image: dish.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591",

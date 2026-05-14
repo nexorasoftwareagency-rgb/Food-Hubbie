@@ -97,21 +97,23 @@
             </div>
             <h2>ROSHANI RIDER</h2>
             <p>Secured Access Portal</p>
-            <div class="input-group">
-                <label for="email">Mobile Number / Email</label>
-                <div class="input-wrapper">
-                    <i data-lucide="phone"></i>
-                    <input type="text" id="email" placeholder="Enter mobile or email" autocomplete="username">
+            <form id="loginForm" onsubmit="event.preventDefault(); window.login();">
+                <div class="input-group">
+                    <label for="email">Mobile Number / Email</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="phone"></i>
+                        <input type="text" id="email" placeholder="Enter mobile or email" autocomplete="username" required>
+                    </div>
                 </div>
-            </div>
-            <div class="input-group">
-                <label for="password">Access Password</label>
-                <div class="input-wrapper">
-                    <i data-lucide="lock"></i>
-                    <input type="password" id="password" placeholder="Enter secure password" autocomplete="current-password">
+                <div class="input-group">
+                    <label for="password">Access Password</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="lock"></i>
+                        <input type="password" id="password" placeholder="Enter secure password" autocomplete="current-password" required>
+                    </div>
                 </div>
-            </div>
-            <button class="btn-primary full-width mt-10" id="loginBtn">AUTHENTICATE & START</button>
+                <button type="submit" class="btn-primary full-width mt-10" id="loginBtn">AUTHENTICATE & START</button>
+            </form>
             <p id="loginError" class="error-msg hidden"></p>
             <p class="text-muted text-xtra-small mt-20">Contact Admin if you forgot your credentials</p>
         </div>

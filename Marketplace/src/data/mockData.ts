@@ -18,6 +18,8 @@ export const mockUser: User = {
   name: "Guest User",
   phone: "",
   loyaltyPoints: 0,
+  walletBalance: 0,
+  walletHistory: [],
   savedAddresses: [],
   createdAt: new Date().toISOString(),
 };

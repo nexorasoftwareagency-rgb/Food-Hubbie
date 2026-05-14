@@ -70,6 +70,7 @@ export type MenuItem = {
   id: string;
   outletId: string;
   businessId: string;
+  outletName: string;
   name: string;
   description: string;
   image: string;

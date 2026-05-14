@@ -1237,6 +1237,9 @@ async function initRealtimeListeners() {
         }
     });
     window._activeListeners.push(unsubNotif);
+    } catch (error) {
+        console.error("[Sync] Critical Initialization Error:", error);
+    }
 }
 
 // ZOMATO-STYLE GLOBAL SLIDER DELEGATION (Phase 5.0)
