@@ -137,10 +137,22 @@ export function initAuth() {
             }
 
             if (!adminData) {
+                // Check if this is a pending onboarding request
+                console.log("[Auth] No standard admin profile. Checking onboarding_requests...");
+                const onboardSnap = await db.ref(`onboarding_requests/${user.uid}`).once("value");
+                if (onboardSnap.exists()) {
+                    console.log("[Auth] Pending Partner Detected");
+                    adminData = onboardSnap.val();
+                    adminData.isPending = true;
+                    adminData.role = "Partner (Pending)";
+                }
+            }
+
+            if (!adminData) {
                 console.error("[Auth] Access Denied: No profile found for UID", user.uid);
                 throw new Error("ACCESS_DENIED");
             }
-            console.log("[Auth] Profile loaded successfully:", adminData.name, "(Outlet:", adminData.outlet, ")");
+            console.log("[Auth] Profile loaded successfully:", adminData.name || adminData.bizName, "(Role:", adminData.role, ")");
         } catch (e) {
             console.error("[Auth] Admin Profile Fetch Error:", e);
             // Check custom claims for emergency super admin access
@@ -246,8 +258,23 @@ export function initAuth() {
 
         // Show UI
         const authOverlay = document.getElementById("authOverlay");
+        const pendingOverlay = document.getElementById("pendingOverlay");
+        const onboardingOverlay = document.getElementById("onboardingOverlay");
         const layout = document.querySelector(".layout");
+
+        if (adminData.isPending) {
+            console.log("[Auth] Gating access: User is PENDING_APPROVAL");
+            if (authOverlay) authOverlay.classList.add('hidden');
+            if (onboardingOverlay) onboardingOverlay.classList.add('hidden');
+            if (layout) layout.classList.add('hidden');
+            if (pendingOverlay) pendingOverlay.classList.remove('hidden');
+            window.hideLoader?.();
+            return;
+        }
+
         if (authOverlay) authOverlay.classList.add('hidden');
+        if (onboardingOverlay) onboardingOverlay.classList.add('hidden');
+        if (pendingOverlay) pendingOverlay.classList.add('hidden');
         if (layout) {
             layout.classList.remove('hidden');
             layout.classList.add('flex');

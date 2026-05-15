@@ -9,11 +9,13 @@ import {
   Home,
   Phone,
   ArrowLeft,
+  Star,
 } from "lucide-react";
 import { useOrderContext } from "@/context/OrderContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { STATUS_PIPELINE, statusIndex } from "@/services/orderService";
 import type { OrderStatus } from "@/types";
+import ReviewModal from "@/components/modals/ReviewModal";
 
 const stageIcons: Record<OrderStatus, typeof CheckCircle2> = {
   Placed: CheckCircle2,
@@ -36,11 +38,12 @@ const stageMessages: Partial<Record<OrderStatus, string>> = {
 
 export default function Tracking() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { orders, updateOrderStatus, getOrderById } = useOrderContext();
+  const { orders, updateOrderStatus, getOrderById, markOrderAsReviewed } = useOrderContext();
   const order = getOrderById(orderId ?? "");
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [eta, setEta] = useState(35);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   useEffect(() => {
     if (!order) return;
@@ -120,9 +123,23 @@ export default function Tracking() {
               <p className="text-lg font-heading font-bold text-foreground">
                 Delivered Successfully!
               </p>
-              <p className="text-sm text-muted-foreground">
-                Hope you enjoyed your meal.
-              </p>
+              
+              {!order.isReviewed ? (
+                <div className="mt-4 w-full pt-4 border-t border-border border-dashed">
+                  <p className="text-sm text-muted-foreground mb-4">How was your experience with {order.outletName}?</p>
+                  <button
+                    onClick={() => setIsReviewModalOpen(true)}
+                    className="w-full bg-primary text-primary-foreground py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                  >
+                    <Star className="h-4 w-4 fill-primary-foreground" />
+                    Rate Now
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Thanks for your feedback!
+                </p>
+              )}
             </motion.div>
           ) : (
             <>
@@ -286,6 +303,15 @@ export default function Tracking() {
           Continue Ordering
         </Link>
       </div>
+
+      {order && (
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onClose={() => setIsReviewModalOpen(false)}
+          order={order}
+          onSuccess={() => markOrderAsReviewed(order.id)}
+        />
+      )}
     </div>
   );
 }

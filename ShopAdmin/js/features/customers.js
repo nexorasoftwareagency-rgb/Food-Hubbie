@@ -1,7 +1,7 @@
 import { state } from '../state.js';
 import { Outlet } from '../firebase.js';
 import { ui } from '../ui.js';
-import { logAudit, escapeHtml, formatDate, haptic, getISTDateString } from '../utils.js';
+import { logAudit, atomicAdminAction, escapeHtml, formatDate, haptic, getISTDateString, safeCSV } from '../utils.js';
 
 // --- CUSTOMERS ---
 
@@ -294,16 +294,16 @@ export function downloadExcel() {
 
     const data = salesData.map(o => ({
         Date: formatDate(o.createdAt),
-        "Order ID": o.orderId || o.id,
-        Customer: o.customerName || 'Guest',
-        Phone: o.phone || '',
+        "Order ID": safeCSV(o.orderId || o.id),
+        Customer: safeCSV(o.customerName || 'Guest'),
+        Phone: safeCSV(o.phone || ''),
         Total: o.total || 0,
-        Method: o.paymentMethod || 'COD',
-        Status: o.status,
+        Method: safeCSV(o.paymentMethod || 'COD'),
+        Status: safeCSV(o.status),
         Items: (() => {
             const rawItems = o.cart || (Array.isArray(o.items) ? o.items : Object.values(o.items || {}));
             const items = rawItems.length ? rawItems : (o.item ? [{name: o.item, qty: 1}] : []);
-            return items.map(i => `${i.name || i.item} x${i.qty || i.quantity || 1}`).join(', ');
+            return safeCSV(items.map(i => `${i.name || i.item} x${i.qty || i.quantity || 1}`).join(', '));
         })()
     }));
 
@@ -351,13 +351,13 @@ export function downloadPDF() {
 
     const tableData = salesData.map(o => [
         formatDate(o.createdAt),
-        o.customerName || 'Guest',
+        safeCSV(o.customerName || 'Guest'),
         `Rs. ${o.total}`,
-        o.paymentMethod || 'COD',
+        safeCSV(o.paymentMethod || 'COD'),
         (() => {
             const rawItems = o.cart || (Array.isArray(o.items) ? o.items : Object.values(o.items || {}));
             const items = rawItems.length ? rawItems : (o.item ? [{name: o.item, qty: 1}] : []);
-            return items.map(i => `${i.name || i.item} x${i.qty || i.quantity || 1}`).join(', ');
+            return safeCSV(items.map(i => `${i.name || i.item} x${i.qty || i.quantity || 1}`).join(', '));
         })()
     ]);
 
@@ -466,8 +466,14 @@ export async function clearLostSales() {
 
     haptic(20);
     try {
-        await Outlet.ref('logs/lostSales').remove();
-        logAudit("Maintenance", "Cleared All Lost Sales Logs", "Global");
+        const updates = {};
+        updates['logs/lostSales'] = null; // Atomic removal
+        
+        await atomicAdminAction(updates, "MAINTENANCE_CLEAR_LOST_SALES", {
+            action: "Purged All Abandoned Cart Records",
+            scope: "Global Logs"
+        });
+        
         ui.showToast("Logs cleared successfully", "success");
         loadLostSales();
     } catch (e) {

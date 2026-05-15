@@ -263,9 +263,14 @@ window.forceOutlet = (outletId, businessId) => {
  * FILE UPLOAD UTILITY (Base64)
  * Converts images to compressed Base64 for database storage.
  */
+/**
+ * FILE UPLOAD UTILITY (Base64)
+ * Converts images to compressed Base64 for database storage.
+ * Automatically compresses images to < 200KB.
+ */
 export async function uploadImage(fileOrBlob, path) {
     if (!fileOrBlob) return null;
-    console.log(`[Database Store] Converting ${path || 'image'} to text-based Base64...`);
+    console.log(`[Database Store] Processing ${path || 'image'} with 200KB constraint...`);
 
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -275,22 +280,42 @@ export async function uploadImage(fileOrBlob, path) {
             img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 600;
                 let width = img.width;
                 let height = img.height;
-
+                
+                // Initial size limit (maxWidth 1024)
+                const MAX_WIDTH = 1024;
                 if (width > MAX_WIDTH) {
                     height = (MAX_WIDTH / width) * height;
                     width = MAX_WIDTH;
                 }
 
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+                const compress = (w, h, quality) => {
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, w, h);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    return canvas.toDataURL('image/jpeg', quality);
+                };
 
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                console.log(`[Database Store] Image converted. Size: ${(dataUrl.length / 1024).toFixed(1)} KB`);
+                let quality = 0.8;
+                let dataUrl = compress(width, height, quality);
+                
+                // Iterative Compression Loop
+                let iterations = 0;
+                while (dataUrl.length > 200 * 1024 && iterations < 5) {
+                    if (quality > 0.3) {
+                        quality -= 0.15;
+                    } else {
+                        width *= 0.8;
+                        height *= 0.8;
+                    }
+                    dataUrl = compress(width, height, quality);
+                    iterations++;
+                }
+
+                console.log(`[Database Store] Final Size: ${(dataUrl.length / 1024).toFixed(1)} KB (Iter: ${iterations})`);
                 resolve(dataUrl);
             };
             img.onerror = (err) => reject(new Error("Image processing failed"));

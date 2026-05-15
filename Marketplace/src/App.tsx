@@ -10,6 +10,8 @@ import { OrderProvider } from "@/context/OrderContext";
 import { AuthProvider } from "@/context/AuthContext";
 
 import { AppLayout } from "@/components/layout/AppLayout";
+import { NotificationHandler } from "@/components/notifications/NotificationHandler";
+import { Toaster as Sonner } from "@/components/ui/sonner";
 
 import Home from "@/pages/Home";
 import Outlets from "@/pages/Outlets";
@@ -59,6 +61,8 @@ function App() {
                   <Router />
                 </WouterRouter>
                 <Toaster />
+                <Sonner />
+                <NotificationHandler />
               </TooltipProvider>
             </CartProvider>
           </OrderProvider>

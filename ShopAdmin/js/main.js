@@ -37,10 +37,23 @@ import {
 import { saveStoreSettings, quickUpdateOutletStatus, addFeeSlab } from './features/settings.js';
 import { initRiderAnalytics } from './features/rider-analytics.js';
 import { initInventory } from './features/inventory.js';
+import { renderSettlements, exportSettlementLedger } from './features/settlements.js';
 
 // Side-effect imports
 import './firebase.js';
 import './branding.js';
+
+// Expose for DOM events
+window.switchTab = switchTab;
+window.toggleSidebar = toggleSidebar;
+window.adminLogin = adminLogin;
+window.userLogout = userLogout;
+window.openOrderDrawer = openOrderDrawer;
+window.updateStatus = updateStatus;
+window.assignRider = assignRider;
+window.printReceiptById = printReceiptById;
+window.renderSettlements = renderSettlements;
+window.exportSettlements = exportSettlementLedger;
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("[Main] DOM Content Loaded. Initializing...");

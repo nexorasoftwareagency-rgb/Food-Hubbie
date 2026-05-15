@@ -1,5 +1,5 @@
 import { Outlet, uploadImage, deleteImage } from '../firebase.js';
-import { showToast, escapeHtml, logAudit } from '../utils.js';
+import { showToast, escapeHtml, logAudit, atomicAdminAction } from '../utils.js';
 import { state } from '../state.js';
 import { requireAdminReauth } from '../auth.js';
 import { showConfirm } from '../ui-utils.js';
@@ -92,23 +92,26 @@ export async function addCategory() {
 
         const order = parseInt(orderInput?.value) || 0;
 
+        const updates = {};
         const data = {
             name: name,
             image: imageUrl,
             order: order,
             outlet: (window.currentOutlet || 'outlet_pizza').toLowerCase(),
-            addons: Object.keys(addons).length > 0 ? addons : null
+            addons: Object.keys(addons).length > 0 ? addons : null,
+            updatedAt: ServerValue.TIMESTAMP
         };
 
         if (state.editingCategoryId) {
-            await Outlet.ref(`categories/${state.editingCategoryId}`).update(data);
+            updates[`categories/${state.editingCategoryId}`] = data;
+            await atomicAdminAction(updates, 'CATALOG_CATEGORY_UPDATE', { name, id: state.editingCategoryId });
             showToast('Category updated successfully!', 'success');
-            logAudit("Catalog", `Updated Category: ${name}`, state.editingCategoryId);
             state.editingCategoryId = null;
         } else {
-            await Outlet.ref('categories').push(data);
+            const newId = Outlet.ref('categories').push().key;
+            updates[`categories/${newId}`] = data;
+            await atomicAdminAction(updates, 'CATALOG_CATEGORY_ADD', { name, id: newId });
             showToast('Category added successfully!', 'success');
-            logAudit("Catalog", `Added Category: ${name}`, "Global");
         }
 
         // Reset Form
@@ -200,15 +203,18 @@ export async function deleteCategory(id) {
                     }
                 });
 
-                // 2. Perform atomic database cleanup
-                await Outlet.ref('').update(updates);
+                // 2. Perform atomic database cleanup with Audit
+                await atomicAdminAction(updates, 'CATALOG_CATEGORY_DELETE', { 
+                    name: catName, 
+                    id, 
+                    dishesDeleted: Object.keys(updates).length - 1 
+                });
 
                 // 3. Cleanup storage (Background)
                 imagesToDelete.forEach(img => {
                     deleteImage(img).catch(err => console.warn("[Catalog] Image deletion failed:", img, err));
                 });
 
-                logAudit("Catalog", `Deleted Category and associated dishes: ${catName}`, id);
                 showToast(`Category "${catName}" and all its items deleted.`, 'success');
             } catch (err) {
                 console.error("[Catalog] Delete failed:", err);
@@ -370,6 +376,11 @@ export async function saveDish() {
 
         const order = parseInt(document.getElementById('dishOrder')?.value) || 0;
 
+        // Fetch current store name for denormalization
+        const storeSnap = await Outlet.ref('settings/Store/storeName').once('value');
+        const storeName = storeSnap.val() || "Restaurant";
+
+        const updates = {};
         const data = {
             name,
             category: cat,
@@ -378,16 +389,20 @@ export async function saveDish() {
             stock: true,
             order: order,
             sizes: Object.keys(sizes).length > 0 ? sizes : null,
-            addons: Object.keys(addons).length > 0 ? addons : null
+            addons: Object.keys(addons).length > 0 ? addons : null,
+            outletName: storeName,
+            outletId: Outlet.current,
+            businessId: Outlet.businessId,
+            updatedAt: ServerValue.TIMESTAMP
         };
 
-        const ref = Outlet.ref('dishes');
         if (state.editingDishId) {
-            await ref.child(state.editingDishId).update(data);
-            logAudit("Catalog", `Updated Dish: ${name}`, state.editingDishId);
+            updates[`dishes/${state.editingDishId}`] = data;
+            await atomicAdminAction(updates, 'CATALOG_DISH_UPDATE', { name, id: state.editingDishId });
         } else {
-            const newRef = await ref.push(data);
-            logAudit("Catalog", `Added New Dish: ${name}`, newRef.key);
+            const newId = Outlet.ref('dishes').push().key;
+            updates[`dishes/${newId}`] = data;
+            await atomicAdminAction(updates, 'CATALOG_DISH_ADD', { name, id: newId });
         }
 
         hideDishModal();
@@ -441,11 +456,18 @@ export function deleteDish(dishId) {
             try {
                 const snap = await Outlet.ref(`dishes/${dishId}`).once('value');
                 const d = snap.val();
-                const dishName = d?.name || "Unknown";
-                const img = d?.image;
-                if (img) await deleteImage(img);
-                await Outlet.ref(`dishes/${dishId}`).remove();
-                logAudit("Catalog", `Deleted Dish: ${dishName}`, dishId);
+                if (!d) return showToast("Dish not found", "error");
+                
+                const dishName = d.name;
+                const img = d.image;
+
+                const updates = {};
+                updates[`dishes/${dishId}`] = null;
+
+                await atomicAdminAction(updates, 'CATALOG_DISH_DELETE', { name: dishName, id: dishId });
+                
+                if (img) await deleteImage(img).catch(e => console.warn("Image delete failed:", e));
+                
                 showToast('Dish deleted', 'success');
             } catch (e) {
                 showToast('Delete failed: ' + e.message, 'error');

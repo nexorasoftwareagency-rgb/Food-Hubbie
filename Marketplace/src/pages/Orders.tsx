@@ -1,9 +1,11 @@
 import { useOrderContext } from "@/context/OrderContext";
 import { Link } from "wouter";
-import { ArrowRight, Clock, Receipt, RotateCcw } from "lucide-react";
+import { ArrowRight, Clock, Receipt, RotateCcw, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import type { Order } from "@/types";
+import { useState } from "react";
+import ReviewModal from "@/components/modals/ReviewModal";
 
 function statusBadgeClass(status: Order["status"]): string {
   switch (status) {
@@ -22,8 +24,9 @@ function statusBadgeClass(status: Order["status"]): string {
 }
 
 export default function Orders() {
-  const { orders } = useOrderContext();
+  const { orders, markOrderAsReviewed } = useOrderContext();
   const { dispatch } = useCart();
+  const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
 
   const handleReorder = (order: Order) => {
     dispatch({ type: "CLEAR_CART" });
@@ -127,6 +130,15 @@ export default function Orders() {
                 </span>
 
                 <div className="flex gap-3">
+                  {order.status === "Delivered" && !order.isReviewed && (
+                    <button
+                      onClick={() => setReviewOrder(order)}
+                      className="flex items-center gap-1.5 text-sm font-bold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors"
+                    >
+                      <Star className="h-4 w-4 fill-primary" />
+                      Rate Order
+                    </button>
+                  )}
                   {order.status !== "Cancelled" && (
                     <button
                       onClick={() => handleReorder(order)}
@@ -149,6 +161,15 @@ export default function Orders() {
             </motion.div>
           ))}
         </div>
+      )}
+
+      {reviewOrder && (
+        <ReviewModal
+          isOpen={!!reviewOrder}
+          onClose={() => setReviewOrder(null)}
+          order={reviewOrder}
+          onSuccess={() => markOrderAsReviewed(reviewOrder.id)}
+        />
       )}
     </div>
   );

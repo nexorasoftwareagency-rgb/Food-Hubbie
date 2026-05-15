@@ -35,11 +35,12 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [isProcessing, setIsProcessing] = useState(false);
   const [upiId, setUpiId] = useState("");
+  const [isFreeDelivery, setIsFreeDelivery] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [surge, setSurge] = useState<SurgeConfig | null>(null);
   const [globalDiscount, setGlobalDiscount] = useState<GlobalDiscount | null>(null);
-  const [couponCode, setCouponCode] = useState("");
-  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   useEffect(() => {
     if (cartState.outletId) {
@@ -52,7 +53,11 @@ export default function Checkout() {
     fetchGlobalDiscount().then(config => {
       if (config?.isActive) setGlobalDiscount(config);
     });
-  }, [cartState.outletId]);
+    // Check if free delivery is already applied from Cart page
+    if (cartState.appliedCoupon?.code === "FREESHIP") {
+      setIsFreeDelivery(true);
+    }
+  }, [cartState.outletId, cartState.appliedCoupon]);
 
   const [form, setForm] = useState<DeliveryAddress>({
     name: user?.name ?? "",
@@ -69,11 +74,12 @@ export default function Checkout() {
     surgeMultiplier: surge?.multiplier || 1,
     globalDiscount: globalDiscount ? { type: globalDiscount.type, value: globalDiscount.value } : undefined,
     couponDiscount: cartState.appliedCoupon ? (cartState.appliedCoupon.type === 'percent' ? Math.round(cartState.items.reduce((s, i) => s + i.price * i.quantity, 0) * (cartState.appliedCoupon.value / 100)) : cartState.appliedCoupon.value) : 0,
-    platformFee
+    platformFee,
+    isFreeDelivery
   });
   
   // Projected Cashback (2% of net food value)
-  const projectedBonus = Math.round((summary.subtotal - summary.savings) * 0.02);
+  const projectedBonus = Math.round((summary.subtotal - (cartState.appliedCoupon?.type === 'percent' ? Math.round(summary.subtotal * (cartState.appliedCoupon.value / 100)) : (cartState.appliedCoupon?.value || 0))) * 0.02);
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -87,13 +93,17 @@ export default function Checkout() {
           alert(`Minimum order of ₹${coupon.minOrder} required for this coupon.`);
           return;
         }
+        if (couponCode.toUpperCase() === "FREESHIP") {
+          setIsFreeDelivery(true);
+        }
         cartDispatch({ type: "APPLY_COUPON", payload: coupon });
         setCouponCode("");
       } else {
         alert("Invalid or expired promo code.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Coupon validation error:", err);
+      alert(err.message || "Failed to validate coupon. Please try again.");
     } finally {
       setIsValidatingCoupon(false);
     }
@@ -117,8 +127,7 @@ export default function Checkout() {
       const couponDiscount = cartState.appliedCoupon ? (cartState.appliedCoupon.type === 'percent' ? Math.round(subtotal * (cartState.appliedCoupon.value / 100)) : cartState.appliedCoupon.value) : 0;
 
       // 2. Calculate Bonus (2% of net food value - excluding delivery and taxes)
-      const netFoodValue = summary.subtotal - summary.savings;
-      const bonusAmount = Math.round(netFoodValue * 0.02);
+      const bonusAmount = projectedBonus;
 
       // 3. Place the order in database
       const orderId = await placeOrder({
@@ -135,7 +144,7 @@ export default function Checkout() {
         paymentMethod,
         deliveryAddress: form,
         platformFee: summary.platformFee,
-        cashbackBonus: bonusAmount, // Log for transparency
+        cashbackBonus: bonusAmount,
       });
 
       // 4. Deduct from wallet if payment method is wallet
@@ -149,6 +158,11 @@ export default function Checkout() {
           );
         } catch (walletErr) {
           console.error("Wallet debit failed after order placement:", walletErr);
+          const { updateOrderStatus } = await import("@/services/orderService");
+          await updateOrderStatus(orderId, "Cancelled", "Payment Failed");
+          alert("Wallet payment failed. Order cancelled.");
+          setIsProcessing(false);
+          return;
         }
       }
 
@@ -163,6 +177,9 @@ export default function Checkout() {
           );
         } catch (bonusErr) {
           console.error("Bonus credit failed:", bonusErr);
+          const { markCashbackPending } = await import("@/services/orderService");
+          await markCashbackPending(orderId, bonusAmount);
+          alert("Cashback pending—will be credited shortly.");
         }
       }
       
@@ -235,66 +252,66 @@ export default function Checkout() {
 
               <div className="p-6">
                 {/* Saved addresses quick-pick */}
-                {user?.savedAddresses && (user.savedAddresses || []).length > 0 && (
-                  <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-                    {(user.savedAddresses || []).map((addr) => (
-                      <button
-                        key={addr.id}
-                        onClick={() =>
-                          setForm((prev) => ({
-                            ...prev,
-                            address: addr.address,
-                            landmark: addr.landmark ?? "",
-                          }))
-                        }
-                        className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
-                          form.address === addr.address
-                            ? "bg-primary text-white border-primary shadow-md shadow-primary/20"
-                            : "border-border bg-muted/50 hover:bg-muted"
-                        }`}
-                      >
-                        {addr.label}
-                      </button>
+                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                      {(user.savedAddresses || []).map((addr) => (
+                        <button
+                          key={addr.id}
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              address: addr.address,
+                              landmark: addr.landmark ?? "",
+                            }))
+                          }
+                          className={`flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
+                            form.address === addr.address
+                              ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                              : "border-border bg-muted/50 hover:bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <MapPin className="h-3 w-3" />
+                          {addr.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    {(
+                      [
+                        { key: "name", label: "Full Name", type: "text", placeholder: "e.g. John Doe" },
+                        { key: "phone", label: "Phone Number", type: "tel", placeholder: "e.g. 98765 43210" },
+                        { key: "address", label: "Complete Address", type: "textarea", placeholder: "House No, Street, Locality..." },
+                        { key: "landmark", label: "Landmark (optional)", type: "text", placeholder: "e.g. Near Big Bazaar" },
+                      ] as const
+                    ).map(({ key, label, type, placeholder }) => (
+                      <div key={key}>
+                        <label className="block text-[10px] font-black text-muted-foreground mb-1.5 uppercase tracking-widest opacity-70">
+                          {label}
+                        </label>
+                        {type === "textarea" ? (
+                          <textarea
+                            value={form[key] ?? ""}
+                            onChange={(e) =>
+                              setForm((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                            placeholder={placeholder}
+                            className="w-full bg-muted/30 border border-border/50 rounded-xl p-3.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[100px] transition-all"
+                          />
+                        ) : (
+                          <input
+                            type={type}
+                            value={form[key] ?? ""}
+                            onChange={(e) =>
+                              setForm((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                            placeholder={placeholder}
+                            className="w-full bg-muted/30 border border-border/50 rounded-xl p-3.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                          />
+                        )}
+                      </div>
                     ))}
                   </div>
-                )}
-
-                <div className="space-y-4">
-                  {(
-                    [
-                      { key: "name", label: "Full Name", type: "text", placeholder: "John Doe" },
-                      { key: "phone", label: "Phone Number", type: "tel", placeholder: "9876543210" },
-                      { key: "address", label: "Complete Address", type: "textarea", placeholder: "House No, Street, Locality..." },
-                      { key: "landmark", label: "Landmark (optional)", type: "text", placeholder: "Near..." },
-                    ] as const
-                  ).map(({ key, label, type, placeholder }) => (
-                    <div key={key}>
-                      <label className="block text-[10px] font-black text-muted-foreground mb-1.5 uppercase tracking-widest opacity-70">
-                        {label}
-                      </label>
-                      {type === "textarea" ? (
-                        <textarea
-                          value={form[key] ?? ""}
-                          onChange={(e) =>
-                            setForm((prev) => ({ ...prev, [key]: e.target.value }))
-                          }
-                          placeholder={placeholder}
-                          className="w-full bg-muted/30 border border-border/50 rounded-xl p-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[100px] transition-all"
-                        />
-                      ) : (
-                        <input
-                          type={type}
-                          value={form[key] ?? ""}
-                          onChange={(e) =>
-                            setForm((prev) => ({ ...prev, [key]: e.target.value }))
-                          }
-                          placeholder={placeholder}
-                          className="w-full bg-muted/30 border border-border/50 rounded-xl p-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -312,29 +329,35 @@ export default function Checkout() {
                   {(paymentMethods || []).map((method) => (
                     <label
                       key={method.id}
-                      className={`flex items-center gap-4 p-4 border-2 rounded-2xl cursor-pointer transition-all ${
+                      className={`flex items-center gap-4 p-4 border-2 rounded-2xl cursor-pointer transition-all relative group ${
                         paymentMethod === method.id
-                          ? "border-primary bg-primary/5 shadow-sm"
+                          ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
                           : "border-border/50 hover:bg-muted/50"
                       }`}
                     >
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        paymentMethod === method.id ? "border-primary" : "border-muted-foreground/30"
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                        paymentMethod === method.id ? "border-primary bg-primary" : "border-muted-foreground/30"
                       }`}>
-                        {paymentMethod === method.id && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                        {paymentMethod === method.id && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                       </div>
-                      <method.icon
-                        className={`h-5 w-5 ${
-                          paymentMethod === method.id
-                            ? "text-primary"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                      <span className="font-bold text-sm">{method.name}</span>
-                      {method.id === "wallet" && (
-                        <span className="ml-auto text-xs font-black text-primary bg-primary/10 px-2 py-1 rounded-lg border border-primary/20">
-                          Balance: ₹{user?.walletBalance || 0}
+                      <div className={`p-2 rounded-xl transition-colors ${paymentMethod === method.id ? "bg-primary text-white" : "bg-muted text-muted-foreground group-hover:bg-muted/80"}`}>
+                        <method.icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-black text-sm uppercase tracking-tight">{method.name}</span>
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          {method.id === 'upi' ? "Pay instantly using any UPI App" : 
+                           method.id === 'card' ? "Secure payments via Visa/MasterCard" :
+                           method.id === 'wallet' ? "Use your Foodhubbie credits" :
+                           "Pay when food arrives"}
                         </span>
+                      </div>
+                      {method.id === "wallet" && (
+                        <div className="ml-auto flex flex-col items-end">
+                           <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-1 rounded-lg border border-primary/20">
+                            ₹{user?.walletBalance || 0}
+                          </span>
+                        </div>
                       )}
                     </label>
                   ))}

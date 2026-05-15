@@ -17,6 +17,8 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
 
   const cartItem = state.items.find((i) => i.id === item.id);
   const quantity = cartItem?.quantity || 0;
+  
+  const isOutOfStock = item.isAvailable === false || (item.stock !== undefined && item.stock <= 0);
 
   // Perspective Tilt Logic
   const x = useMotionValue(0);
@@ -92,7 +94,9 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
           rotateY,
           transformStyle: "preserve-3d",
         }}
-        className="flex gap-4 p-4 bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 group relative"
+        className={`flex gap-4 p-4 bg-card rounded-2xl border border-border/50 shadow-sm transition-all duration-300 group relative ${
+          isOutOfStock ? "opacity-70 grayscale-[0.5]" : "hover:shadow-xl hover:border-primary/20"
+        }`}
       >
         <div 
           style={{ transform: "translateZ(20px)" }}
@@ -154,16 +158,28 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
           <img
             src={item.image}
             alt={item.name}
-            className="w-full h-full object-cover rounded-2xl shadow-sm group-hover:scale-105 transition-transform duration-500"
+            className={`w-full h-full object-cover rounded-2xl shadow-sm transition-transform duration-500 ${
+              !isOutOfStock && "group-hover:scale-105"
+            }`}
           />
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
+              <span className="text-[10px] font-black text-white bg-red-600 px-2 py-1 rounded-lg uppercase tracking-widest shadow-lg">
+                Sold Out
+              </span>
+            </div>
+          )}
           <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-24 z-10">
             {quantity === 0 ? (
               <button
                 onClick={handleAdd}
-                className="w-full bg-background border border-primary/20 text-primary font-black py-2 rounded-xl shadow-lg hover:shadow-primary/20 hover:bg-primary hover:text-white transition-all uppercase text-xs tracking-widest active:scale-95"
+                disabled={isOutOfStock}
+                className={`w-full bg-background border border-primary/20 text-primary font-black py-2 rounded-xl shadow-lg transition-all uppercase text-xs tracking-widest active:scale-95 ${
+                  isOutOfStock ? "opacity-50 cursor-not-allowed grayscale" : "hover:shadow-primary/20 hover:bg-primary hover:text-white"
+                }`}
               >
-                ADD
-                {item.customizable && <span className="absolute top-0 right-1 text-[8px] opacity-70">+</span>}
+                {isOutOfStock ? "UNAVAILABLE" : "ADD"}
+                {item.customizable && !isOutOfStock && <span className="absolute top-0 right-1 text-[8px] opacity-70">+</span>}
               </button>
             ) : (
               <div className="flex items-center justify-between w-full bg-primary text-primary-foreground font-black py-2 px-2.5 rounded-xl shadow-lg text-sm transition-all animate-in zoom-in-95 duration-200">

@@ -8,6 +8,7 @@ import { fetchOutletById } from "@/services/outletService";
 import { deliveryFeeLabel } from "@/lib/deliveryFee";
 import type { Outlet } from "@/types";
 import { useEffect } from "react";
+import { validateCoupon } from "@/services/promotionService";
 
 export default function Cart() {
   const { state, dispatch, total, itemCount, platformFee } = useCart();
@@ -15,11 +16,10 @@ export default function Cart() {
   const [coupon, setCoupon] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponDiscount, setCouponDiscount] = useState(0);
+  const [isFreeDelivery, setIsFreeDelivery] = useState(false);
 
   useEffect(() => {
     if (state.outletId) {
-      // In a real app, we might need businessId too, 
-      // but for now let's assume we search it or it's in context
       fetchOutletById(state.outletId).then(setOutlet);
     }
   }, [state.outletId]);
@@ -27,21 +27,52 @@ export default function Cart() {
   const summary = calcCartSummary(
     state.items,
     outlet,
-    { couponDiscount, platformFee }
+    { couponDiscount, platformFee, isFreeDelivery }
   );
   
+  // 🎯 ZOMATO LOGIC: Free Delivery Milestone (₹499 threshold)
+  const FREE_DELIVERY_THRESHOLD = 499;
+  const neededForFree = Math.max(0, FREE_DELIVERY_THRESHOLD - summary.subtotal);
+  const freeProgress = Math.min(100, (summary.subtotal / FREE_DELIVERY_THRESHOLD) * 100);
+
   // Projected Cashback (2% of net food value)
   const projectedBonus = Math.round((summary.subtotal - couponDiscount) * 0.02);
 
   const outletName = outlet?.name || "Restaurant";
 
-  const applyCoupon = () => {
-    if (coupon.trim().toUpperCase() === "FIRST50") {
-      setCouponDiscount(50);
-      setCouponApplied(true);
-    } else if (coupon.trim().toUpperCase() === "FREESHIP") {
-      setCouponDiscount(summary.deliveryFee);
-      setCouponApplied(true);
+  const applyCoupon = async () => {
+    const code = coupon.trim().toUpperCase();
+    if (!code) return;
+
+    try {
+      const couponData = await validateCoupon(code);
+      if (couponData) {
+        if (couponData.minOrder && summary.subtotal < couponData.minOrder) {
+          alert(`Minimum order of ₹${couponData.minOrder} required for this coupon.`);
+          return;
+        }
+
+        let discount = 0;
+        let freeShip = false;
+
+        if (code === "FREESHIP" || (couponData.type as any) === 'freeship') {
+          freeShip = true;
+          discount = 0;
+        } else if (couponData.type === 'percent') {
+          discount = Math.round(summary.subtotal * (couponData.value / 100));
+        } else {
+          discount = Math.round(couponData.value);
+        }
+
+        setCouponDiscount(discount);
+        setIsFreeDelivery(freeShip);
+        setCouponApplied(true);
+      } else {
+        alert("Invalid or expired coupon code.");
+      }
+    } catch (error) {
+      console.error("Coupon validation error:", error);
+      alert("Failed to validate coupon. Please try again.");
     }
   };
 
@@ -90,6 +121,33 @@ export default function Cart() {
               Add more items
             </Link>
           </div>
+
+          {/* 🎯 ZOMATO FEATURE: Free Delivery Milestone */}
+          {!isFreeDelivery && summary.deliveryFee > 0 && (
+            <div className="bg-card p-4 rounded-2xl border border-border shadow-sm overflow-hidden relative">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-bold flex items-center gap-2">
+                  <Star className="h-4 w-4 text-secondary fill-secondary" />
+                  {neededForFree > 0 
+                    ? `Add ₹${neededForFree} more for FREE delivery` 
+                    : "You've unlocked FREE delivery!"}
+                </span>
+                <span className="text-xs font-black text-secondary">₹{FREE_DELIVERY_THRESHOLD} GOAL</span>
+              </div>
+              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${freeProgress}%` }}
+                  className="h-full bg-secondary transition-all"
+                />
+              </div>
+              {neededForFree > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-2 font-medium">
+                  Add a dessert or beverage to skip the ₹{summary.deliveryFee} delivery fee!
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Items */}
           <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -206,13 +264,14 @@ export default function Cart() {
                     {coupon.toUpperCase()} applied!
                   </p>
                   <p className="text-green-600 text-xs">
-                    You saved ₹{couponDiscount}
+                    {isFreeDelivery ? "Free Delivery Applied" : `You saved ₹${couponDiscount}`}
                   </p>
                 </div>
                 <button
                   onClick={() => {
                     setCouponApplied(false);
                     setCouponDiscount(0);
+                    setIsFreeDelivery(false);
                     setCoupon("");
                   }}
                   className="text-xs text-destructive font-semibold"
@@ -248,11 +307,28 @@ export default function Cart() {
           <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
             <h3 className="font-bold mb-2">Delivery Instructions</h3>
             <textarea
-              placeholder="Any specific instructions for the delivery partner?"
+              placeholder="Any specific instructions for the delivery partner? (e.g., Ring doorbell, leave at gate)"
               data-testid="textarea-delivery-instructions"
               className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
             />
           </div>
+
+          {/* 🎯 ZOMATO FEATURE: Savings Celebration */}
+          {(summary.savings > 0 || couponApplied) && (
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4"
+            >
+              <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
+                <Tag className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h4 className="text-emerald-700 font-black leading-tight">YAY! YOU SAVED ₹{summary.savings + couponDiscount}</h4>
+                <p className="text-emerald-600/70 text-xs font-medium">This order is cheaper than usual. Great choice!</p>
+              </div>
+            </motion.div>
+          )}
         </div>
 
         {/* Bill summary */}

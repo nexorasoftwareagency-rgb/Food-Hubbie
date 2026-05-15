@@ -11,19 +11,32 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
     <!-- Auth Gateway -->
     <div id="loginOverlay" class="auth-overlay">
         <div class="auth-card">
-            <div class="auth-logo"><i data-lucide="lock" size="48"></i></div>
-            <h2 class="text-xl font-black mb-2">Enterprise Auth</h2>
-            <p class="text-muted mb-8 text-sm">Master Access Node Initialization Required</p>
-            <input type="password" id="passcode" class="auth-input" placeholder="••••••" maxlength="6">
-            <button class="btn-pro w-full justify-center h-50 text-base" onclick="verifyPasscode()">
-                Initialize Session
+            <div class="pro-logo mb-8 justify-center">
+                <i data-lucide="shield-check" color="#6366F1" size="40"></i>
+                <span class="text-3xl font-black text-white">PRO CONSOLE</span>
+            </div>
+            <h2 class="text-xl font-black text-white mb-2">Enterprise Access</h2>
+            <p class="text-muted mb-8 text-sm">Master administrative node initialization required</p>
+            
+            <div class="form-group text-left">
+                <label class="text-xs font-bold uppercase tracking-widest text-muted mb-2 block">Administrative Email</label>
+                <input type="email" id="loginEmail" class="pro-input" placeholder="admin@foodhubbie.com">
+            </div>
+            <div class="form-group text-left mb-8">
+                <label class="text-xs font-bold uppercase tracking-widest text-muted mb-2 block">Master Passcode</label>
+                <input type="password" id="loginPassword" class="pro-input" placeholder="••••••••">
+            </div>
+            
+            <button id="btnLogin" class="btn-pro w-full justify-center h-50 text-base" onclick="doLogin()">
+                INITIALIZE SESSION <i data-lucide="arrow-right" size="18"></i>
             </button>
-            <p id="loginError" class="hidden text-danger mt-4 font-semibold text-xs">Access Denied: Invalid Master Key</p>
+            <p id="loginError" class="hidden text-danger mt-4 font-semibold text-xs text-center"></p>
         </div>
     </div>
 
@@ -42,13 +55,40 @@
                     <i data-lucide="layout-dashboard" size="18"></i>
                     <span>Network Control</span>
                 </div>
-                <div class="nav-item" data-tab="onboarding">
-                    <i data-lucide="plus-square" size="18"></i>
-                    <span>Node Provisioning</span>
-                </div>
+                <nav class="sidebar-nav">
+                <a href="#" class="nav-link active" data-tab="dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Ecosystem Overview</span>
+                </a>
+                <a href="#" class="nav-link" data-tab="onboarding">
+                    <i data-lucide="user-plus"></i>
+                    <span>Partner Requests</span>
+                    <span id="onboardingCount" class="badge-v4 hidden">0</span>
+                </a>
+                <a href="#" class="nav-link" data-tab="reconciliation">
+                    <i data-lucide="banknote"></i>
+                    <span>Financial Recon</span>
+                </a>
+                <a href="#" class="nav-link" data-tab="businesses">
+                    <i data-lucide="building-2"></i>
+                    <span>Managed Entities</span>
+                </a>
+                <a href="#" class="nav-link" data-tab="analytics">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Global Analytics</span>
+                </a>
+            </nav>
                 <div class="nav-item" data-tab="businesses">
                     <i data-lucide="building-2" size="18"></i>
                     <span>Ecosystem Partners</span>
+                </div>
+                <div class="nav-item" data-tab="reconciliation">
+                    <i data-lucide="wallet" size="18"></i>
+                    <span>Financial Control</span>
+                </div>
+                <div class="nav-item" data-tab="inventory">
+                    <i data-lucide="package" size="18"></i>
+                    <span>Inventory Control</span>
                 </div>
                 <div class="nav-item" data-tab="promotions">
                     <i data-lucide="ticket" size="18"></i>
@@ -73,7 +113,25 @@
                     <span>Ecosystem Reports</span>
                 </div>
 
+                <div class="nav-group-label">Growth & Engagement</div>
+                <div class="nav-item" data-tab="liveorders">
+                    <i data-lucide="clock" size="18"></i>
+                    <span>Live Orders</span>
+                </div>
+                <div class="nav-item" data-tab="reviews">
+                    <i data-lucide="star" size="18"></i>
+                    <span>Ratings & Reviews</span>
+                </div>
+                <div class="nav-item" data-tab="broadcast">
+                    <i data-lucide="bell-ring" size="18"></i>
+                    <span>Broadcast Center</span>
+                </div>
+
                 <div class="nav-group-label">System Core</div>
+                <div class="nav-item" data-tab="audit">
+                    <i data-lucide="terminal" size="18"></i>
+                    <span>Security Audit</span>
+                </div>
                 <div class="nav-item" data-tab="settings">
                     <i data-lucide="cpu" size="18"></i>
                     <span>Infrastructure</span>
@@ -110,25 +168,45 @@
 
             <!-- Dashboard Pane -->
             <div id="dashboard" class="tab-pane active">
-                <div class="metric-grid">
+                <!-- Hero Banner -->
+                <div class="overview-hero">
+                    <div style="position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <h2>Welcome back, Super Admin 👋</h2>
+                            <p>Foodhubbie ecosystem is running smoothly</p>
+                        </div>
+                        <div class="pro-badge badge-live" style="background:rgba(255,255,255,0.2);color:white;font-size:11px;padding:6px 14px;border-radius:12px">
+                            <span class="status-dot live" style="background:white"></span> System Online
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr)">
                     <div class="metric-card">
                         <div class="metric-header">
                             <div class="metric-icon"><i data-lucide="building"></i></div>
                             <div class="pro-badge badge-info">Global</div>
                         </div>
-                        <div>
-                            <div class="metric-value" id="countBusinesses">0</div>
-                            <div class="metric-label">Business Entities</div>
+                        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+                            <div>
+                                <div class="metric-value" id="countBusinesses">0</div>
+                                <div class="metric-label">Business Entities</div>
+                            </div>
+                            <div id="sparkBiz" class="kpi-sparkline"></div>
                         </div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-header">
-                            <div class="metric-icon"><i data-lucide="share-2"></i></div>
+                            <div class="metric-icon" style="background:var(--accent-gradient);box-shadow:0 4px 8px rgba(249,115,22,0.2)"><i data-lucide="share-2"></i></div>
                             <div class="pro-badge badge-success">Active</div>
                         </div>
-                        <div>
-                            <div class="metric-value" id="countOutlets">0</div>
-                            <div class="metric-label">Operational Nodes</div>
+                        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+                            <div>
+                                <div class="metric-value" id="countOutlets">0</div>
+                                <div class="metric-label">Operational Nodes</div>
+                            </div>
+                            <div id="sparkOutlets" class="kpi-sparkline"></div>
                         </div>
                     </div>
                     <div class="metric-card">
@@ -136,18 +214,43 @@
                             <div class="metric-icon"><i data-lucide="activity"></i></div>
                             <div class="pro-badge badge-warning">Realtime</div>
                         </div>
+                        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+                            <div>
+                                <div class="metric-value" id="countOrdersToday">0</div>
+                                <div class="metric-label">Platform Throughput</div>
+                            </div>
+                            <div id="sparkOrders" class="kpi-sparkline"></div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon" style="background:linear-gradient(135deg,#6366F1,#4F46E5);box-shadow:0 4px 8px rgba(99,102,241,0.2)"><i data-lucide="users"></i></div>
+                            <div class="pro-badge badge-info">Registry</div>
+                        </div>
                         <div>
-                            <div class="metric-value" id="countOrdersToday">0</div>
-                            <div class="metric-label">Platform Throughput</div>
+                            <div class="metric-value" id="countCustomers">0</div>
+                            <div class="metric-label">Total Customers</div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Order Peak Hours Heatmap -->
+                <div class="pro-card">
+                    <div class="table-header">
+                        <h3 class="font-bold flex items-center gap-2">
+                            <i data-lucide="flame" size="18" color="#F97316"></i> Peak Order Hours
+                        </h3>
+                        <div class="pro-badge badge-live">Live Feed</div>
+                    </div>
+                    <div id="orderHeatmap" class="viz-heatmap"></div>
+                </div>
+
+                <!-- Business Registry Table -->
                 <div class="content-section">
                     <div class="pro-card">
                         <div class="table-header">
                             <h3 class="font-bold flex items-center gap-2">
-                                <i data-lucide="database" size="18" color="#38BDF8"></i> Business Registry
+                                <i data-lucide="database" size="18" color="#10B981"></i> Business Registry
                             </h3>
                             <div class="text-xs text-muted">Last Sync: <span id="lastSyncTime">Just now</span></div>
                         </div>
@@ -157,6 +260,7 @@
                                     <th>Partner Identity</th>
                                     <th>Admin Authority</th>
                                     <th>Scale (Nodes)</th>
+                                    <th>Commission Model</th>
                                     <th>Network Status</th>
                                     <th>Operations</th>
                                 </tr>
@@ -164,12 +268,52 @@
                             <tbody id="businessList"></tbody>
                         </table>
                     </div>
+                <!-- PARTNER ONBOARDING PANE -->
+        <section class="tab-pane" id="onboardingPane">
+            <header class="pane-header">
+                <div class="flex-col">
+                    <h1 class="text-3xl font-black tracking-tight">Partner Approval Queue</h1>
+                    <p class="text-slate-400">Validate and provision new infrastructure nodes for prospective partners.</p>
+                </div>
+                <div class="header-stats flex gap-20">
+                    <div class="stat-pill">
+                        <span class="label">Pending Requests</span>
+                        <span id="pendingCount" class="value text-warning">0</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="label">Approved Today</span>
+                        <span id="approvedCount" class="value text-success">0</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="data-card mt-30">
+                <div class="table-container">
+                    <table class="pro-table v4">
+                        <thead>
+                            <tr>
+                                <th>Entity / Owner</th>
+                                <th>Email</th>
+                                <th>Compliance (KYC)</th>
+                                <th>Submitted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="onboardingTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center py-40 text-muted">
+                                    <div class="flex-col items-center gap-12">
+                                        <i data-lucide="loader-2" class="animate-spin" size="24"></i>
+                                        <span>Synchronizing with onboarding kernel...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            <!-- Onboarding -->
-            <div id="onboarding" class="tab-pane">
-                <div class="content-section max-w-800 mx-auto pt-10">
+        </section>
+        <div class="content-section max-w-800 mx-auto pt-10">
                     <div class="pro-card">
                         <div class="table-header">
                             <h3 class="font-bold">Infrastructure Provisioning</h3>
@@ -268,6 +412,106 @@
                 </div>
             </div>
 
+            <!-- Financial Reconciliation Pane -->
+            <div id="reconciliation" class="tab-pane">
+                <div class="overview-hero" style="background: linear-gradient(135deg, #1e293b, #0f172a); min-height: 160px; padding: 30px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                        <div>
+                            <h2 class="text-2xl font-black text-white" style="margin:0">Partner Financial Control</h2>
+                            <p class="text-slate-400" style="margin:0">Manual settlement and payout reconciliation center</p>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <div class="filter-group-v2" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 12px; display:flex; align-items:center; gap:8px;">
+                                <input type="date" id="reconFrom" class="pro-input-transparent" style="background:transparent; border:none; color:white; font-family:inherit; outline:none">
+                                <span class="text-slate-500">to</span>
+                                <input type="date" id="reconTo" class="pro-input-transparent" style="background:transparent; border:none; color:white; font-family:inherit; outline:none">
+                                <button class="btn-pro-icon" style="margin-left:8px; background:rgba(255,255,255,0.1); border:none; padding:6px; border-radius:8px; cursor:pointer" onclick="loadReconciliations()"><i data-lucide="refresh-cw" size="16"></i></button>
+                            </div>
+                            <button class="btn-pro" onclick="exportReconciliationReport()">
+                                <i data-lucide="file-spreadsheet" size="18"></i> Export Sheet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Financial KPIs -->
+                <div class="metric-grid" style="margin-top: -40px; display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; padding:0 24px;">
+                    <div class="metric-card">
+                        <div class="metric-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div class="metric-icon" style="background: rgba(16,185,129,0.1); color: #10B981; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i data-lucide="trending-up"></i></div>
+                            <span class="pro-badge badge-success">Platform</span>
+                        </div>
+                        <div class="metric-value" id="reconGlobalRev" style="font-size:24px; font-weight:900; color:white">₹0</div>
+                        <div class="metric-label" style="color:var(--slate); font-size:12px">Total Volume Processed</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div class="metric-icon" style="background: rgba(99,102,241,0.1); color: #6366F1; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i data-lucide="percent"></i></div>
+                            <span class="pro-badge badge-info">Earnings</span>
+                        </div>
+                        <div class="metric-value" id="reconGlobalComm" style="font-size:24px; font-weight:900; color:white">₹0</div>
+                        <div class="metric-label" style="color:var(--slate); font-size:12px">Platform Commissions</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div class="metric-icon" style="background: rgba(245,158,11,0.1); color: #F59E0B; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i data-lucide="clock"></i></div>
+                            <span class="pro-badge badge-warning">Action Req</span>
+                        </div>
+                        <div class="metric-value" id="reconGlobalPending" style="font-size:24px; font-weight:900; color:white">₹0</div>
+                        <div class="metric-label" style="color:var(--slate); font-size:12px">Pending Settlements</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div class="metric-icon" style="background: rgba(56,189,248,0.1); color: #38BDF8; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i data-lucide="check-circle"></i></div>
+                            <span class="pro-badge badge-success">Closed</span>
+                        </div>
+                        <div class="metric-value" id="reconGlobalSettled" style="font-size:24px; font-weight:900; color:white">₹0</div>
+                        <div class="metric-label" style="color:var(--slate); font-size:12px">Total Amount Settled</div>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="pro-card">
+                        <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                            <h3 class="font-bold flex items-center gap-2" style="margin:0">
+                                <i data-lucide="list" size="18" color="#6366F1"></i> Transaction Ledger (All Outlets)
+                            </h3>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <select id="filterOutlet" class="pro-input-sm" onchange="loadReconciliations()" style="padding:8px 12px; border-radius:8px; background:var(--bg-card); border:1px solid var(--border-color); color:white">
+                                    <option value="all">All Ecosystem Partners</option>
+                                </select>
+                                <select id="filterStatus" class="pro-input-sm" onchange="loadReconciliations()" style="padding:8px 12px; border-radius:8px; background:var(--bg-card); border:1px solid var(--border-color); color:white">
+                                    <option value="all">All Statuses</option>
+                                    <option value="PENDING" selected>Pending Settlement</option>
+                                    <option value="SETTLED">Settled Records</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="overflow-x:auto">
+                            <table class="pro-table excel-style" style="width:100%; border-collapse:collapse">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:left; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Ref ID / Date</th>
+                                        <th style="text-align:left; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Partner Node</th>
+                                        <th style="text-align:left; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Order Total</th>
+                                        <th style="text-align:left; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Commission</th>
+                                        <th style="text-align:left; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Rider Payout</th>
+                                        <th style="text-align:left; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Net Payout</th>
+                                        <th style="text-align:left; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Status</th>
+                                        <th style="text-align:right; padding:12px; color:var(--slate); font-size:12px; text-transform:uppercase; border-bottom:1px solid var(--border-color)">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reconTable">
+                                    <tr>
+                                        <td colspan="8" class="text-center p-40 text-muted">Initializing financial data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Logistics -->
             <div id="delivery" class="tab-pane">
                 <div class="content-section">
@@ -282,7 +526,7 @@
                             <thead>
                                 <tr>
                                     <th>Distance Parameter (Km)</th>
-                                    <th>Service Cost (₹)</th>
+                                    <th>Service Cost (Γé╣)</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -331,6 +575,7 @@
                                 </div>
                                 <button class="btn-pro" onclick="saveSurge()">Apply</button>
                             </div>
+                            <input type="text" id="surgeReason" class="auth-input mt-2" placeholder="Surge reason (e.g. Peak Hours)">
                         </div>
 
                         <!-- Global Discount Card -->
@@ -345,6 +590,10 @@
                                 <div class="flex-1">
                                     <input type="number" id="globalDiscountValue" class="auth-input mb-0 p-3 text-base font-black" placeholder="0">
                                 </div>
+                                <select id="globalDiscountType" class="auth-input mb-0 p-3" style="width:auto;">
+                                    <option value="percent">%</option>
+                                    <option value="fixed">₹</option>
+                                </select>
                                 <button class="btn-pro" onclick="saveGlobalDiscount()">Apply</button>
                             </div>
                         </div>
@@ -394,16 +643,93 @@
                 </div>
             </div>
 
+            <!-- Inventory Control -->
+            <div id="inventory" class="tab-pane">
+                <div class="content-section">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-black" style="color:var(--pro-text)">Ecosystem Inventory</h2>
+                            <p class="text-muted font-medium">Real-time stock monitoring and menu availability control</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button class="btn-pro" onclick="loadInventory()"><i data-lucide="refresh-cw" size="18"></i> Refresh Stock</button>
+                            <button class="btn-pro btn-danger" onclick="toggleStockOutAll()"><i data-lucide="shield-alert" size="18"></i> Emergency Freeze</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-6 mb-8">
+                        <div class="metric-card" style="border-top: 3px solid #F43F5E">
+                            <div class="metric-header">
+                                <div class="metric-icon" style="background: rgba(244,63,94,0.1); color: #F43F5E"><i data-lucide="alert-triangle"></i></div>
+                                <div class="pro-badge badge-warning">Action Required</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="lowStockCount">0</div>
+                                <div class="metric-label">Low Stock Items (&lt;10)</div>
+                            </div>
+                        </div>
+                        <div class="metric-card" style="border-top: 3px solid #10B981">
+                            <div class="metric-header">
+                                <div class="metric-icon" style="background: rgba(16,185,129,0.1); color: #10B981"><i data-lucide="check-circle"></i></div>
+                                <div class="pro-badge badge-success">Healthy</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="totalActiveItems">0</div>
+                                <div class="metric-label">Total Active Menu Items</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="shopping-cart"></i></div>
+                                <div class="pro-badge badge-info">Out of Stock</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="outOfStockCount">0</div>
+                                <div class="metric-label">Currently Unavailable Items</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 class="font-bold flex items-center gap-2">
+                                <i data-lucide="package-search" size="18" color="#F59E0B"></i> Global Inventory Registry
+                            </h3>
+                            <div class="flex gap-4">
+                                <input type="text" class="pro-input" placeholder="Search dish or outlet..." id="inventorySearch" onkeyup="filterInventory()">
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="pro-table">
+                                <thead>
+                                    <tr>
+                                        <th>Dish Details</th>
+                                        <th>Partner Outlet</th>
+                                        <th>Stock Level</th>
+                                        <th>Status</th>
+                                        <th>Last Updated</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventoryRegistry"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Reports Center -->
             <div id="reports" class="tab-pane">
                 <div class="content-section">
                     <div class="flex justify-between items-center mb-8">
                         <h2 class="text-xl font-black text-slate mb-0">Analytics Oversight</h2>
                         <div class="flex gap-2">
-                            <button class="btn-pro btn-muted" onclick="exportReport('csv')"><i data-lucide="file-text" size="18"></i> Export Data (CSV)</button>
-                            <button class="btn-pro" onclick="exportReport('pdf')"><i data-lucide="printer" size="18"></i> Export Report (PDF)</button>
+                            <button class="btn-pro btn-muted" onclick="exportReport('excel')"><i data-lucide="file-spreadsheet" size="18"></i> Export Excel</button>
+                            <button class="btn-pro" onclick="exportReport('pdf')"><i data-lucide="download-cloud" size="18"></i> Download PDF Report</button>
                         </div>
                     </div>
+                    <!-- External PDF Generator -->
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
                     <!-- Global Revenue & Volume -->
                     <div class="metric-grid">
                         <div class="metric-card">
@@ -412,7 +738,7 @@
                                 <div class="pro-badge badge-success">GTV</div>
                             </div>
                             <div>
-                                <div class="metric-value" id="reportGlobalSales">₹0</div>
+                                <div class="metric-value" id="reportGlobalSales">Γé╣0</div>
                                 <div class="metric-label">Total Ecosystem Revenue</div>
                             </div>
                         </div>
@@ -432,7 +758,7 @@
                                 <div class="pro-badge badge-warning">AOV</div>
                             </div>
                             <div>
-                                <div class="metric-value" id="reportAvgOrderValue">₹0</div>
+                                <div class="metric-value" id="reportAvgOrderValue">Γé╣0</div>
                                 <div class="metric-label">Avg. Transaction Value</div>
                             </div>
                         </div>
@@ -442,8 +768,49 @@
                                 <div class="pro-badge btn-danger text-white">Loyalty</div>
                             </div>
                             <div>
-                                <div class="metric-value" id="reportGlobalLoyalty">₹0</div>
+                                <div class="metric-value" id="reportGlobalLoyalty">Γé╣0</div>
                                 <div class="metric-label">Total Rewards Disbursed</div>
+                            </div>
+                        </div>
+                    <div class="metric-grid mt-4">
+                        <div class="metric-card" style="border-top: 3px solid #6366F1">
+                            <div class="metric-header">
+                                <div class="metric-icon" style="background: rgba(99,102,241,0.1); color: #6366F1"><i data-lucide="piggy-bank"></i></div>
+                                <div class="pro-badge badge-info">Earnings</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportPlatformRev">₹0</div>
+                                <div class="metric-label">Net Platform Revenue</div>
+                            </div>
+                        </div>
+                        <div class="metric-card" style="border-top: 3px solid #F97316">
+                            <div class="metric-header">
+                                <div class="metric-icon" style="background: rgba(249,115,22,0.1); color: #F97316"><i data-lucide="wallet"></i></div>
+                                <div class="pro-badge badge-warning">Payables</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportPartnerPayout">₹0</div>
+                                <div class="metric-label">Total Partner Payouts</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="percent"></i></div>
+                                <div class="pro-badge badge-success">Yield</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportTakeRate">0%</div>
+                                <div class="metric-label">Avg. Platform Take Rate</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="arrow-up-right"></i></div>
+                                <div class="pro-badge badge-info">Growth</div>
+                            </div>
+                            <div>
+                                <div class="metric-value">+12.4%</div>
+                                <div class="metric-label">MoM Revenue Growth</div>
                             </div>
                         </div>
                     </div>
@@ -468,7 +835,7 @@
                                 <thead>
                                     <tr>
                                         <th>Entity</th>
-                                        <th>Revenue (₹)</th>
+                                        <th>Revenue (Γé╣)</th>
                                         <th>Orders</th>
                                     </tr>
                                 </thead>
@@ -485,7 +852,7 @@
                                 <thead>
                                     <tr>
                                         <th>Node</th>
-                                        <th>Sales (₹)</th>
+                                        <th>Sales (Γé╣)</th>
                                         <th>Rating</th>
                                     </tr>
                                 </thead>
@@ -515,6 +882,361 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Users Registry -->
+            <div id="users" class="tab-pane">
+                <div class="content-section">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-black text-white mb-1">Global User Registry</h2>
+                            <p class="text-muted text-sm">Platform-wide customer database & wallet management</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <input type="text" id="userSearch" class="auth-input" style="width:260px;" placeholder="Search name, email, phone..." oninput="filterUsers()">
+                            <button class="btn-pro btn-muted" onclick="exportUsers()"><i data-lucide="download" size="18"></i> Export</button>
+                        </div>
+                    </div>
+                    <div class="pro-card">
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>User Identity</th>
+                                    <th>Contact Info</th>
+                                    <th>Wallet Balance</th>
+                                    <th>Last Active</th>
+                                    <th>Operations</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersListTable">
+                                <tr><td colspan="5" class="text-center p-6 text-muted">Loading user registry...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Businesses (Dedicated View) -->
+            <div id="businesses" class="tab-pane">
+                <div class="content-section">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-black text-white mb-1">Ecosystem Partners</h2>
+                            <p class="text-muted text-sm">All onboarded business entities and their outlet networks</p>
+                        </div>
+                        <button class="btn-pro" onclick="showOnboarding()"><i data-lucide="plus" size="18"></i> Provision New</button>
+                    </div>
+                    <div class="pro-card">
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Partner Identity</th>
+                                    <th>Admin Authority</th>
+                                    <th>Scale (Nodes)</th>
+                                    <th>Network Status</th>
+                                    <th>Operations</th>
+                                </tr>
+                            </thead>
+                            <tbody id="businessListAlt"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Audit Console -->
+            <div id="audit" class="tab-pane">
+                <div class="content-section">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-black text-white mb-1">Security Audit Console</h2>
+                            <p class="text-muted text-sm">Unified system-wide telemetric event stream</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <select id="auditLogFilter" class="auth-input" style="width:200px;">
+                                <option value="all">All Sources</option>
+                                <option value="admin">Admin Portals</option>
+                                <option value="marketplace">Marketplace</option>
+                                <option value="whatsapp">WhatsApp Bot</option>
+                                <option value="rider">Rider App</option>
+                            </select>
+                            <button class="btn-pro-icon" onclick="loadAuditLogs()"><i data-lucide="rotate-cw" size="18"></i></button>
+                        </div>
+                    </div>
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 class="font-bold flex items-center gap-2"><i data-lucide="terminal" size="18" color="#6366F1"></i> Operational Telemetry</h3>
+                            <div class="pro-badge badge-success animate-pulse">Live Feed</div>
+                        </div>
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Entity</th>
+                                    <th>Event / Action</th>
+                                    <th>Metadata</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody id="unifiedAuditBody">
+                                <tr><td colspan="5" class="text-center p-6 text-muted">Initializing telemetry stream...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ LIVE ORDER COMMAND CENTER ============ -->
+            <div id="liveorders" class="tab-pane">
+                <!-- Order Pipeline Metrics -->
+                <div class="metric-grid" style="grid-template-columns: repeat(5, 1fr)">
+                    <div class="metric-card" style="cursor:pointer" onclick="filterOrderPipeline('all')">
+                        <div class="metric-header">
+                            <div class="metric-icon"><i data-lucide="layers" size="18"></i></div>
+                        </div>
+                        <div class="metric-value" id="orderCountAll">0</div>
+                        <div class="metric-label">Total Orders</div>
+                    </div>
+                    <div class="metric-card" style="cursor:pointer;border-left:3px solid #F97316" onclick="filterOrderPipeline('new')">
+                        <div class="metric-value" style="color:#F97316" id="orderCountNew">0</div>
+                        <div class="metric-label">New / Pending</div>
+                    </div>
+                    <div class="metric-card" style="cursor:pointer;border-left:3px solid #3B82F6" onclick="filterOrderPipeline('preparing')">
+                        <div class="metric-value" style="color:#3B82F6" id="orderCountPreparing">0</div>
+                        <div class="metric-label">Preparing</div>
+                    </div>
+                    <div class="metric-card" style="cursor:pointer;border-left:3px solid #8B5CF6" onclick="filterOrderPipeline('out')">
+                        <div class="metric-value" style="color:#8B5CF6" id="orderCountOut">0</div>
+                        <div class="metric-label">Out for Delivery</div>
+                    </div>
+                    <div class="metric-card" style="cursor:pointer;border-left:3px solid #10B981" onclick="filterOrderPipeline('delivered')">
+                        <div class="metric-value" style="color:#10B981" id="orderCountDelivered">0</div>
+                        <div class="metric-label">Delivered</div>
+                    </div>
+                </div>
+
+                <!-- SLA Alerts -->
+                <div id="slaAlerts" class="mb-4"></div>
+
+                <!-- Order Pipeline Table -->
+                <div class="pro-card">
+                    <div class="table-header">
+                        <h3 class="font-bold flex items-center gap-2">
+                            <i data-lucide="clock" size="18" color="#F97316"></i> Real-Time Order Pipeline
+                        </h3>
+                        <div class="flex gap-2">
+                            <div class="flex bg-muted rounded-lg p-1 mr-2" style="height:38px">
+                                <button id="btnListView" class="px-3 rounded-md text-xs font-bold transition-all bg-card shadow-sm" onclick="setOrderView('table')">
+                                    <i data-lucide="list" size="14" style="display:inline-block;margin-right:4px;vertical-align:middle"></i> Table
+                                </button>
+                                <button id="btnKanbanView" class="px-3 rounded-md text-xs font-bold transition-all text-muted hover:text-foreground" onclick="setOrderView('kanban')">
+                                    <i data-lucide="layout-kanban" size="14" style="display:inline-block;margin-right:4px;vertical-align:middle"></i> Kanban
+                                </button>
+                            </div>
+                            <select id="orderOutletFilter" class="auth-input" style="width:180px;margin:0" onchange="loadLiveOrders()">
+                                <option value="all">All Outlets</option>
+                            </select>
+                            <button class="btn-pro" onclick="loadLiveOrders()">
+                                <i data-lucide="refresh-cw" size="14"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div id="orderTableView" style="overflow-x:auto">
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Outlet</th>
+                                    <th>Customer</th>
+                                    <th>Items</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Age</th>
+                                    <th>Rider</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liveOrdersBody">
+                                <tr><td colspan="9" class="text-center p-12 text-muted">Click "Refresh" or switch to this tab to load live orders...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Kanban View Container -->
+                    <div id="orderKanbanView" class="hidden">
+                        <div class="kanban-board">
+                            <!-- Columns will be injected here -->
+                            <div id="kanbanContainer" class="flex gap-4 p-2 overflow-x-auto min-h-[600px]"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ RATINGS & REVIEWS ============ -->
+            <div id="reviews" class="tab-pane">
+                <!-- Review Overview Metrics -->
+                <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr)">
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B);box-shadow:0 4px 8px rgba(245,158,11,0.2)"><i data-lucide="star" size="18"></i></div>
+                        </div>
+                        <div class="metric-value" id="avgPlatformRating">—</div>
+                        <div class="metric-label">Platform Avg Rating</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="totalReviewCount">0</div>
+                        <div class="metric-label">Total Reviews</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" style="color:#10B981" id="positiveReviewPct">0%</div>
+                        <div class="metric-label">Positive (4-5★)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" style="color:#EF4444" id="negativeReviewPct">0%</div>
+                        <div class="metric-label">Needs Attention (1-2★)</div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4" style="flex-wrap:wrap">
+                    <!-- Top Rated Outlets -->
+                    <div class="pro-card flex-1" style="min-width:320px">
+                        <div class="table-header">
+                            <h3 class="font-bold flex items-center gap-2">
+                                <i data-lucide="trophy" size="18" color="#FBBF24"></i> Top Rated Outlets
+                            </h3>
+                        </div>
+                        <div id="topRatedList">
+                            <div class="text-center p-6 text-muted text-sm">Loading outlet ratings...</div>
+                        </div>
+                    </div>
+
+                    <!-- Low Performers -->
+                    <div class="pro-card flex-1" style="min-width:320px">
+                        <div class="table-header">
+                            <h3 class="font-bold flex items-center gap-2">
+                                <i data-lucide="alert-triangle" size="18" color="#EF4444"></i> Flagged / Low Rated
+                            </h3>
+                        </div>
+                        <div id="lowRatedList">
+                            <div class="text-center p-6 text-muted text-sm">No flagged outlets</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Reviews -->
+                <div class="pro-card mt-4">
+                    <div class="table-header">
+                        <h3 class="font-bold flex items-center gap-2">
+                            <i data-lucide="message-square" size="18" color="#10B981"></i> Recent Reviews
+                        </h3>
+                        <div class="flex gap-2">
+                            <select id="reviewFilter" class="auth-input" style="width:150px;margin:0" onchange="loadReviews()">
+                                <option value="all">All Ratings</option>
+                                <option value="5">5★ Only</option>
+                                <option value="4">4★ Only</option>
+                                <option value="3">3★ Only</option>
+                                <option value="low">1-2★ (Critical)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="reviewsList">
+                        <div class="text-center p-12 text-muted text-sm">Loading reviews...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ BROADCAST CENTER ============ -->
+            <div id="broadcast" class="tab-pane">
+                <div class="flex gap-4" style="flex-wrap:wrap">
+                    <!-- Compose Notification -->
+                    <div class="pro-card flex-1" style="min-width:400px">
+                        <div class="table-header">
+                            <h3 class="font-bold flex items-center gap-2">
+                                <i data-lucide="send" size="18" color="#10B981"></i> Compose Broadcast
+                            </h3>
+                        </div>
+                        <form id="broadcastForm" onsubmit="event.preventDefault(); sendBroadcast();">
+                            <div class="flex flex-col gap-4">
+                                <div>
+                                    <label class="label-pro text-sm">Notification Title</label>
+                                    <input type="text" id="broadcastTitle" class="auth-input" placeholder="e.g. Flash Sale — 50% OFF" required>
+                                </div>
+                                <div>
+                                    <label class="label-pro text-sm">Message Body</label>
+                                    <textarea id="broadcastBody" class="auth-input resize-none" rows="3" placeholder="e.g. Order now and get 50% off on all items! Use code FLASH50." required></textarea>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="label-pro text-sm">Target Audience</label>
+                                        <select id="broadcastAudience" class="auth-input mb-0">
+                                            <option value="all_users">All Customers</option>
+                                            <option value="active_7d">Active (Last 7 Days)</option>
+                                            <option value="inactive_30d">Dormant (30+ Days)</option>
+                                            <option value="high_value">High Value (₹1000+ spent)</option>
+                                            <option value="riders">All Riders</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="label-pro text-sm">Category</label>
+                                        <select id="broadcastCategory" class="auth-input mb-0">
+                                            <option value="promotion">🎉 Promotion</option>
+                                            <option value="announcement">📢 Announcement</option>
+                                            <option value="update">🔄 Platform Update</option>
+                                            <option value="alert">⚠️ Alert</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="label-pro text-sm">Image URL (Optional)</label>
+                                    <input type="url" id="broadcastImage" class="auth-input mb-0" placeholder="https://example.com/promo-banner.jpg">
+                                </div>
+
+                                <div class="p-3 bg-pro-bg rounded-lg border-t flex gap-2 items-start">
+                                    <i data-lucide="info" size="14" class="text-muted mt-1"></i>
+                                    <p class="text-xs text-muted line-height-1-4">Broadcasts are logged in the audit trail and delivered via FCM topic messaging. Users must have notifications enabled.</p>
+                                </div>
+
+                                <button type="submit" class="btn-pro h-50 justify-center text-base btn-accent">
+                                    <i data-lucide="send" size="18"></i> Send Broadcast
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Stats + History -->
+                    <div style="flex:1;min-width:320px;display:flex;flex-direction:column;gap:16px">
+                        <!-- Broadcast Stats -->
+                        <div class="pro-card">
+                            <div class="table-header">
+                                <h3 class="font-bold flex items-center gap-2">
+                                    <i data-lucide="bar-chart-3" size="18" color="#F97316"></i> Broadcast Stats
+                                </h3>
+                            </div>
+                            <div class="metric-grid" style="grid-template-columns: repeat(2, 1fr)">
+                                <div>
+                                    <div class="metric-value" id="broadcastSentCount">0</div>
+                                    <div class="metric-label">Total Sent</div>
+                                </div>
+                                <div>
+                                    <div class="metric-value" id="broadcastThisWeek">0</div>
+                                    <div class="metric-label">This Week</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Broadcasts -->
+                        <div class="pro-card flex-1">
+                            <div class="table-header">
+                                <h3 class="font-bold flex items-center gap-2">
+                                    <i data-lucide="history" size="18" color="#64748B"></i> Recent Broadcasts
+                                </h3>
+                            </div>
+                            <div id="broadcastHistory" style="max-height:350px;overflow-y:auto">
+                                <div class="text-center p-6 text-muted text-sm">No broadcasts sent yet</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -609,8 +1331,7 @@
         </div>
     </div>
 
-    <script src="js/main.js"></script>
-    <script>lucide.createIcons();</script>
+
     <!-- Outlet Management Modal -->
     <div id="outletModal" class="auth-overlay hidden bg-overlay backdrop-blur">
         <div class="pro-card w-full max-w-680 max-h-90vh overflow-y-auto">
@@ -687,7 +1408,7 @@
                             <label class="label-pro text-sm">Discount Type</label>
                             <select id="couponType" class="auth-input p-3 mb-0" title="Select Discount Type" aria-label="Select Discount Type">
                                 <option value="percent">Percentage (%)</option>
-                                <option value="fixed">Fixed (₹)</option>
+                                <option value="fixed">Fixed (Γé╣)</option>
                             </select>
                         </div>
                         <div>
@@ -698,7 +1419,7 @@
 
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="label-pro text-sm">Min Order (₹)</label>
+                            <label class="label-pro text-sm">Min Order (Γé╣)</label>
                             <input type="number" id="couponMinOrder" class="auth-input p-3 mb-0" placeholder="199" required>
                         </div>
                         <div>
@@ -736,7 +1457,7 @@
                     </div>
 
                     <div>
-                        <label class="label-pro text-sm">Amount to Credit (₹)</label>
+                        <label class="label-pro text-sm">Amount to Credit (Γé╣)</label>
                         <input type="number" id="walletAmount" class="auth-input text-2xl font-black p-3 text-center btn-success text-white" placeholder="0" required>
                     </div>
 
@@ -756,6 +1477,38 @@
                 </div>
             </form>
         </div>
+    <!-- Edit Commission Modal -->
+    <div id="modalCommission" class="auth-overlay hidden bg-overlay backdrop-blur">
+        <div class="pro-card w-full max-w-450">
+            <div class="table-header">
+                <h3 class="font-bold flex items-center gap-2">
+                    <i data-lucide="percent" size="18" color="#F97316"></i> Revenue Model
+                </h3>
+                <button class="btn-pro-icon" onclick="hideCommissionModal()"><i data-lucide="x" size="18"></i></button>
+            </div>
+            <div class="modal-body p-6">
+                <p class="text-xs text-muted mb-4">Configure the revenue sharing model for this business entity. Changes apply to future orders.</p>
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="label-pro">Commission Rate (%)</label>
+                        <input type="number" id="comm_percentage" class="auth-input" placeholder="e.g. 15" min="0" max="100" step="0.5">
+                    </div>
+                    <div>
+                        <label class="label-pro">Platform Fixed Fee (₹)</label>
+                        <input type="number" id="comm_fixed" class="auth-input" placeholder="e.g. 5" min="0" step="1">
+                        <small class="text-xs text-muted">Additional fee charged per transaction.</small>
+                    </div>
+                    <input type="hidden" id="comm_business_id">
+                </div>
+            </div>
+            <div class="modal-footer flex gap-2 mt-4 p-4 border-t">
+                <button class="btn btn-secondary flex-1" onclick="hideCommissionModal()">Cancel</button>
+                <button class="btn-pro btn-success flex-1 justify-center" onclick="saveCommission()">Update Model</button>
+            </div>
+        </div>
     </div>
+
+    <script src="js/main.js"></script>
+    <script>lucide.createIcons();</script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import { state } from '../state.js';
-import { Outlet } from '../firebase.js';
-import { logAudit, showToast } from '../utils.js';
+import { Outlet, uploadImage } from '../firebase.js';
+import { logAudit, atomicAdminAction, showToast } from '../utils.js';
 import { ui } from '../ui.js';
 
 // --- STATE & UTILS ---
@@ -8,7 +8,8 @@ const SETTINGS_PATHS = {
     STORE: "settings/Store",
     DELIVERY: "settings/Delivery",
     BOT: "settings/Bot",
-    DISPLAY: "settings/Display"
+    DISPLAY: "settings/Display",
+    REVENUE: "settings/Revenue"
 };
 
 /**
@@ -62,6 +63,24 @@ function validateBackupCode(code) {
     return { valid: true };
 }
 
+/**
+ * Visual Shake Effect for Errors (Smooth Functioning Phase)
+ */
+function applyShake(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('error-border', 'shake');
+    el.focus();
+    setTimeout(() => {
+        el.classList.remove('shake');
+    }, 500);
+    
+    // Clear error border on input
+    el.addEventListener('input', () => {
+        el.classList.remove('error-border');
+    }, { once: true });
+}
+
 // --- CORE FUNCTIONS ---
 
 export async function loadStoreSettings() {
@@ -71,13 +90,15 @@ export async function loadStoreSettings() {
             Outlet.ref(SETTINGS_PATHS.STORE).once("value"),
             Outlet.ref(SETTINGS_PATHS.DELIVERY).once("value"),
             Outlet.ref(SETTINGS_PATHS.BOT).once("value"),
-            Outlet.ref(SETTINGS_PATHS.DISPLAY).once("value")
+            Outlet.ref(SETTINGS_PATHS.DISPLAY).once("value"),
+            Outlet.ref(SETTINGS_PATHS.REVENUE).once("value")
         ]);
 
         const store = storeSnap.val();
         const del = delSnap.val();
         const bot = botSnap.val();
         const disp = dispSnap.val();
+        const rev = revSnap.val() || {};
 
         // 1. Store Info
         const s = store || {};
@@ -111,8 +132,13 @@ export async function loadStoreSettings() {
         document.getElementById('settingAdminPhone').value = d.notifyPhone || '';
         document.getElementById('settingDeliveryBackupCode').value = d.backupCode || '';
 
-        // Render Fee Slabs
-        renderFeeSlabs(d.slabs || []);
+        // 2.5 Revenue & Commission (NEW)
+        document.getElementById('settingCommissionType').value = rev.commissionType || 'PERCENTAGE';
+        document.getElementById('settingCommissionValue').value = rev.commissionValue || '20';
+        document.getElementById('settingRiderFeeBase').value = rev.riderFeeBase || '30';
+        document.getElementById('settingRiderKmIncentive').value = rev.riderKmIncentive || '5';
+
+
 
         // 3. Bot Aesthetics & Marketing
         const b = bot || {};
@@ -167,6 +193,11 @@ export async function loadStoreSettings() {
         if (window.updateOutletStatusIndicator) window.updateOutletStatusIndicator(s.shopStatus || 'AUTO');
         
         state.settingsDirty = false;
+        
+        // 7. Update Preview & Health (Smooth Functioning)
+        updateReceiptPreview();
+        calculateSettingsHealth();
+        
         console.log("[Settings] All data populated.");
     } catch (e) {
         console.error("[Settings] Load Error:", e);
@@ -174,26 +205,125 @@ export async function loadStoreSettings() {
     }
 }
 
+/**
+ * CALCULATE SETTINGS HEALTH (Smooth Functioning Phase)
+ * Analyzes how complete the store profile is and updates the progress bar.
+ */
+export function calculateSettingsHealth() {
+    const fields = [
+        'settingStoreName', 'settingStoreAddress', 'settingGSTIN', 'settingFSSAI',
+        'settingTagline', 'settingLat', 'settingLng', 'settingQRUrl',
+        'settingGreetingUrl', 'settingMenuUrl'
+    ];
+    
+    let completed = 0;
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && (el.value || '').trim().length > 3) completed++;
+    });
+
+    const percent = Math.round((completed / fields.length) * 100);
+    const fill = document.getElementById('settingsHealthFill');
+    const txt = document.getElementById('settingsHealthTxt');
+    
+    if (fill) {
+        fill.style.width = percent + '%';
+        // Update color based on health
+        if (percent < 40) fill.style.background = 'var(--danger)';
+        else if (percent < 80) fill.style.background = 'var(--primary)';
+        else fill.style.background = 'var(--action-green)';
+    }
+    if (txt) txt.innerText = percent + '% Complete';
+}
+
+/**
+ * UPDATE RECEIPT PREVIEW (Smooth Functioning Phase)
+ * Renders a virtual thermal receipt in real-time as the admin types.
+ */
+export function updateReceiptPreview() {
+    const getVal = (id) => document.getElementById(id)?.value || '';
+    const isChecked = (id) => document.getElementById(id)?.checked;
+
+    // Header Info
+    const storeName = document.getElementById('previewStoreName');
+    const tagline = document.getElementById('previewTagline');
+    const address = document.getElementById('previewAddress');
+
+    if (storeName) {
+        storeName.innerText = getVal('settingStoreName').toUpperCase() || 'STORE NAME';
+        storeName.parentElement.style.display = isChecked('checkShowStoreName') ? 'block' : 'none';
+    }
+    if (tagline) {
+        tagline.innerText = getVal('settingTagline') || 'Your Tagline Here';
+        tagline.style.display = isChecked('checkShowTagline') ? 'block' : 'none';
+    }
+    if (address) {
+        address.innerText = getVal('settingStoreAddress') || 'Store Address...';
+        address.style.display = isChecked('checkShowAddress') ? 'block' : 'none';
+    }
+
+    // Footer Info
+    const gstin = document.getElementById('previewGSTIN');
+    const fssai = document.getElementById('previewFSSAI');
+    const powered = document.getElementById('previewPoweredBy');
+    const wifiContainer = document.getElementById('previewWifiContainer');
+
+    if (gstin) {
+        gstin.innerText = 'GST: ' + (getVal('settingGSTIN') || '10XXXXXXXXXXXX');
+        gstin.style.display = isChecked('checkShowGSTIN') ? 'block' : 'none';
+    }
+    if (fssai) {
+        fssai.innerText = 'FSSAI: ' + (getVal('settingFSSAI') || '1XXXXXXXXXXXXX');
+        fssai.style.display = isChecked('checkShowFSSAI') ? 'block' : 'none';
+    }
+    if (powered) {
+        powered.innerText = getVal('settingPoweredBy') || 'Powered by Foodhubbie';
+        powered.style.display = isChecked('checkShowPoweredBy') ? 'block' : 'none';
+    }
+
+    if (wifiContainer) {
+        document.getElementById('previewWifiSSID').innerText = getVal('settingWifiName') || 'SSID';
+        document.getElementById('previewWifiPass').innerText = getVal('settingWifiPass') || '****';
+        wifiContainer.style.display = isChecked('checkShowWifiInfo') ? 'block' : 'none';
+    }
+
+    // Lucide Icons update for info box if needed
+    if (window.lucide) window.lucide.createIcons({ root: document.getElementById('thermalReceiptPreview') });
+}
+
+
 export async function saveStoreSettings() {
     console.log("[Settings] Preparing to save...");
     
     // 1. Validation
-    const lat = document.getElementById('settingLat').value;
-    const lng = document.getElementById('settingLng').value;
-    const vCoord = validateCoords(lat, lng);
-    if (!vCoord.valid) return showToast(vCoord.msg, "error");
+    const latInput = document.getElementById('settingLat');
+    const lngInput = document.getElementById('settingLng');
+    const vCoord = validateCoords(latInput.value, lngInput.value);
+    if (!vCoord.valid) {
+        applyShake('settingLat');
+        return showToast(vCoord.msg, "error");
+    }
 
-    const gstinVal = document.getElementById('settingGSTIN').value.trim();
-    const vGst = validateGSTIN(gstinVal);
-    if (vGst !== true && !vGst.valid) return showToast(vGst.msg, "error");
+    const gstinInput = document.getElementById('settingGSTIN');
+    const vGst = validateGSTIN(gstinInput.value.trim());
+    if (vGst !== true && !vGst.valid) {
+        applyShake('settingGSTIN');
+        return showToast(vGst.msg, "error");
+    }
 
-    const fssaiVal = document.getElementById('settingFSSAI').value.trim();
-    const vFssai = validateFSSAI(fssaiVal);
-    if (vFssai !== true && !vFssai.valid) return showToast(vFssai.msg, "error");
+    const fssaiInput = document.getElementById('settingFSSAI');
+    const vFssai = validateFSSAI(fssaiInput.value.trim());
+    if (vFssai !== true && !vFssai.valid) {
+        applyShake('settingFSSAI');
+        return showToast(vFssai.msg, "error");
+    }
 
-    const backupCode = document.getElementById('settingDeliveryBackupCode').value.trim();
-    const vBackup = validateBackupCode(backupCode);
-    if (vBackup !== true && !vBackup.valid) return showToast(vBackup.msg, "error");
+    const backupInput = document.getElementById('settingDeliveryBackupCode');
+    const vBackup = validateBackupCode(backupInput.value.trim());
+    if (vBackup !== true && !vBackup.valid) {
+        applyShake('settingDeliveryBackupCode');
+        return showToast(vBackup.msg, "error");
+    }
 
     const phones = [
         { id: 'settingDevPhone', label: "Developer Phone" },
@@ -204,7 +334,10 @@ export async function saveStoreSettings() {
     for (const p of phones) {
         const input = document.getElementById(p.id);
         const v = validatePhone(input.value, p.label);
-        if (v !== true && !v.valid) return showToast(v.msg, "error");
+        if (v !== true && !v.valid) {
+            applyShake(p.id);
+            return showToast(v.msg, "error");
+        }
         if (v.value) input.value = v.value; // Auto-prefix 91
     }
 
@@ -212,6 +345,10 @@ export async function saveStoreSettings() {
 
     try {
         // 2. Collect Data
+        const updates = {};
+        const lat = document.getElementById('settingLat').value;
+        const lng = document.getElementById('settingLng').value;
+
         const storeData = {
             entityName: document.getElementById('settingEntityName').value,
             storeName: document.getElementById('settingStoreName').value,
@@ -230,15 +367,24 @@ export async function saveStoreSettings() {
             reviewUrl: document.getElementById('settingReviewUrl').value,
             devPhone: document.getElementById('settingDevPhone').value,
             reportPhone: document.getElementById('settingReportPhone').value,
-            lat, lng,
-            paymentQR: document.getElementById('settingQRUrl').value,
-            updatedAt: new Date().toISOString()
+            lat, 
+            lng,
+            paymentQR: document.getElementById('settingQRUrl').value || null,
+            updatedAt: ServerValue.TIMESTAMP
         };
 
-        const deliveryData = {
+        const delData = {
             notifyPhone: document.getElementById('settingAdminPhone').value,
             backupCode: document.getElementById('settingDeliveryBackupCode').value,
-            slabs: getSlabsFromTable()
+            updatedAt: ServerValue.TIMESTAMP
+        };
+
+        const revData = {
+            commissionType: document.getElementById('settingCommissionType').value,
+            commissionValue: parseFloat(document.getElementById('settingCommissionValue').value) || 0,
+            riderFeeBase: parseFloat(document.getElementById('settingRiderFeeBase').value) || 0,
+            riderKmIncentive: parseFloat(document.getElementById('settingRiderKmIncentive').value) || 0,
+            updatedAt: ServerValue.TIMESTAMP
         };
 
         const botData = {
@@ -248,38 +394,63 @@ export async function saveStoreSettings() {
             imgOut: document.getElementById('botImgOutPreview').src,
             imgDelivered: document.getElementById('botImgDeliveredPreview').src,
             imgFeedback: document.getElementById('botImgFeedbackPreview').src,
-            greetingImage: document.getElementById('settingGreetingUrl').value,
-            menuImage: document.getElementById('settingMenuUrl').value,
+            greetingImage: document.getElementById('settingGreetingUrl').value || null,
+            menuImage: document.getElementById('settingMenuUrl').value || null,
             socialInsta: document.getElementById('botSocialInsta').value,
             socialFb: document.getElementById('botSocialFb').value,
             socialReview: document.getElementById('botSocialReview').value,
             socialWebsite: document.getElementById('botSocialWebsite').value,
             reason1: document.getElementById('settingFeedbackReason1').value,
             reason2: document.getElementById('settingFeedbackReason2').value,
-            reason3: document.getElementById('settingFeedbackReason3').value
+            reason3: document.getElementById('settingFeedbackReason3').value,
+            updatedAt: ServerValue.TIMESTAMP
         };
 
-        const displayData = {};
-        const checks = [
+        const dispData = {};
+        [
             'checkShowStoreName', 'checkShowAddress', 'checkShowGSTIN', 'checkShowFSSAI', 'checkShowTagline',
             'checkShowPoweredBy', 'checkShowQR', 'checkShowWifiInfo', 'checkShowSocial', 'checkShowFeedbackQR'
-        ];
-        checks.forEach(id => {
+        ].forEach(id => {
             const el = document.getElementById(id);
-            if (el) displayData[id] = el.checked;
+            if (el) dispData[id] = el.checked;
         });
 
-        // 3. Batch Update
-        await Promise.all([
-            Outlet.ref(SETTINGS_PATHS.STORE).update(storeData),
-            Outlet.ref(SETTINGS_PATHS.DELIVERY).update(deliveryData),
-            Outlet.ref(SETTINGS_PATHS.BOT).update(botData),
-            Outlet.ref(SETTINGS_PATHS.DISPLAY).set(displayData)
-        ]);
+        // Collect fee slabs from table
+        const slabs = [];
+        document.querySelectorAll('#deliverySlabsTable tbody tr').forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            if (inputs.length >= 2) {
+                slabs.push({
+                    km: parseFloat(inputs[0].value) || 0,
+                    fee: parseFloat(inputs[1].value) || 0
+                });
+            }
+        });
+        if (slabs.length > 0) delData.slabs = slabs;
 
-        showToast("Settings saved successfully!", "success");
+        // Populate update object
+        updates[SETTINGS_PATHS.STORE] = storeData;
+        updates[SETTINGS_PATHS.DELIVERY] = delData;
+        updates[SETTINGS_PATHS.BOT] = botData;
+        updates[SETTINGS_PATHS.DISPLAY] = dispData;
+        updates[SETTINGS_PATHS.REVENUE] = revData;
+
+        // 3. Execute Atomic Action
+        await atomicAdminAction(updates, 'STORE_SETTINGS_UPDATE', {
+            storeName: storeData.storeName,
+            entityName: storeData.entityName
+        });
+
+        showToast("All settings saved successfully! 🚀", "success");
         state.settingsDirty = false;
-        logAudit("Settings", "Updated Store Settings", "Global");
+        
+        // Check if store name changed to sync dishes
+        const oldStoreSnap = await Outlet.ref(SETTINGS_PATHS.STORE).once('value');
+        const oldStore = oldStoreSnap.val() || {};
+        if (oldStore.storeName !== storeData.storeName) {
+            await syncOutletName(storeData.storeName);
+        }
+
         document.getElementById('displayCoords').innerText = `${lat}, ${lng}`;
         if (window.updateOutletStatusIndicator) window.updateOutletStatusIndicator(storeData.shopStatus);
 
@@ -291,85 +462,49 @@ export async function saveStoreSettings() {
     }
 }
 
-// --- FEE SLABS LOGIC ---
+async function syncOutletName(newName) {
+    console.log(`[Sync] Propagating new outlet name: ${newName}`);
+    try {
+        const dishesRef = Outlet.ref('dishes');
+        const snap = await dishesRef.once('value');
+        const dishes = snap.val();
+        if (!dishes) return;
 
-function renderFeeSlabs(slabs) {
-    const tbody = document.getElementById('feeSlabsTable');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    
-    slabs.forEach((slab, index) => {
-        const tr = document.createElement('tr');
-        tr.className = 'premium-row-v4';
-        tr.innerHTML = `
-            <td>
-                <div class="flex-row flex-center flex-gap-8">
-                    <i data-lucide="map-pin" class="text-muted" style="width:14px;"></i>
-                    <input type="number" class="slab-km form-input-small w-80" value="${slab.km}" placeholder="KM">
-                    <span class="text-muted-small">km</span>
-                </div>
-            </td>
-            <td>
-                <div class="flex-row flex-center flex-gap-8">
-                    <span class="text-muted-small">₹</span>
-                    <input type="number" class="slab-fee form-input-small w-80" value="${slab.fee}" placeholder="Fee">
-                </div>
-            </td>
-            <td class="text-right">
-                <button class="btn-icon-danger" data-action="removeFeeSlab" title="Remove Slab">
-                    <i data-lucide="trash-2" style="width:16px;"></i>
-                </button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-    if (window.lucide) window.lucide.createIcons({ root: tbody });
+        const updates = {};
+        Object.keys(dishes).forEach(id => {
+            updates[`${id}/outletName`] = newName;
+            updates[`${id}/outletId`] = Outlet.current;
+            updates[`${id}/businessId`] = Outlet.businessId;
+        });
+
+        await dishesRef.update(updates);
+        console.log(`[Sync] Successfully updated ${Object.keys(dishes).length} dishes.`);
+    } catch (err) {
+        console.error("[Sync] Failed to update dishes:", err);
+        showToast("Dish sync partially failed", "warning");
+    }
 }
 
-export function addFeeSlab() {
-    const tbody = document.getElementById('feeSlabsTable');
-    if (!tbody) return;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td><input type="number" class="slab-km form-input-small" value="0" placeholder="KM"></td>
-        <td><input type="number" class="slab-fee form-input-small" value="0" placeholder="₹"></td>
-        <td><button class="btn-icon text-danger" data-action="removeFeeSlab">🗑️</button></td>
-    `;
-    tbody.appendChild(tr);
-}
 
-function getSlabsFromTable() {
-    const slabs = [];
-    document.querySelectorAll('#feeSlabsTable tr').forEach(tr => {
-        const km = parseFloat(tr.querySelector('.slab-km').value);
-        const fee = parseFloat(tr.querySelector('.slab-fee').value);
-        if (!isNaN(km)) slabs.push({ km, fee: isNaN(fee) ? 0 : fee });
-    });
-    return slabs.sort((a, b) => a.km - b.km);
-}
 
 // --- IMAGE PREVIEWS ---
 
-export function previewSettingsImage(inputId, previewId, hiddenId) {
+export async function previewSettingsImage(inputId, previewId, hiddenId) {
     const file = document.getElementById(inputId).files[0];
     if (!file) return;
 
-    if (file.size > 500 * 1024) {
-        showToast("Image too large (>500KB). Please compress.", "error");
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const base64 = e.target.result;
+    try {
+        const compressedBase64 = await uploadImage(file, `settings/${inputId}`);
         const previewEl = document.getElementById(previewId);
-        if (previewEl) previewEl.src = base64;
+        if (previewEl) previewEl.src = compressedBase64;
         if (hiddenId) {
             const hiddenEl = document.getElementById(hiddenId);
-            if (hiddenEl) hiddenEl.value = base64;
+            if (hiddenEl) hiddenEl.value = compressedBase64;
         }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+        console.error("Settings Image Processing Failed:", err);
+        showToast("Image processing failed", "error");
+    }
 }
 
 // --- QUICK ACTIONS ---
@@ -461,5 +596,36 @@ document.addEventListener('input', (e) => {
             console.log("[Settings] State is now DIRTY");
             state.settingsDirty = true;
         }
+
+        // Smart Logic for Specific Fields (Smooth Functioning Phase)
+        const id = e.target.id;
+        
+        // Auto-Capitalize Store Name & Tagline
+        if (id === 'settingStoreName' || id === 'settingTagline') {
+            e.target.value = e.target.value.toUpperCase();
+        }
+
+        // Auto-Format GSTIN (Uppercase)
+        if (id === 'settingGSTIN') {
+            e.target.value = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15);
+        }
+
+        // Auto-Format FSSAI (Numeric only)
+        if (id === 'settingFSSAI') {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 14);
+        }
+        
+        // Update Smooth Functioning Features
+        updateReceiptPreview();
+        calculateSettingsHealth();
+    }
+});
+
+document.addEventListener('change', (e) => {
+    const settingsTab = document.getElementById('tab-settings');
+    if (settingsTab && settingsTab.contains(e.target)) {
+        // Toggle switches also update the preview
+        updateReceiptPreview();
+        calculateSettingsHealth();
     }
 });

@@ -2,8 +2,10 @@
 // Foodhubbie SaaS — Central Order Management
 // Synchronized with Firebase Realtime Database and ShopAdmin ERP.
 
-import { db, ref, get, push, set } from "@/lib/firebase";
-import type { Order, CartItem, DeliveryAddress, PaymentMethod } from "@/types";
+import { db, ref, get, push, set, auth } from "@/lib/firebase";
+import { update } from "firebase/database";
+import type { Order, CartItem, DeliveryAddress, PaymentMethod, OrderStatus } from "@/types";
+import { logMarketplaceAudit } from "./auditService";
 
 const STORAGE_KEY = "foodhubbie_orders";
 
@@ -19,6 +21,21 @@ export function statusIndex(status: string): number {
 export async function submitOrder(input: PlaceOrderInput): Promise<string> {
   const now = new Date().toISOString();
   const bid = input.businessId || "business_roshani";
+  
+  // 1. Fetch Business Commission Config
+  let commissionConfig = { percentage: 0, fixed: 0 };
+  try {
+    const bizSnap = await get(ref(db, `businesses/${bid}/commission`));
+    if (bizSnap.exists()) {
+      commissionConfig = bizSnap.val();
+    }
+  } catch (err) {
+    console.warn("Could not fetch commission config, defaulting to zero:", err);
+  }
+
+  // 2. Calculate Platform Revenue
+  const netCommissionableAmount = Math.max(0, input.subtotal - (input.discount || 0));
+  const commissionAmount = (netCommissionableAmount * (commissionConfig.percentage / 100)) + commissionConfig.fixed;
   
   const orderData = {
     customerName: input.deliveryAddress.name,
@@ -45,13 +62,20 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
     createdAt: now,
     updatedAt: now,
     cart: input.items.map((i) => ({
+      id: i.menuItemId,
       name: i.name,
       qty: i.quantity,
       price: i.price,
       size: i.customization?.size?.name || "Regular",
       addon: i.customization?.addons?.map(a => a.name).join(", ") || "None",
       image: i.image
-    }))
+    })),
+    commission: {
+      amount: parseFloat(commissionAmount.toFixed(2)),
+      percentage: commissionConfig.percentage,
+      fixed: commissionConfig.fixed,
+      calculatedAt: now
+    }
   };
 
   try {
@@ -59,17 +83,24 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
     const newOrderRef = push(ref(db, path));
     await set(newOrderRef, orderData);
 
-    // Increment Coupon usage if applied
+    // Increment Coupon usage if applied (Atomic Transaction)
     if (input.couponCode) {
       try {
-        const couponRef = ref(db, `system/promotions/coupons/${input.couponCode.toUpperCase()}`);
-        const couponSnap = await get(couponRef);
-        if (couponSnap.exists()) {
-          const cData = couponSnap.val();
-          await set(ref(db, `system/promotions/coupons/${input.couponCode.toUpperCase()}/usedCount`), (cData.usedCount || 0) + 1);
-        }
+        const { increment } = await import("firebase/database");
+        const couponRef = ref(db, `system/promotions/coupons/${input.couponCode.toUpperCase()}/usedCount`);
+        await update(ref(db, `system/promotions/coupons/${input.couponCode.toUpperCase()}`), {
+          usedCount: increment(1)
+        });
+        
+        await logMarketplaceAudit('COUPON_REDEEM', {
+          couponCode: input.couponCode.toUpperCase(),
+          orderId: orderId,
+          userId: input.userId
+        });
+
+        console.log(`[OrderService] Coupon ${input.couponCode} incremented and audited.`);
       } catch (cErr) {
-        console.error("Failed to increment coupon usedCount:", cErr);
+        console.error("Failed to increment coupon usedCount atomically:", cErr);
       }
     }
 
@@ -88,6 +119,11 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
       statusHistory: [{ status: "Placed", timestamp: now }],
       paymentMethod: input.paymentMethod,
       deliveryAddress: input.deliveryAddress,
+      couponCode: input.couponCode,
+      couponDiscount: input.couponDiscount,
+      globalDiscount: input.globalDiscountAmount,
+      platformFee: input.platformFee,
+      cashbackBonus: input.cashbackBonus,
       createdAt: now,
       updatedAt: now,
       estimatedMinutes: 35
@@ -96,11 +132,91 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
     const currentOrders = loadOrders();
     persistOrders([finalOrder, ...currentOrders]);
 
+    // 🚀 AUDIT LOG
+    await logMarketplaceAudit('ORDER_PLACED', {
+    });
+    
+    // 🚀 INVENTORY SYNC: Atomic Stock Decrement
+    const { increment } = await import("firebase/database");
+    for (const item of input.items) {
+      try {
+        const dishRef = ref(db, `businesses/${bid}/outlets/${input.outletId}/dishes/${item.menuItemId}`);
+        // Only update if it exists to avoid creating empty dish nodes
+        const dishSnap = await get(dishRef);
+        if (dishSnap.exists()) {
+          const dish = dishSnap.val();
+          if (dish.stock !== undefined) {
+            await update(dishRef, {
+              stock: increment(-item.quantity),
+              updatedAt: now
+            });
+            console.log(`[OrderService] Stock decremented for ${item.name} (-${item.quantity})`);
+          }
+        }
+      } catch (invErr) {
+        console.warn(`[OrderService] Stock decrement failed for ${item.menuItemId}:`, invErr);
+      }
+    }
+
     return finalOrder.id;
   } catch (err) {
     console.error("Order submission failed:", err);
     throw new Error("Could not process order. Please try again.");
   }
+}
+
+/** Update order status in Firebase */
+export async function updateOrderStatus(orderId: string, status: OrderStatus, note?: string): Promise<void> {
+  // Find order path (bid/oid/orders/orderId)
+  // For simplicity in this demo, we might need to store the path in localOrder or search.
+  // In a real multi-tenant app, the path should be known or stored.
+  // We'll search the local cache to find bid and oid.
+  const orders = loadOrders();
+  const order = orders.find(o => o.id === orderId);
+  if (!order) throw new Error("Order not found in local cache.");
+
+  const path = `businesses/${order.businessId}/outlets/${order.outletId}/orders/${orderId}`;
+  const now = new Date().toISOString();
+  
+  await update(ref(db, path), {
+    status,
+    updatedAt: now,
+    [`statusHistory/${Date.now()}`]: { status, timestamp: now, note: note || "" }
+  });
+
+  // 🚀 AUDIT LOG
+  await logMarketplaceAudit('ORDER_STATUS_UPDATE', {
+    orderId,
+    status,
+    note
+  });
+
+  // Sync local cache
+  order.status = status;
+  order.statusHistory.push({ status, timestamp: now });
+  persistOrders(orders);
+}
+
+/** Mark cashback as pending for an order */
+export async function markCashbackPending(orderId: string, amount: number): Promise<void> {
+  const orders = loadOrders();
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  const path = `businesses/${order.businessId}/outlets/${order.outletId}/orders/${orderId}`;
+  await update(ref(db, path), {
+    cashbackStatus: "pending",
+    cashbackBonus: amount
+  });
+
+  // 🚀 AUDIT LOG
+  await logMarketplaceAudit('CASHBACK_PENDING', {
+    orderId,
+    amount
+  });
+
+  order.cashbackStatus = "pending";
+  persistOrders(orders);
 }
 
 /** Load orders from localStorage (UI Cache) */

@@ -7,9 +7,46 @@
 
 const { getData, saveUserProfile, getUserProfile, setData, updateData, pushData, getGlobalData, BUSINESS_ID, OUTLET_ID } = require('./firebase');
 const { formatJid, isShopOpen, calculateDistance, calculateDeliveryFee, generateOTP } = require('../shared/utils');
+const { logBotAudit } = require('./audit');
 
-// In-memory sessions
-const sessions = {};
+// Session Cache (In-memory layer for performance)
+const sessionCache = {};
+
+/**
+ * Persists user session to Firebase
+ */
+async function persistSession(jid, session) {
+  try {
+    // We store sessions in a dedicated path: system/botSessions/{BUSINESS_ID}/{OUTLET_ID}/{jid}
+    // We sanitize the jid key for Firebase (replace . with ,)
+    const safeJid = jid.replace(/\./g, ',');
+    const path = `system/botSessions/${BUSINESS_ID}/${OUTLET_ID}/${safeJid}`;
+    await setData(path, session);
+    sessionCache[jid] = session;
+  } catch (err) {
+    console.error(`[Session] Failed to persist for ${jid}:`, err.message);
+  }
+}
+
+/**
+ * Loads user session from Firebase or Cache
+ */
+async function getSession(jid) {
+  if (sessionCache[jid]) return sessionCache[jid];
+  
+  try {
+    const safeJid = jid.replace(/\./g, ',');
+    const path = `system/botSessions/${BUSINESS_ID}/${OUTLET_ID}/${safeJid}`;
+    const session = await getData(path);
+    if (session) {
+      sessionCache[jid] = session;
+      return session;
+    }
+  } catch (err) {
+    console.error(`[Session] Failed to load for ${jid}:`, err.message);
+  }
+  return null;
+}
 
 /**
  * Main message handler
@@ -23,10 +60,12 @@ async function handleIncomingMessage(sock, m) {
   const location = m.message?.locationMessage;
   const pushName = m.pushName || "";
 
-  // Initialize session if new
-  if (!sessions[senderJid]) {
+  // Initialize session (Load from DB if not in cache)
+  let user = await getSession(senderJid);
+  
+  if (!user) {
     const profile = await getUserProfile(senderJid);
-    sessions[senderJid] = {
+    user = {
       step: 'START',
       cart: [],
       current: {},
@@ -39,8 +78,9 @@ async function handleIncomingMessage(sock, m) {
       address: profile?.address || null,
       location: profile?.location || null
     };
+    sessionCache[senderJid] = user;
   }
-  const user = sessions[senderJid];
+  
   user.lastActivity = Date.now();
 
   // Rate limiting & reset handling
@@ -49,7 +89,11 @@ async function handleIncomingMessage(sock, m) {
     user.cart = [];
     user.current = {};
     if (OUTLET_ID === 'GLOBAL') user.activeOutlet = null;
+    await persistSession(senderJid, user);
     await sock.sendMessage(senderJid, { text: "🔄 *System Reset.* Reply with any message to start again." });
+    
+    // 🚀 AUDIT LOG
+    await logBotAudit('BOT_RESET', { reason: text.toLowerCase() }, senderJid);
     return;
   }
 
@@ -528,7 +572,7 @@ async function handleFinalCheckout(sock, jid, user, text) {
   }
 
   if (text === "1") {
-    const orderId = `FH-${Date.now().toString().slice(-6)}`;
+    const orderId = `FH-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const subtotal = user.cart.reduce((s, i) => s + i.total, 0);
     const total = subtotal + (user.deliveryFee || 0);
 
@@ -563,9 +607,16 @@ async function handleFinalCheckout(sock, jid, user, text) {
       location: user.location
     }, oid);
 
-    let success = `🎉 *ORDER PLACED!* 🎉\n━━━━━━━━━━━━━━━━━━━━\n🆔 *Order ID:* #${orderId}\n🚚 *Status:* Placed\n💰 *Total:* ₹${total}\n━━━━━━━━━━━━━━━━━━━━\n_We will notify you once confirmed!_`;
-    
     await sock.sendMessage(jid, { text: success });
+    
+    // 🚀 AUDIT LOG
+    await logBotAudit('BOT_ORDER_PLACED', {
+      orderId,
+      total,
+      outletId: oid,
+      itemsCount: user.cart.length
+    }, jid);
+
     user.cart = [];
     user.step = 'CATEGORY'; // Back to shop menu
   }

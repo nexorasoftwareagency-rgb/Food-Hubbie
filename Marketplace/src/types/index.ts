@@ -90,6 +90,7 @@ export type MenuItem = {
   crusts?: MenuItemCrust[];
   preparationTimeMin: number;
   sortOrder: number;
+  stock?: number;
 };
 
 export type CartItemCustomization = {
@@ -159,11 +160,16 @@ export type Order = {
   paymentMethod: PaymentMethod;
   deliveryAddress: DeliveryAddress;
   couponCode?: string;
-  discount?: number;
+  couponDiscount?: number;
+  globalDiscount?: number;
+  platformFee?: number;
+  cashbackBonus?: number;
+  cashbackStatus?: "pending" | "credited" | "failed";
   estimatedMinutes: number;
   riderName?: string;
   riderPhone?: string;
   riderVehicle?: string;
+  isReviewed?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -177,9 +183,16 @@ export type UserAddress = {
   isDefault: boolean;
 };
 
+export type PositiveNumber = number & { readonly __brand: "PositiveNumber" };
+
+export function toPositiveNumber(val: number): PositiveNumber {
+  if (val < 0 || isNaN(val)) return 0 as PositiveNumber;
+  return val as PositiveNumber;
+}
+
 export type WalletTransaction = {
   id: string;
-  amount: number;
+  amount: PositiveNumber;
   type: "credit" | "debit";
   description: string;
   orderId?: string;
@@ -194,7 +207,7 @@ export type User = {
   avatar?: string;
   loyaltyPoints: number;
   walletBalance: number;
-  walletHistory: WalletTransaction[];
+  recentTransactions: WalletTransaction[]; // Lightweight alternative
   savedAddresses: UserAddress[];
   createdAt: string;
 };

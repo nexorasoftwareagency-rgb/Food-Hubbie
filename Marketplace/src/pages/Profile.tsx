@@ -155,7 +155,7 @@ export default function Profile() {
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-foreground">Address {i + 1}</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{addr.address}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{addr?.address ?? '—'}</p>
               </div>
               <Edit3 className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
             </div>

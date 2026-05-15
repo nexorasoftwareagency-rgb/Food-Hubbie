@@ -156,7 +156,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const feeRef = ref(db, "system/config/platformFee/amount");
         const snapshot = await get(feeRef);
         if (snapshot.exists()) {
-          setPlatformFee(Number(snapshot.val()));
+          const val = snapshot.val();
+          const fee = Number(val);
+          if (!isNaN(fee) && fee >= 0 && fee <= 50) {
+            setPlatformFee(fee);
+          } else {
+            console.warn(`[CartContext] Invalid platform fee received: ${val}. Using default.`);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch platform fee:", err);

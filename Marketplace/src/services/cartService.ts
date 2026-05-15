@@ -25,6 +25,7 @@ export function calcCartSummary(
     surgeMultiplier?: number;
     globalDiscount?: { type: 'percent' | 'fixed', value: number };
     platformFee?: number;
+    isFreeDelivery?: boolean;
   } = {}
 ): CartSummary {
   let subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -36,7 +37,7 @@ export function calcCartSummary(
     if (globalDiscount.type === 'percent') {
       globalSavings = Math.round(subtotal * (globalDiscount.value / 100));
     } else {
-      globalSavings = globalDiscount.value;
+      globalSavings = Math.round(globalDiscount.value);
     }
   }
 
@@ -53,11 +54,22 @@ export function calcCartSummary(
   }
 
   // 3. Apply Surge Pricing to delivery (Standard Industry Practice)
-  const finalDeliveryFee = Math.round(deliveryFee * surgeMultiplier);
+  let finalDeliveryFee = Math.round(deliveryFee * surgeMultiplier);
+  
+  // Handle Free Delivery Coupon
+  const isFreeDelivery = promotions.isFreeDelivery || false;
+  const deliverySavings = isFreeDelivery ? finalDeliveryFee : 0;
+  finalDeliveryFee = Math.max(0, finalDeliveryFee - deliverySavings);
 
-  const taxes = Math.round(afterCouponSubtotal * GST_RATE);
+  // 4. Tax Calculation
+  const isDeliveryFeeTaxable = false; // Configurable
+  const isPlatformFeeTaxable = false; // Configurable
+  
+  const taxableBase = afterCouponSubtotal + (isDeliveryFeeTaxable ? finalDeliveryFee : 0) + (isPlatformFeeTaxable ? platformFee : 0);
+  const taxes = Math.round(taxableBase * GST_RATE);
+  
   const total = afterCouponSubtotal + finalDeliveryFee + taxes + platformFee;
-  const savings = globalSavings + couponDiscount;
+  const savings = globalSavings + couponDiscount + deliverySavings;
 
   return { 
     subtotal: subtotal, 

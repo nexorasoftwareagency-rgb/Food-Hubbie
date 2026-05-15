@@ -11,6 +11,7 @@ import { loadCustomers, loadReports, loadLostSales } from './features/customers.
 import { toggleNotificationSheet, updateNotificationUI, updateNotificationSettingsUI } from './features/notifications.js';
 import { renderOrders } from './features/orders.js';
 import { loadInventory, cleanupInventory } from './features/inventory.js';
+import { renderSettlements } from './features/settlements.js';
 
 
 
@@ -175,8 +176,15 @@ export const switchTab = async (tabId, skipHistory = false) => {
             case 'dashboard':
             case 'orders':
             case 'live':
+            case 'kitchen':
                 loadRiders(); // Need riders for live assignment
                 renderOrders(state.lastOrdersSnap);
+                // Extra trigger for live ops
+                if (tabId === 'live') {
+                    import('./features/orders.js').then(m => {
+                        if (m.renderLiveFleet) m.renderLiveFleet();
+                    });
+                }
                 break;
             case 'liveTracker':
                 setTimeout(() => initLiveRiderTracker(), 100);
@@ -210,6 +218,9 @@ export const switchTab = async (tabId, skipHistory = false) => {
                 break;
             case 'inventory':
                 loadInventory();
+                break;
+            case 'settlements':
+                renderSettlements();
                 break;
         }
 

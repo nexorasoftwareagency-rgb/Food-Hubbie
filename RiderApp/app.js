@@ -1237,8 +1237,31 @@ async function initRealtimeListeners() {
         }
     });
     window._activeListeners.push(unsubNotif);
+    
+    // Reset retry count on success
+    window.initRealtimeListenersRetryCount = 0;
+    
     } catch (error) {
         console.error("[Sync] Critical Initialization Error:", error);
+        
+        // Notify user
+        window.showToast("Connection failed. Please refresh or contact support.", "error");
+        
+        // Log to Firebase
+        logError("initRealtimeListeners", error);
+        
+        // Exponential Backoff Retry
+        window.initRealtimeListenersRetryCount = (window.initRealtimeListenersRetryCount || 0) + 1;
+        const maxRetries = 5;
+        
+        if (window.initRealtimeListenersRetryCount <= maxRetries) {
+            const delay = Math.pow(2, window.initRealtimeListenersRetryCount) * 1000;
+            console.log(`[Sync] Retrying initialization in ${delay}ms (Attempt ${window.initRealtimeListenersRetryCount}/${maxRetries})...`);
+            setTimeout(() => {
+                window.clearAllListeners();
+                initRealtimeListeners();
+            }, delay);
+        }
     }
 }
 
@@ -1689,25 +1712,25 @@ window._doRenderAllOrders = () => {
                         </div>
 
                         <div class="billing-summary-box mb-15 p-12 br-12" style="background:rgba(0,0,0,0.03); border:1px dashed rgba(0,0,0,0.1);">
-                            <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Subtotal</span><span class="font-bold">₹${o.subtotal || 0}</span></div>
+                            <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Subtotal</span><span class="font-bold">₹${escapeHtml(Number(o.subtotal || 0).toString())}</span></div>
                             
                             ${o.globalDiscount ? `
-                                <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Ecosystem Discount</span><span class="text-success font-bold">-₹${o.globalDiscount}</span></div>
+                                <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Ecosystem Discount</span><span class="text-success font-bold">-₹${escapeHtml(Number(o.globalDiscount).toString())}</span></div>
                             ` : ''}
 
                             ${o.couponCode ? `
                                 <div class="flex-between mb-4" style="font-size:12px;">
                                     <span class="text-muted">Coupon (${escapeHtml(o.couponCode)})</span>
-                                    <span class="text-success font-bold">-₹${o.couponDiscount || (o.discount - (o.globalDiscount || 0))}</span>
+                                    <span class="text-success font-bold">-₹${escapeHtml((o.couponDiscount != null ? Number(o.couponDiscount) : Math.max(0, Number(o.discount || 0) - Number(o.globalDiscount || 0))).toString())}</span>
                                 </div>
                             ` : (o.discount && !o.globalDiscount ? `
-                                <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Discount</span><span class="text-success font-bold">-₹${o.discount}</span></div>
+                                <div class="flex-between mb-4" style="font-size:12px;"><span class="text-muted">Discount</span><span class="text-success font-bold">-₹${escapeHtml(Number(o.discount).toString())}</span></div>
                             ` : '')}
 
-                            <div class="flex-between mb-8" style="font-size:12px;"><span class="text-muted">Delivery Fee</span><span class="font-bold">₹${o.deliveryFee || 0}</span></div>
+                            <div class="flex-between mb-8" style="font-size:12px;"><span class="text-muted">Delivery Fee</span><span class="font-bold">₹${escapeHtml(Number(o.deliveryFee || 0).toString())}</span></div>
                             <div class="flex-between pt-8 border-t" style="border-top:1px solid rgba(0,0,0,0.1);">
                                 <span class="font-bold fs-14">To Collect</span>
-                                <span class="fs-18 font-900 color-primary">₹${o.total || 0}</span>
+                                <span class="fs-18 font-900 color-primary">₹${escapeHtml(Number(o.total || 0).toString())}</span>
                             </div>
                         </div>
 
@@ -1716,8 +1739,8 @@ window._doRenderAllOrders = () => {
                             <div class="checklist-title">Verify Items</div>
                             ${(o.normalizedItems || o.items || []).map(i => `
                                 <div class="check-item">
-                                    <input type="checkbox" id="check-${i.item || i.name}">
-                                    <label for="check-${i.item || i.name}">${i.name || i.item} (${i.size}) x${i.qty || i.quantity}</label>
+                                    <input type="checkbox" id="check-${escapeHtml(i.item || i.name)}">
+                                    <label for="check-${escapeHtml(i.item || i.name)}">${escapeHtml(i.name || i.item)} (${escapeHtml(i.size || '---')}) x${i.qty || i.quantity || 1}</label>
                                 </div>
                             `).join('')}
                         </div>
@@ -2227,6 +2250,80 @@ onValue(ref(db, '.info/connected'), (snap) => {
         }
     }
 });
+
+// --- PROFILE MANAGEMENT (Phase 6.0) ---
+async function compressImage(file, targetSizeKB = 200) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const MAX_WIDTH = 1024;
+                if (width > MAX_WIDTH) {
+                    height = (MAX_WIDTH / width) * height;
+                    width = MAX_WIDTH;
+                }
+                const perform = (w, h, q) => {
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    return canvas.toDataURL('image/jpeg', q);
+                };
+                let q = 0.8;
+                let dataUrl = perform(width, height, q);
+                let iterations = 0;
+                while (dataUrl.length > targetSizeKB * 1024 && iterations < 5) {
+                    if (q > 0.3) q -= 0.15;
+                    else { width *= 0.8; height *= 0.8; }
+                    dataUrl = perform(width, height, q);
+                    iterations++;
+                }
+                fetch(dataUrl).then(res => res.blob()).then(blob => resolve(blob));
+            };
+        };
+    });
+}
+
+window.handleProfilePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !currentUser) return;
+
+    window.showToast("Compressing & Uploading...", "info");
+    try {
+        const compressedBlob = await compressImage(file, 200);
+        const path = `riders/${currentUser.profile.id}/profile_${Date.now()}.jpg`;
+        const sRef = storageRef(dbStorage, path);
+        await uploadBytes(sRef, compressedBlob);
+        const url = await getDownloadURL(sRef);
+        
+        await update(ref(db, `riders/${currentUser.profile.id}`), { profilePhoto: url });
+        document.getElementById('r-profile-img').src = url;
+        document.getElementById('sidebar-avatar').src = url;
+        window.showToast("Profile photo updated!", "success");
+    } catch (err) {
+        console.error("Upload failed:", err);
+        window.showToast("Upload failed.", "error");
+    }
+};
+
+window.editProfileField = async (field) => {
+    if (!currentUser) return;
+    const currentVal = currentUser.profile[field] || "";
+    const newVal = prompt(`Enter new ${field}:`, currentVal);
+    if (newVal !== null && newVal.trim() !== currentVal) {
+        try {
+            await update(ref(db, `riders/${currentUser.profile.id}`), { [field]: newVal.trim() });
+            window.showToast(`${field} updated!`, "success");
+            location.reload(); // Refresh to update UI
+        } catch (e) { window.showToast("Update failed.", "error"); }
+    }
+};
 
 window.initGlobalSlider();
 window.updateRiderPerformanceUI = () => { }; 

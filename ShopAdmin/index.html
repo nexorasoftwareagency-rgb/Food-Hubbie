@@ -118,677 +118,673 @@
                     <span class="error-msg"></span>
                 </div>
 
-                <div class="login-footer-v4">
-                    <span>Enterprise Security Level 4</span>
-                    <div class="security-dot"></div>
+                <div class="login-footer-v4" style="flex-direction: column; gap: 12px; align-items: center;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>Enterprise Security Level 4</span>
+                        <div class="security-dot"></div>
+                    </div>
+                    <button type="button" class="btn-pro-transparent" onclick="window.open('./partner-onboarding.html', '_blank')" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8;">
+                        <i data-lucide="store" size="14"></i> Join as Partner
+                    </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ONBOARDING WIZARD (Ultra Premium v4) -->
+    <div id="onboardingOverlay" class="login-container-v4 hidden" style="z-index: 10001;">
+        <div class="login-card-v4" style="max-width: 600px; padding: 40px;">
+            <div class="onboarding-steps mb-30" style="display:flex; justify-content:space-between; position:relative;">
+                <div class="step-line" style="position:absolute; top:18px; left:0; right:0; height:2px; background:rgba(255,255,255,0.1); z-index:0;">
+                    <div id="stepProgress" style="width:0%; height:100%; background:var(--accent); transition: width 0.4s ease;"></div>
+                </div>
+                <div class="step-item active" id="step1-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); color:var(--accent); font-weight:900;">1</div>
+                <div class="step-item" id="step2-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">2</div>
+                <div class="step-item" id="step3-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">3</div>
+                <div class="step-item" id="step4-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">4</div>
+                <div class="step-item" id="step5-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">5</div>
+            </div>
+
+            <div id="onboardingContent">
+                <!-- ... existing steps ... -->
+                <!-- Step 1: Account Creation -->
+                <div id="onboardStep1" class="onboard-pane">
+                    <h2 class="mb-8">Partner Authentication</h2>
+                    <p class="text-muted mb-24">Create your primary administrative gateway account.</p>
+                    <div class="login-input-group-v4">
+                        <label><i data-lucide="mail"></i> Email Address</label>
+                        <input type="email" id="obEmail" class="login-input-v4" placeholder="owner@restaurant.com">
+                    </div>
+                    <div class="login-input-group-v4">
+                        <label><i data-lucide="lock"></i> Choose Password</label>
+                        <input type="password" id="obPass" class="login-input-v4" placeholder="••••••••">
+                    </div>
+                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
+                        <button class="btn-pro-transparent" type="button" onclick="hideOnboardingFlow()" style="flex:1">Back to Login</button>
+                        <button class="btn-login-v4" type="button" onclick="validateStep1()" style="flex:2">
+                            <span>Next: Business Profile</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Business Profile -->
+                <div id="onboardStep2" class="onboard-pane hidden">
+                    <h2 class="mb-8">Business Node Details</h2>
+                    <p class="text-muted mb-24">Tell us about your restaurant entity.</p>
+                    <div class="grid grid-cols-2 gap-12" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <div class="login-input-group-v4">
+                            <label>Restaurant Name</label>
+                            <input type="text" id="obBizName" class="login-input-v4" placeholder="e.g. Tasty Bites">
+                        </div>
+                        <div class="login-input-group-v4">
+                            <label>Owner Name</label>
+                            <input type="text" id="obOwnerName" class="login-input-v4" placeholder="Full Name">
+                        </div>
+                    </div>
+                    <div class="login-input-group-v4">
+                        <label>Business Address</label>
+                        <textarea id="obAddress" class="login-input-v4" style="height:80px; padding:12px; margin-bottom:0;" placeholder="Complete street address..."></textarea>
+                    </div>
+                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
+                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(1)" style="flex:1">Back</button>
+                        <button class="btn-login-v4" type="button" onclick="validateStep2()" style="flex:2">
+                            <span>Next: KYC Vault</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: KYC Vault -->
+                <div id="onboardStep3" class="onboard-pane hidden">
+                    <h2 class="mb-8">Ecosystem Compliance</h2>
+                    <p class="text-muted mb-24">Upload mandatory regulatory documents for verification.</p>
+                    <div class="kyc-upload-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                        <div class="kyc-card p-16 rounded-xl border-white-op-1 text-center" style="background:rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 12px;">
+                            <i data-lucide="file-text" class="mb-12 text-accent" style="display:block; margin: 0 auto 12px;"></i>
+                            <div class="text-sm font-bold">FSSAI License</div>
+                            <input type="file" id="obFssai" class="hidden" onchange="handleKYCUpload('fssai', this)">
+                            <button class="btn-pro-sm mt-8" type="button" onclick="document.getElementById('obFssai').click()">Upload File</button>
+                            <div id="fssaiStatus" class="text-xs text-muted mt-4">Pending</div>
+                        </div>
+                        <div class="kyc-card p-16 rounded-xl border-white-op-1 text-center" style="background:rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 12px;">
+                            <i data-lucide="landmark" class="mb-12 text-accent" style="display:block; margin: 0 auto 12px;"></i>
+                            <div class="text-sm font-bold">GST Certificate</div>
+                            <input type="file" id="obGst" class="hidden" onchange="handleKYCUpload('gst', this)">
+                            <button class="btn-pro-sm mt-8" type="button" onclick="document.getElementById('obGst').click()">Upload File</button>
+                            <div id="gstStatus" class="text-xs text-muted mt-4">Pending</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
+                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(2)" style="flex:1">Back</button>
+                        <button class="btn-login-v4" type="button" onclick="validateStep3()" style="flex:2">
+                            <span>Next: Final Review</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Menu Architecture -->
+                <div id="onboardStep4" class="onboard-pane hidden">
+                    <h2 class="mb-8">Menu Architecture</h2>
+                    <p class="text-muted mb-24">Define your core culinary offerings and starter categories.</p>
+                    <div class="login-input-group-v4">
+                        <label>Primary Cuisine</label>
+                        <select id="obCuisine" class="login-input-v4">
+                            <option value="multi">Multi-Cuisine</option>
+                            <option value="italian">Italian / Pizza</option>
+                            <option value="bakery">Bakery / Cakes</option>
+                            <option value="indian">North Indian</option>
+                            <option value="south_indian">South Indian</option>
+                            <option value="chinese">Chinese / Thai</option>
+                        </select>
+                    </div>
+                    <div class="login-input-group-v4">
+                        <label>Starter Categories (Comma separated)</label>
+                        <input type="text" id="obCategories" class="login-input-v4" placeholder="e.g. Starters, Main Course, Desserts">
+                    </div>
+                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
+                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(3)" style="flex:1">Back</button>
+                        <button class="btn-login-v4" type="button" onclick="validateStep4()" style="flex:2">
+                            <span>Next: Final Review</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 5: Final Review -->
+                <div id="onboardStep5" class="onboard-pane hidden">
+                    <h2 class="mb-8">Onboarding Confirmation</h2>
+                    <p class="text-muted mb-24">Review your details before submitting for infrastructure provisioning.</p>
+                    <div class="summary-card p-20 rounded-xl bg-black-op-4 font-mono text-xs mb-24" style="background:rgba(0,0,0,0.4); padding:20px; border-radius:12px;">
+                        <div class="mb-4" style="color:var(--accent)">> ENTITY: <span id="sumBizName">--</span></div>
+                        <div class="mb-4" style="color:var(--accent)">> OWNER: <span id="sumOwner">--</span></div>
+                        <div class="mb-4" style="color:var(--accent)">> EMAIL: <span id="sumEmail">--</span></div>
+                        <div class="mb-4" style="color:var(--accent)">> CUISINE: <span id="sumCuisine">--</span></div>
+                        <div class="mb-4" style="color:var(--accent)">> DOCUMENTS: <span id="sumKyc">PENDING</span></div>
+                        <div class="mt-12 text-muted animate-pulse">_ Awaiting kernel submission...</div>
+                    </div>
+                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
+                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(4)" style="flex:1">Back</button>
+                        <button class="btn-login-v4" type="button" id="submitOnboardBtn" onclick="finalizeOnboarding()" style="flex:2">
+                            <span>Initialize Registration 🚀</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PENDING APPROVAL SCREEN -->
+    <div id="pendingOverlay" class="login-container-v4 hidden" style="z-index: 10002; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+        <div class="login-card-v4 text-center" style="max-width: 500px; padding: 50px;">
+            <div class="animate-pulse mb-30" style="width: 80px; height: 80px; background: rgba(245,158,11,0.1); color: #F59E0B; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; border: 2px solid #F59E0B;">
+                <i data-lucide="shield-alert" size="40"></i>
+            </div>
+            <h2 class="text-2xl font-black mb-12">Deployment in Progress</h2>
+            <p class="text-slate-400 mb-30">Your partner node has been registered and is currently awaiting Super Admin validation. Access to the full ERP suite will be granted once compliance checks are finalized.</p>
             
-            <!-- Stitched Corner Accents -->
-            <div class="corner-stitch tl"></div>
-            <div class="corner-stitch tr"></div>
-            <div class="corner-stitch bl"></div>
-            <div class="corner-stitch br"></div>
+            <div class="status-timeline mb-30" style="text-align:left; border-left:2px solid rgba(255,255,255,0.05); padding-left:20px; margin-left:10px;">
+                <div class="mb-20" style="position:relative; opacity:1;">
+                    <div style="position:absolute; left:-27px; top:4px; width:12px; height:12px; border-radius:50%; background:#10B981; border:3px solid #1e293b"></div>
+                    <div class="font-bold text-sm">Account Registered</div>
+                    <div class="text-xs text-muted">Authentication layer established</div>
+                </div>
+                <div class="mb-20" style="position:relative; opacity:1;">
+                    <div style="position:absolute; left:-27px; top:4px; width:12px; height:12px; border-radius:50%; background:#F59E0B; border:3px solid #1e293b"></div>
+                    <div class="font-bold text-sm">Super Admin Approval</div>
+                    <div class="text-xs text-muted">Pending security and KYC audit</div>
+                </div>
+                <div style="position:relative; opacity:0.4;">
+                    <div style="position:absolute; left:-27px; top:4px; width:12px; height:12px; border-radius:50%; background:white; border:3px solid #1e293b"></div>
+                    <div class="font-bold text-sm">Live Infrastructure Provisioning</div>
+                    <div class="text-xs text-muted">Awaiting database node initialization</div>
+                </div>
+            </div>
+
+            <button class="btn-pro-transparent" type="button" onclick="userLogout()">
+                <i data-lucide="log-out" size="14"></i> Logout
+            </button>
         </div>
     </div>
 
     <div class="layout hidden">
-        <div id="sidebarOverlay" class="sidebar-overlay" data-action="toggleSidebar"></div>
-
-        <!-- SIDEBAR -->
-        <nav class="sidebar" id="sidebarNav" role="navigation" aria-label="Main Navigation">
+        <!-- SIDEBAR (Pro Console) -->
+        <aside class="sidebar" id="sidebarNav">
             <div class="sidebar-header">
-                <div class="logo-box">
-                    <img src="https://placehold.co/40x40?text=F" alt="Foodhubbie Logo">
-                    <div>
-                        <h1 class="logo-text">FOODHUBBIE</h1>
-                        <div class="version-badge">Premium v4.2</div>
-                    </div>
+                <div class="pro-logo-box">
+                    <i data-lucide="shield-check" style="width:24px; height:24px;"></i>
                 </div>
-                <button class="sidebar-close-btn" id="btnSidebarClose" title="Close Sidebar" data-action="toggleSidebar">
-                    <i data-lucide="x"></i>
-                </button>
+                <div class="sidebar-brand">
+                    <span>FOODHUBBIE</span>
+                    <div style="font-size:9px; color:var(--primary); letter-spacing:0.1em; font-weight:800;">PRO CONSOLE</div>
+                </div>
             </div>
-            <ul class="nav-list">
-                <li id="menu-dashboard" class="active" title="View Main Dashboard Snapshot">
-                    <button data-action="switchTab" data-tab="dashboard" class="nav-btn">
+
+            <ul class="sidebar-nav nav-list" style="list-style:none; padding:0; margin:0;">
+                <div class="nav-group-label" style="padding:20px 16px 8px; font-size:10px; font-weight:800; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.1em;">Operations</div>
+                
+                <li class="nav-item active" id="menu-dashboard">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="dashboard" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
                         <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
                     </button>
                 </li>
-                <li id="menu-orders" title="Manage Customer Orders">
-                    <button data-action="switchTab" data-tab="orders" class="nav-btn">
-                        <i data-lucide="shopping-cart"></i> <span>Orders</span>
+                <li class="nav-item" id="menu-orders">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="orders" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="shopping-bag"></i> <span>Order History</span>
                     </button>
                 </li>
-                <li id="menu-live" title="Monitor Live Store Operations">
-                    <button data-action="switchTab" data-tab="live" class="nav-btn">
-                        <i data-lucide="activity"></i> <span>Live Ops</span> <span id="badge-live"
-                            class="counter-badge hidden">0</span>
+                <li class="nav-item" id="menu-live">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="live" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <div class="flex-row flex-center flex-gap-12">
+                            <i data-lucide="activity"></i> <span>Live Ops</span>
+                            <span id="badge-live" class="nav-badge hidden">0</span>
+                        </div>
                     </button>
                 </li>
-                <li id="menu-walkin" title="Open Point of Sale (POS) Interface">
-                    <button data-action="switchTab" data-tab="walkin" class="nav-btn">
+                <li class="nav-item" id="menu-kitchen">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="kitchen" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="chef-hat"></i> <span>Kitchen Console</span>
+                    </button>
+                </li>
+                <li class="nav-item" id="menu-walkin">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="walkin" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
                         <i data-lucide="monitor"></i> <span>POS Control</span>
                     </button>
                 </li>
-                <li id="menu-menu" title="Manage Product Menu and Items">
-                    <button data-action="switchTab" data-tab="menu" class="nav-btn">
-                        <i data-lucide="utensils"></i> <span>Menu</span>
+
+                <div class="nav-group-label" style="padding:20px 16px 8px; font-size:10px; font-weight:800; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.1em;">Catalog</div>
+                <li class="nav-item" id="menu-menu">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="menu" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="utensils"></i> <span>Menu Items</span>
                     </button>
                 </li>
-                <li id="menu-categories" title="Organize Menu Categories">
-                    <button data-action="switchTab" data-tab="categories" class="nav-btn">
+                <li class="nav-item" id="menu-categories">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="categories" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
                         <i data-lucide="folder-tree"></i> <span>Categories</span>
                     </button>
                 </li>
-                <li id="menu-riders" title="Manage Delivery Staff and Status">
-                    <button data-action="switchTab" data-tab="riders" class="nav-btn">
-                        <i data-lucide="bike"></i> <span>Riders</span>
-                    </button>
-                </li>
-                <li id="menu-customers" title="View and Manage Customer Records">
-                    <button data-action="switchTab" data-tab="customers" class="nav-btn">
-                        <i data-lucide="users"></i> <span>Customers</span>
-                    </button>
-                </li>
-                <li id="menu-lostSales" title="View Orders Abandoned at Checkout">
-                    <button data-action="switchTab" data-tab="lostSales" class="nav-btn">
-                        <i data-lucide="shopping-bag"></i> <span>Lost Sales</span>
-                    </button>
-                </li>
-                <li id="menu-reports" title="View Detailed Business Analytics">
-                    <button data-action="switchTab" data-tab="reports" class="nav-btn">
-                        <i data-lucide="bar-chart-3"></i> <span>Analytics</span>
-                    </button>
-                </li>
-                <li id="menu-riderAnalytics" title="Monitor Rider Performance & Earnings">
-                    <button data-action="switchTab" data-tab="riderAnalytics" class="nav-btn">
-                        <i data-lucide="trending-up"></i> <span>Rider Insights</span>
-                    </button>
-                </li>
-                <li id="menu-feedback" title="View and Manage Customer Reviews">
-                    <button data-action="switchTab" data-tab="feedback" class="nav-btn">
-                        <i data-lucide="star"></i> <span>Feedback</span>
-                    </button>
-                </li>
-                <li id="menu-liveTracker" title="Track Live Deliveries on Map">
-                    <button data-action="switchTab" data-tab="liveTracker" class="nav-btn">
-                        <i data-lucide="map-pin"></i> <span>Live Tracking</span> 
-                        <span class="badge-new badge-live-tracking-pill">LIVE</span>
-                    </button>
-                </li>
-                <li id="menu-notifications" title="View Recent System Alerts">
-                    <button data-action="switchTab" data-tab="notifications" class="nav-btn">
-                        <i data-lucide="bell"></i> <span>Notifications</span> 
-                        <span id="sidebar-notif-count" class="badge-new badge-sidebar-notif-pill">0</span>
-                    </button>
-                </li>
-                <li id="menu-inventory" title="Manage Stock Levels and Supplies">
-                    <button data-action="switchTab" data-tab="inventory" class="nav-btn">
+                <li class="nav-item" id="menu-inventory">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="inventory" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
                         <i data-lucide="package"></i> <span>Inventory</span>
                     </button>
                 </li>
-                <li id="menu-install" title="Download Portal as App">
-                    <button id="menu-download" data-action="installPWA" class="nav-btn">
-                        <i data-lucide="download-cloud"></i> <span>Download App</span>
+
+                <div class="nav-group-label" style="padding:20px 16px 8px; font-size:10px; font-weight:800; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.1em;">Intelligence</div>
+                <li class="nav-item" id="menu-reports">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="reports" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="bar-chart-3"></i> <span>Analytics</span>
                     </button>
                 </li>
-                <li id="menu-settings" title="Manage Store & Delivery Configuration">
-                    <button data-action="switchTab" data-tab="settings" class="nav-btn">
-                        <i data-lucide="settings"></i> <span>Settings</span>
+                <li class="nav-item" id="menu-customers">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="customers" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="users"></i> <span>Customers</span>
                     </button>
                 </li>
-                <li id="menu-refresh" title="Force Nuclear Refresh (Clears Cache & Storage)">
-                    <button data-action="completeSiteRefresh" class="nav-btn text-warning">
-                        <i data-lucide="refresh-cw"></i> <span>Nuclear Refresh</span>
+                <li class="nav-item" id="menu-riders">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="riders" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="bike"></i> <span>Rider Fleet</span>
                     </button>
                 </li>
-                <li id="menu-theme" title="Switch Between Light and Dark Mode">
-                    <button data-action="toggleTheme" class="nav-btn">
-                        <i data-lucide="moon"></i> <span>Theme</span>
+                <li class="nav-item" id="menu-liveTracker">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="liveTracker" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="map-pin"></i> <span>Live Map</span>
                     </button>
                 </li>
-                <li id="menu-logout" class="logout-item" title="Sign Out of Dashboard">
-                    <button data-action="userLogout" class="nav-btn">
-                        <i data-lucide="log-out"></i> <span>Logout</span>
+                <li class="nav-item" id="menu-feedback">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="feedback" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="star"></i> <span>Feedback</span>
+                    </button>
+                </li>
+                <li class="nav-item" id="menu-settlements">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="settlements" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="indian-rupee"></i> <span>Settlements</span>
                     </button>
                 </li>
             </ul>
-            <div class="sidebar-footer">
-                <div class="user-profile-mini" data-action="switchTab" data-tab="settings" title="Open Store Settings">
-                    <img src="https://ui-avatars.com/api/?name=Admin&background=f36b21&color=fff" alt="Admin">
-                    <div class="user-info">
-                        <span class="user-name">Store Admin</span>
-                        <span class="user-role">Superuser</span>
+
+            <div class="sidebar-footer" style="padding:20px; border-top:1px solid var(--border-glass);">
+                <li class="nav-item" id="menu-settings" style="list-style:none;">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="settings" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer; margin-bottom:12px;">
+                        <i data-lucide="settings"></i> <span>Settings</span>
+                    </button>
+                </li>
+                <li class="nav-item" style="list-style:none;">
+                    <button class="nav-link nav-btn" data-action="userLogout" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:var(--error); cursor:pointer;">
+                        <i data-lucide="log-out"></i> <span>Logout</span>
+                    </button>
+                </li>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- MOBILE ANCHORS -->
+            <div id="mobileAppHeader" class="hidden"></div>
+            <div class="mobile-app-title hidden"></div>
+
+            <!-- TOP BAR -->
+            <header class="top-bar">
+                <div class="flex-row flex-center flex-gap-16">
+                    <button class="sidebar-toggle btn-action-v4" data-action="toggleSidebar" style="background:var(--bg-card); border-color:var(--border-glass);">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <div class="page-title-stack">
+                        <h2 id="currentTabTitle" class="font-heading" style="font-size:20px; font-weight:800;">Dashboard</h2>
+                        <div id="outletBadge" class="pro-badge badge-info" style="font-size:9px; margin-top:2px;">...</div>
                     </div>
                 </div>
-            </div>
-        </nav>
 
-        <!-- MAIN -->
-        <div class="main">
-
-
-
-    <!-- MAIN APP STRUCTURE -->
-            <div id="mobileAppHeader" class="mobile-header mobile-only">
-                <div id="mobileHamburger" class="mobile-header-left" data-action="toggleSidebar"
-                    title="Toggle Side Navigation Drawer">
-                    <i data-lucide="menu" class="hamburger-icon"></i>
-                </div>
-                <div class="mobile-header-center">
-                    <h2 id="mobileTabTitle" class="premium-font">Dashboard</h2>
-                </div>
-                <div class="mobile-header-right">
+                <div class="flex-row flex-center flex-gap-20">
                     <div class="flex-row flex-center flex-gap-10">
-                        <div class="notif-bell-container" data-action="toggleNotificationSheet"
-                            title="View Recent Alerts">
-                            <i data-lucide="bell"></i>
-                            <span id="notifBadge" class="notif-badge hidden"></span>
-                        </div>
-                        <select id="outletSwitcherMobile" class="outlet-switcher-admin hidden"
-                            data-action="switchOutlet" title="Switch Active Outlet">
+                        <select id="outletSwitcher" class="form-input-v4 hidden" data-action="switchOutlet" style="height:36px; font-size:12px; background:var(--bg-glass); width:180px;">
                             <!-- Populated via JS -->
                         </select>
-                        <span id="mobileOutletBadge" class="outlet-badge" title="Active Store Location">...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- DESKTOP TOPBAR -->
-            <div class="topbar desktop-topbar desktop-only">
-                <div class="desktop-hamburger" data-action="toggleSidebar" title="Toggle Sidebar Navigation View">
-                    <i data-lucide="menu"></i>
-                </div>
-                <div class="flex-row flex-center flex-gap-20">
-                    <div>
-                        <h2 id="currentTabTitle">Dashboard Overview</h2>
-                        <span id="outletBadge" class="outlet-badge">LOADING...</span>
-                    </div>
-                    <div class="flex-row flex-center flex-gap-10">
-                        <select id="outletSwitcher" class="outlet-switcher-admin hidden" data-action="switchOutlet"
-                            title="Switch Active Outlet">
-                            <!-- Populated via JS for Super Admins -->
-                        </select>
-                        <button id="btnNewTabOutlet" class="btn-text-primary-sm hidden" data-action="openOutletInNewTab"
-                            title="Open selected outlet in new tab">
-                            <i data-lucide="external-link" class="icon-fixed-sm"></i>
+                        <select id="outletSwitcherMobile" class="hidden"></select>
+                        <button id="btnNewTabOutlet" class="btn-action-v4 hidden" data-action="openOutletInNewTab" title="Open in New Tab">
+                            <i data-lucide="external-link" style="width:14px;"></i>
                         </button>
                     </div>
-                </div>
-                <div class="user-display">
-                    <span id="syncStatus" class="status-indicator disconnected" title="Firebase Connection Status"></span>
-                    <span id="userEmailDisplay" class="user-email"></span>
-                    <button id="logoutBtn" data-action="userLogout" class="btn-secondary btn-small"
-                        title="Exit Admin System">Logout</button>
-                </div>
-            </div>
 
-            <!-- DASHBOARD TAB -->
-            <div id="tab-dashboard" class="tab-content">
-                <div class="kpi-row mb-24">
-                    <div class="kpi-card-v4 success">
-                        <div class="icon-wrap success"><i data-lucide="package"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="statOrders">0</span>
-                            <span class="lbl">New Orders</span>
+                    <div class="top-bar-actions flex-row flex-center flex-gap-12">
+                        <div class="notif-trigger-pro" data-action="switchTab" data-tab="notifications" style="position:relative; cursor:pointer;">
+                            <i data-lucide="bell" style="color:var(--text-muted);"></i>
+                            <span id="notifBadge" class="badge-danger pro-badge" style="position:absolute; top:-5px; right:-5px; font-size:8px; padding:2px 4px; display:none;">0</span>
                         </div>
-                        <div class="trend-badge trend-up"><i data-lucide="trending-up"></i> Today</div>
-                    </div>
-                    <div class="kpi-card-v4 orange">
-                        <div class="icon-wrap orange"><i data-lucide="clock"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="statPending">0</span>
-                            <span class="lbl">In Progress</span>
-                        </div>
-                    </div>
-                    <div class="kpi-card-v4 info">
-                        <div class="icon-wrap info"><i data-lucide="indian-rupee"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="statRevenue">₹0</span>
-                            <span class="lbl">Total Revenue</span>
-                        </div>
-                    </div>
-                    <div class="kpi-card-v4 success">
-                        <div class="icon-wrap success"><i data-lucide="bike"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="statRidersActive">0</span>
-                            <span class="lbl">Riders Online</span>
+                        <div class="user-anchor" style="display:flex; align-items:center; gap:10px; padding:6px 12px; background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:12px;">
+                            <div class="avatar-pro" style="width:24px; height:24px; font-size:10px; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; border-radius:6px; font-weight:800;">A</div>
+                            <span id="userEmailDisplay" class="fs-12 font-600" style="color:var(--text-muted); max-width:120px; overflow:hidden; text-overflow:ellipsis;">Admin</span>
                         </div>
                     </div>
                 </div>
+            </header>
 
-                <div class="dashboard-grid">
-                    <!-- MAIN: Recent Orders -->
-                    <div class="dashboard-main">
-                        <div class="priority-section">
-                            <div class="flex-row justify-between flex-center mb-15">
-                                <h3 class="section-title"><i data-lucide="alert-circle" class="icon-fixed-sm"></i>
-                                    Priority Orders (Action Required)</h3>
-                                <button class="btn-text-primary-sm" data-action="switchTab" data-tab="orders">View
-                                    All</button>
+            <!-- TAB ENGINE -->
+            <div class="content-scroll-area p-32">
+                
+                <!-- DASHBOARD TAB -->
+                <div id="tab-dashboard" class="tab-content">
+                    <div class="kpi-grid">
+                        <div class="kpi-card-pro">
+                            <span class="label">New Orders</span>
+                            <span class="value" id="statOrders">0</span>
+                            <div class="trend up"><i data-lucide="arrow-up-right"></i> +12% Today</div>
+                        </div>
+                        <div class="kpi-card-pro" style="--primary: var(--warning)">
+                            <span class="label">Pending Prep</span>
+                            <span class="value" id="statPending">0</span>
+                        </div>
+                        <div class="kpi-card-pro" style="--primary: var(--success)">
+                            <span class="label">Today's Sales</span>
+                            <span class="value" id="statRevenue">₹0</span>
+                        </div>
+                        <div class="kpi-card-pro" style="--primary: var(--info)">
+                            <span class="label">Fleet Status</span>
+                            <span class="value" id="statRidersActive">0</span>
+                        </div>
+                    </div>
+
+                    <!-- REVENUE ANALYTICS CHART (ZOMATO STYLE) -->
+                    <div class="pro-card mt-24">
+                        <div class="flex-between flex-center mb-20">
+                            <div>
+                                <h3 class="font-heading" style="font-size:16px;">Sales Intelligence</h3>
+                                <p class="text-muted-small">Hourly revenue and order density analysis</p>
                             </div>
-                            <div id="priorityOrderList" class="priority-order-list">
-                                <div class="loading-placeholder">Scanning for pending orders...</div>
-                            </div>
-                        </div>
-
-                        <div class="recent-section mt-24">
-                            <h3 class="section-title">Recent Order History</h3>
-
-                            <div class="glass-card mb-24 p-0 overflow-hidden">
-                                <div class="table-responsive">
-                                    <table class="premium-table-v4">
-                                        <thead>
-                                            <tr>
-                                                <th>Order ID</th>
-                                                <th>Customer</th>
-                                                <th>Items</th>
-                                                <th>Total</th>
-                                                <th>Payment</th>
-                                                <th>Status</th>
-                                                <th>Assign Rider</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="ordersTable">
-                                            <!-- Dynamic orders injected here -->
-                                        </tbody>
-                                    </table>
+                            <div class="flex-row flex-gap-12">
+                                <div class="chart-legend-item">
+                                    <div class="dot" style="background: var(--primary);"></div>
+                                    <span>Revenue</span>
+                                </div>
+                                <div class="chart-legend-item">
+                                    <div class="dot" style="background: var(--info);"></div>
+                                    <span>Orders</span>
                                 </div>
                             </div>
                         </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
                     </div>
 
-                    <!-- SIDE: Top Items & Riders -->
-                    <div class="dashboard-sidebar">
-                        <div class="panel">
-                            <div class="panel-header">
-                                <h3 class="panel-title">⭐ Top Spenders</h3>
+                    <!-- MISSION CRITICAL ALERT BANNER (Floating) -->
+                    <div id="incomingOrderAlert" class="incoming-order-banner hidden">
+                        <div class="banner-content">
+                            <div class="banner-icon pulse">
+                                <i data-lucide="bell-ring"></i>
                             </div>
-                            <div id="topCustomersList">
-                                <p class="text-muted-small">Calculating customer data...</p>
+                            <div class="banner-info">
+                                <span class="title">NEW ORDER INCOMING!</span>
+                                <span class="sub" id="incomingOrderDetails">Order #--- • ₹---</span>
                             </div>
-                        </div>
-
-                        <div class="panel">
-                            <div class="panel-header">
-                                <h3 class="panel-title">🍕 Top Selling Items</h3>
-                            </div>
-                            <div id="topItemsList">
-                                <p class="text-muted-small">Processing sales data...</p>
-                            </div>
-                        </div>
-
-                        <div class="panel">
-                            <div class="panel-header flex-row flex-between flex-center">
-                                <h3 class="panel-title">🚚 Rider Status</h3>
-                                <button data-tab="riders" data-action="switchTab" class="btn-text-primary-sm"
-                                    title="Manage Delivery Staff and Status">
-                                    Manage <i data-lucide="chevron-right"></i>
+                            <div class="banner-actions">
+                                <button class="btn-banner accept" data-action="switchTab" data-tab="live">
+                                    <i data-lucide="check"></i> <span>VIEW LIVE</span>
+                                </button>
+                                <button class="btn-banner dismiss" onclick="window.stopOrderAlertLoop()">
+                                    <i data-lucide="volume-x"></i>
                                 </button>
                             </div>
-                            <div class="mb-10"><span id="onlineRiderCount" class="badge badge-ready">0 ON</span></div>
-                            <div id="riderStatusList" class="scroll-y max-h-300">
-                                <!-- Dynamic -->
+                        </div>
+                    </div>
+
+                    <div class="dashboard-split mt-24" style="display:grid; grid-template-columns: 2fr 1fr; gap:24px;">
+                        <div class="pro-card">
+                            <div class="flex-between flex-center mb-24">
+                                <h3 class="font-heading" style="font-size:16px;">Priority Operations</h3>
+                                <button class="btn-action-v4" data-action="switchTab" data-tab="live">Live View</button>
                             </div>
+                            <div id="priorityOrderList" class="priority-stack"></div>
+                        </div>
+                        <div class="pro-card">
+                            <h3 class="font-heading mb-24" style="font-size:16px;">Rider Status</h3>
+                            <div id="riderStatusList" class="space-y-12"></div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- ORDERS TAB -->
-            <div id="tab-orders" class="tab-content hidden">
-                <div class="panel">
-                    <div class="panel-header">
-                        <h3>Order History</h3>
-                        <div class="flex-row flex-center flex-gap-10 flex-wrap-mobile">
-                            <input type="date" id="orderFrom" class="search-input-group w-130" title="Filter orders from date">
-                            <input type="date" id="orderTo" class="search-input-group w-130" title="Filter orders to date">
-                            <input type="text" id="orderSearch" placeholder="Search ID or Name..."
-                                class="search-input-group flex-1" title="Search orders by ID or customer name">
+                <!-- ORDERS TAB -->
+                <div id="tab-orders" class="tab-content hidden">
+                    <div class="pro-card">
+                        <div class="flex-between mb-24">
+                            <h3 class="font-heading">Order Intelligence</h3>
+                            <div class="flex-row flex-gap-12">
+                                <input type="text" id="orderSearch" class="form-input-v4" placeholder="Search orders..." style="width:240px;">
+                                <input type="date" id="orderFrom" class="form-input-v4">
+                                <input type="date" id="orderTo" class="form-input-v4">
+                            </div>
                         </div>
-                    </div>
-                    <div class="scroll-x">
-                        <table class="premium-table-v4">
+                        <table class="pro-table">
                             <thead>
-                                <tr class="table-header-row">
-
-                                    <th>Order ID</th>
+                                <tr>
+                                    <th>Order Info</th>
                                     <th>Customer</th>
                                     <th>Address</th>
                                     <th>Total</th>
                                     <th>Payment</th>
                                     <th>Status</th>
-                                    <th>Actions</th>
+                                    <th class="text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="ordersTableFull"></tbody>
                         </table>
                     </div>
                 </div>
-            </div>
 
-            <!-- LIVE ORDERS TAB -->
-            <div id="tab-live" class="tab-content hidden">
-                <div class="panel">
-                    <h3 class="desktop-only">🔥 Live Operations</h3>
-                    <p class="panel-subtitle">Tracking active kitchen and delivery work</p>
-                    <div class="scroll-x">
-                        <table class="premium-table-v4">
+                <!-- LIVE TAB -->
+                <div id="tab-live" class="tab-content hidden">
+                    <div class="pro-card">
+                        <h3 class="font-heading mb-24">Live Logistics Engine</h3>
+                        <table class="pro-table">
                             <thead>
-                                <tr class="table-header-row">
-
-                                    <th>Order ID</th>
+                                <tr>
+                                    <th>ID</th>
                                     <th>Customer</th>
                                     <th>Items</th>
                                     <th>Total</th>
-                                    <th>Status</th>
-                                    <th>Assign Rider</th>
-                                    <th>Actions</th>
+                                    <th>Stage</th>
+                                    <th>Fleet</th>
+                                    <th class="text-right">Controls</th>
                                 </tr>
                             </thead>
                             <tbody id="liveOrdersTable"></tbody>
                         </table>
-                    </div>
-                </div>
-            </div>
 
-            <!-- MENU TAB -->
-            <div id="tab-menu" class="tab-content hidden">
-                <div class="panel">
-                    <div class="panel-header">
-                        <h3 class="desktop-only">Menu Management</h3>
-                        <div class="flex-row flex-center flex-gap-10 mobile-only">
-                            <input type="text" id="menuSearchMobile" placeholder="Search menu..." class="search-input-group">
-                            <button class="btn-primary btn-small btn-show-dish-modal" title="Add a new dish">+</button>
-                        </div>
-                        <div class="desktop-only">
-                            <input type="text" id="menuSearch" placeholder="Search dishes..." class="search-input-group">
-                            <button class="btn-primary btn-small btn-show-dish-modal" title="Add a new dish to the menu">+ Add Dish</button>
-                        </div>
-                    </div>
-                    <div id="menuGrid" class="menu-grid"></div>
-                </div>
-            </div>
-
-            <!-- CATEGORIES TAB -->
-            <div id="tab-categories" class="tab-content hidden">
-                <div class="panel">
-                    <div class="panel-header flex-between-header">
-                        <h3 class="desktop-only">Category Management</h3>
-                        <div class="flex-row flex-center flex-gap-10 flex-wrap-mobile">
-                            <input type="text" id="categorySearch" placeholder="Search categories..." class="search-input-group flex-1">
-                            <button id="btnMigrateDishAddons" class="btn-secondary btn-secondary-xs"
-                                title="Force sync of dish-level add-ons to their respective categories">
-                                <i data-lucide="refresh-cw"></i> Migrate
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-grid">
-                        <!-- Left: Add Category Form -->
-                        <div class="flex-col">
-                            <div class="glass-card p-20">
-                                <h4 class="mb-14">✨ Create New Category</h4>
-                                <div class="flex-row flex-gap-10 flex-center mb-20 p-15 bg-ghost br-15">
-                                    <img id="catPreview" src="https://placehold.co/100/orange/white?text=Category"
-                                        class="category-preview-img" alt="Category Preview">
-                                    <div class="flex-col flex-1">
-                                        <input type="file" id="catFile" accept="image/*" class="hidden"
-                                            title="Select category photo">
-                                        <button id="btnChangeCatPhoto" class="btn-secondary btn-small mb-8">Change
-                                            Photo</button>
-                                        <div class="flex-row flex-gap-10 mt-10">
-                                            <input id="newCatName" placeholder="Category Name" class="form-input mb-0 flex-2"
-                                                title="Category Name">
-                                            <input id="newCatOrder" type="number" placeholder="Serial" class="form-input mb-0 flex-1"
-                                                title="Sorting Order (Lower numbers appear first)">
-                                        </div>
+                        <div class="live-ops-layout" style="display:grid; grid-template-columns: 1fr 400px; gap:24px; margin-top:24px;">
+                            <div class="pro-card p-0" style="height:500px; overflow:hidden; position:relative; background:#1e293b;">
+                                <div id="liveRiderMap" style="height:100%; width:100%; z-index:1;"></div>
+                                <div class="map-overlay-badge">
+                                    <i data-lucide="map-pin" class="pulse"></i> LIVE LOGISTICS
+                                </div>
+                            </div>
+                            <div class="fleet-intelligence">
+                                <h4 class="font-heading mb-16" style="display:flex; align-items:center; gap:8px;">
+                                    <i data-lucide="truck"></i> Fleet Activity
+                                </h4>
+                                <div id="liveFleetList" class="space-y-12">
+                                    <div class="text-muted-small p-20 text-center border-dashed br-12">
+                                        Initializing fleet tracking...
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                                <div id="categoryAddonsContainer" class="category-addons-container mt-10">
-                                    <div class="flex-between flex-center mb-10">
-                                        <label class="form-label-small mb-0">Category Add-ons (Optional)</label>
-                                        <button id="btnAddCatAddonField" data-action="addCategoryAddonField" class="btn-secondary btn-small"
-                                            title="Add a new customization option for this category">+ Add
-                                            Addon</button>
-                                    </div>
-                                    <div id="categoryAddonsList">
-                                        <!-- Rows added here -->
-                                    </div>
+                <!-- KITCHEN CONSOLE TAB -->
+                <div id="tab-kitchen" class="tab-content hidden">
+                    <div class="pro-card" style="min-height: calc(100vh - 120px);">
+                        <div class="flex-between flex-center mb-32">
+                            <div>
+                                <h2 class="font-heading fs-28">Kitchen Command Center</h2>
+                                <p class="text-muted">Direct view for chefs and preparation staff</p>
+                            </div>
+                            <div class="flex-row flex-gap-12">
+                                <div class="badge-status-pro pulse">
+                                    <div class="dot" style="background: var(--success);"></div>
+                                    <span>LIVE UPDATES</span>
                                 </div>
-
-                                <button id="btnAddCategory" data-action="addCategory"
-                                    class="btn-primary w-full mt-20 p-12 br-12 font-weight-700"
-                                    title="Save new category">🚀 Add Category</button>
                             </div>
                         </div>
+                        
+                        <div id="kitchenGrid" class="kitchen-grid">
+                            <!-- High-contrast cards for the kitchen -->
+                        </div>
+                    </div>
+                </div>
 
-                        <!-- Right: Category List -->
-                        <div class="flex-col">
-                            <div class="glass-card p-20">
-                                <h4 class="mb-14">📂 Active Categories</h4>
-                                <div id="categoryList" class="category-grid"></div>
+                <!-- POS (WALKIN) TAB -->
+                <div id="tab-walkin" class="tab-content hidden">
+                    <div class="pro-card pos-immersive-container" style="height:calc(100vh - 160px); display:flex; flex-direction:column;">
+                        <div class="pos-header flex-between p-16 border-b-ghost">
+                            <input type="text" id="walkinDishSearch" class="form-input-v4" placeholder="Search menu..." style="width:300px;">
+                            <div class="flex-row flex-gap-12">
+                                <button data-action="clearWalkinCart" class="btn-action-v4">Clear Cart</button>
+                                <button id="btnPosPrintLast" class="btn-action-v4">Print Last</button>
+                            </div>
+                        </div>
+                        <div class="pos-main" style="display:grid; grid-template-columns: 1fr 350px; gap:20px; flex:1; overflow:hidden;">
+                            <div id="posMenuGrid" class="p-20 overflow-y-auto"></div>
+                            <div class="pos-cart-panel p-20 bg-ghost" style="display:flex; flex-direction:column;">
+                                <h4 class="font-heading mb-16">Current Bill</h4>
+                                <div id="walkinCartItems" class="flex-1 overflow-y-auto space-y-12 mb-20"></div>
+                                <div class="pos-summary border-t-ghost pt-20">
+                                    <div class="flex-between mb-8"><span>Subtotal</span><span id="walkinSubtotal">₹0</span></div>
+                                    <div class="flex-between mb-16 fs-18 font-800"><span>Grand Total</span><span id="walkinTotal">₹0</span></div>
+                                    <button data-action="submitWalkinSale" class="btn-action-v4 w-100" style="background:var(--primary); color:white; border:none; height:48px;">Complete Sale</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- RIDERS TAB -->
-            <section id="tab-riders" class="tab-content hidden">
-                <div class="section-header">
-                    <div class="flex-col">
-                        <h2>Rider Management</h2>
-                        <p class="text-secondary-sm">Monitor delivery staff, earnings, and live status.</p>
-                    </div>
-                </div>
-
-                <!-- Rider Stats Summary Row -->
-                <div class="kpi-row mb-24">
-                    <div class="kpi-card-v4">
-                        <div class="icon-wrap success"><i data-lucide="check-circle"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="rider-stat-online">0</span>
-                            <span class="lbl">Online Now</span>
-                        </div>
-                    </div>
-                    <div class="kpi-card-v4">
-                        <div class="icon-wrap warning"><i data-lucide="navigation"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="rider-stat-busy">0</span>
-                            <span class="lbl">On Delivery</span>
-                        </div>
-                    </div>
-                    <div class="kpi-card-v4">
-                        <div class="icon-wrap danger"><i data-lucide="power"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="rider-stat-offline">0</span>
-                            <span class="lbl">Offline</span>
-                        </div>
-                    </div>
-                    <div class="kpi-card-v4">
-                        <div class="icon-wrap info"><i data-lucide="wallet"></i></div>
-                        <div class="info-wrap">
-                            <span class="val" id="rider-stat-earnings">₹0</span>
-                            <span class="lbl">Today's Earnings</span>
-                        </div>
-                        <div class="trend-badge trend-up"><i data-lucide="trending-up"></i> Wallet</div>
-                    </div>
-                </div>
-
-                <div class="glass-card">
-                    <div class="card-header-flex">
-                        <h3>All Registered Riders</h3>
-                        <div class="flex-center flex-gap-12">
-                            <div class="search-input-wrapper">
-                                <i data-lucide="search"></i>
-                                <input type="text" placeholder="Search riders..." class="search-input"
-                                    id="riderSearchInput">
+                <!-- MENU TAB -->
+                <div id="tab-menu" class="tab-content hidden">
+                    <div class="pro-card">
+                        <div class="flex-between mb-24">
+                            <h3 class="font-heading">Catalog Architecture</h3>
+                            <div class="flex-row flex-gap-12">
+                                <input type="text" id="menuSearch" class="form-input-v4" placeholder="Filter..." style="width:200px;">
+                                <button class="btn-action-v4 btn-show-dish-modal" style="background:var(--primary); color:white; border:none;">+ Add Dish</button>
                             </div>
                         </div>
+                        <div id="menuGrid" class="pro-menu-grid"></div>
                     </div>
-                    <div class="scroll-x">
-                        <table class="premium-table-v4">
+                </div>
+
+                <!-- CATEGORIES TAB -->
+                <div id="tab-categories" class="tab-content hidden">
+                    <div class="dashboard-split" style="display:grid; grid-template-columns: 350px 1fr; gap:24px;">
+                        <div class="pro-card">
+                            <h4 class="font-heading mb-20">New Category</h4>
+                            <div class="cat-upload-zone mb-20">
+                                <img id="catPreview" src="https://placehold.co/100" class="br-12 mb-12">
+                                <input type="file" id="catFile" class="hidden">
+                                <button id="btnChangeCatPhoto" class="btn-action-v4 w-100">Upload Icon</button>
+                            </div>
+                            <input type="text" id="newCatName" class="form-input-v4 w-100 mb-12" placeholder="Category Name">
+                            <input type="number" id="newCatOrder" class="form-input-v4 w-100 mb-20" placeholder="Sort Order">
+                            <div id="categoryAddonsContainer" class="mb-20">
+                                <button data-action="addCategoryAddonField" class="btn-text-primary-sm">+ Add Custom Field</button>
+                                <div id="categoryAddonsList" class="mt-8 space-y-4"></div>
+                            </div>
+                            <button data-action="addCategory" class="btn-action-v4 w-100" style="background:var(--primary); color:white; border:none;">Deploy</button>
+                        </div>
+                        <div class="pro-card">
+                            <h3 class="font-heading mb-24">Active Taxonomy</h3>
+                            <div id="categoryList" class="category-pro-grid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- INVENTORY TAB -->
+                <div id="tab-inventory" class="tab-content hidden">
+                    <div class="pro-card">
+                        <h3 class="font-heading mb-24">Inventory Tracking</h3>
+                        <div id="inventoryContainer"></div>
+                    </div>
+                </div>
+
+                <!-- CUSTOMERS TAB -->
+                <div id="tab-customers" class="tab-content hidden">
+                    <div class="pro-card">
+                        <div class="flex-between mb-24">
+                            <h3 class="font-heading">Client Database</h3>
+                            <input type="text" id="customerSearch" class="form-input-v4" placeholder="Search..." style="width:240px;">
+                        </div>
+                        <div id="customersContainer"></div>
+                    </div>
+                </div>
+
+                <!-- RIDERS TAB -->
+                <div id="tab-riders" class="tab-content hidden">
+                    <div class="pro-card">
+                        <div class="flex-between mb-24">
+                            <h3 class="font-heading">Fleet Personnel</h3>
+                            <input type="text" id="riderSearchInput" class="form-input-v4" placeholder="Search..." style="width:240px;">
+                        </div>
+                        <table class="pro-table">
                             <thead>
                                 <tr>
-                                    <th>Rider Identity</th>
-                                    <th>Access Credentials</th>
-                                    <th>Current Status</th>
-                                    <th>Quick Stats</th>
-                                    <th>Performance</th>
-                                    <th>Actions</th>
+                                    <th>Rider</th>
+                                    <th>Credentials</th>
+                                    <th>Status</th>
+                                    <th>History</th>
+                                    <th>Wallet</th>
+                                    <th class="text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="ridersTable"></tbody>
                         </table>
                     </div>
                 </div>
-            </section>
 
-            <section id="tab-notifications" class="tab-content hidden">
-                <div class="panel">
-                    <div class="panel-header">
-                        <div>
-                            <h2 class="panel-title">NOTIFICATION DASHBOARD</h2>
-                            <p class="panel-subtitle">History of all system alerts and updates</p>
+                <!-- SETTINGS TAB -->
+                <div id="tab-settings" class="tab-content hidden">
+                    <div class="pro-card">
+                        <div class="flex-between mb-24">
+                            <h3 class="font-heading">Global Configuration</h3>
+                            <button data-action="saveStoreSettings" class="btn-action-v4" style="background:var(--success); color:white; border:none;">
+                                <i data-lucide="save"></i> Save All Changes
+                            </button>
                         </div>
-                        <button id="btnClearAllNotif" class="btn-secondary br-12">
-                            Clear All
-                        </button>
-                    </div>
-                    <div id="fullNotificationList" class="notification-dashboard-list">
-                        <!-- Populated via JS -->
-                    </div>
-                </div>
-            </section>
 
-            <!-- SECTION: LIVE RIDER TRACKER -->
-            <section id="tab-liveTracker" class="tab-content hidden">
-                <div class="panel">
-                    <div class="panel-header">
-                        <div>
-                            <h2 class="panel-title">LIVE RIDER TRACKER</h2>
-                            <p class="panel-subtitle">Monitor all online riders in real-time</p>
-                        </div>
-                        <div id="trackerStats" class="notif-time-badge-premium">
-                            0 Riders Online
-                        </div>
-                    </div>
-                    <div id="adminLiveMap" class="admin-map-container h-600 br-20 border-glass"></div>
-                </div>
-            </section>
+                        <div class="dashboard-split" style="display:grid; grid-template-columns: 1fr 400px; gap:24px;">
+                            <div class="space-y-24">
+                                <!-- Revenue & Commission Engine (NEW) -->
+                                <div class="glass-card p-24" style="border-left: 4px solid var(--primary);">
+                                    <h4 class="font-heading mb-16" style="display:flex; align-items:center; gap:8px;">
+                                        <i data-lucide="banknote" class="color-primary"></i> Revenue & Commission Engine
+                                    </h4>
+                                    <p class="text-muted-small mb-20">Configure platform fees and partner payout logic. Changes apply to future orders.</p>
+                                    
+                                    <div class="grid grid-cols-2 grid-gap-20">
+                                        <div>
+                                            <label class="form-label-small">Commission Type</label>
+                                            <select id="settingCommissionType" class="form-input">
+                                                <option value="PERCENTAGE">Percentage (%)</option>
+                                                <option value="FIXED">Fixed Amount (₹)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label-small">Commission Value</label>
+                                            <input type="number" id="settingCommissionValue" class="form-input" placeholder="e.g. 20">
+                                        </div>
+                                    </div>
 
-            <!-- SECTION: LOST SALES -->
-            <div id="tab-lostSales" class="tab-content hidden">
-                <div class="panel">
-                    <div class="panel-header">
-                        <div class="flex-col">
-                            <h3>🚨 Lost Sales (Abandoned Checkout)</h3>
-                            <p class="panel-subtitle">Insights into customers who dropped off at the finish line</p>
-                        </div>
-                        <div class="flex-row flex-gap-12 flex-center">
-                            <div class="notif-time-badge-premium revenue-badge-lost" id="lostSalesTotalRevenue">
-                                <small class="revenue-badge-sub">Potential Revenue Lost</small>
-                                <span class="revenue-badge-val">₹0</span>
-                            </div>
-                            <button id="btnClearLostSales" class="btn-secondary btn-lost-sales-clear">🗑️ Clear
-                                Logs</button>
-                        </div>
-                    </div>
-
-                    <div class="glass-card mb-20 p-0 overflow-hidden">
-                        <div class="table-responsive">
-                            <table class="premium-table-v4">
-                                <thead>
-                                    <tr>
-                                        <th class="p-l-25">Date & Time</th>
-                                        <th>Customer Detail</th>
-                                        <th>Abandonment Step</th>
-                                        <th>Items Summary</th>
-                                        <th class="p-r-25 text-right">Potential Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="lostSalesTableBody">
-                                    <tr>
-                                        <td colspan="5" class="text-center p-60 text-muted">
-                                            <div class="loading-spinner mb-14 m-auto"></div>
-                                            🔄 Collecting abandonment records...
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION: SETTINGS -->
-            <div id="tab-settings" class="tab-content hidden">
-                <div class="panel">
-                    <div class="panel-header">
-                        <h3>⚙️ Delivery & Store Settings</h3>
-                        <button id="btnSaveSettings" class="btn-primary">💾 Save Settings</button>
-                    </div>
-
-                    <div class="settings-grid">
-                        <!-- Receipt & Store Information -->
-                        <div class="glass-card p-20 grid-full">
-                            <div class="flex-between flex-center mb-14">
-                                <div>
-                                    <h4 class="mb-4">📄 Receipt & Store Information</h4>
-                                    <p class="text-muted-small">Legal details and branding for your professional bills
-                                    </p>
+                                    <div class="mt-20 p-16 br-12 bg-ghost border-dashed">
+                                        <h5 class="fs-12 font-700 mb-12">Rider Settlement Logic</h5>
+                                        <div class="grid grid-cols-2 grid-gap-20">
+                                            <div>
+                                                <label class="form-label-small">Rider Fee Base (₹)</label>
+                                                <input type="number" id="settingRiderFeeBase" class="form-input" placeholder="e.g. 30">
+                                            </div>
+                                            <div>
+                                                <label class="form-label-small">Per KM Incentive (₹)</label>
+                                                <input type="number" id="settingRiderKmIncentive" class="form-input" placeholder="e.g. 5">
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div class="flex-row flex-gap-24">
-                                <div class="flex-2">
-                                    <div class="flex-row flex-gap-12 mb-14">
-                                        <div class="flex-1">
-                                            <label class="form-label-small">Legal Entity Name</label>
-                                            <input type="text" id="settingEntityName" class="form-input"
-                                                placeholder="e.g. Avipriya Enterprises">
-                                        </div>
-                                        <div class="flex-1">
-                                            <label class="form-label-small">Store Name (Display)</label>
-                                            <input type="text" id="settingStoreName" class="form-input"
-                                                placeholder="e.g. One Bite Chapra">
-                                        </div>
-                                    </div>
-
-                                    <label class="form-label-small">Store Address</label>
-                                    <textarea id="settingStoreAddress" class="form-input mb-14 h-60 p-10"
-                                        placeholder="Full address for the bill header..."></textarea>
-
-                                    <div class="flex-row flex-gap-12 mb-14">
-                                        <div class="flex-1">
-                                            <label class="form-label-small">GSTIN Number</label>
-                                            <input type="text" id="settingGSTIN" class="form-input"
-                                                placeholder="e.g. 10DYTPS7666L1ZG">
-                                        </div>
-                                        <div class="flex-1">
-                                            <label class="form-label-small">FSSAI Number</label>
-                                            <input type="text" id="settingFSSAI" class="form-input"
-                                                placeholder="e.g. 10422250000150">
-                                        </div>
-                                    </div>
-
-                                    <div class="flex-row flex-gap-12 mb-14">
-                                        <div class="flex-1">
-                                            <label class="form-label-small">Header Tagline</label>
-                                            <input type="text" id="settingTagline" class="form-input"
-                                                placeholder="e.g. JAI HIND">
-                                        </div>
-                                        <div class="flex-1">
-                                            <label class="form-label-small">Powered By Tagline</label>
-                                            <input type="text" id="settingPoweredBy" class="form-input"
-                                                placeholder="Powered by Roshani ERP">
-                                        </div>
-                                    </div>
-
+                                <div class="glass-card p-24">
+                                    <h4 class="font-heading mb-16">Support & Connectivity</h4>
                                     <div class="flex-row flex-gap-12 mb-14">
                                         <div class="flex-1">
                                             <label class="form-label-small">Developer Support (WhatsApp Number)</label>
@@ -1178,40 +1174,127 @@
                                 <div class="flex-row flex-center flex-gap-15 mb-14">
                                     <div class="kpi-icon-box green box-40"><i data-lucide="image" class="icon-18"></i></div>
                                     <h5 class="migration-title green m-0">Image Storage Migration</h5>
+                                        </div> <!-- End Fields Column -->
+
+                                        <!-- RECEIPT PREVIEW SIDEBAR (Smooth Functioning Phase) -->
+                                        <div class="receipt-preview-container">
+                                            <h5 class="mb-14 text-center color-primary ls-1">LIVE RECEIPT PREVIEW</h5>
+                                            <div class="thermal-receipt" id="thermalReceiptPreview">
+                                                <div class="receipt-header">
+                                                    <h3 id="previewStoreName" style="margin:0; font-size: 16px;">STORE NAME</h3>
+                                                    <p id="previewTagline" style="margin:2px 0; font-size: 10px;">Your Tagline Here</p>
+                                                    <p id="previewAddress" style="margin:5px 0; font-size: 9px; line-height: 1.2;">Store Address Line 1<br>City, State, ZIP</p>
+                                                </div>
+                                                <div class="receipt-body">
+                                                    <div class="flex-between mb-4" style="border-bottom: 1px solid #eee; padding-bottom: 4px;">
+                                                        <span>Order #12345</span>
+                                                        <span>14-May-2026</span>
+                                                    </div>
+                                                    <div class="items-list mb-10">
+                                                        <div class="flex-between"><span>1x Margherita Pizza</span> <span>₹299</span></div>
+                                                        <div class="flex-between"><span>1x Coke (500ml)</span> <span>₹60</span></div>
+                                                    </div>
+                                                    <div class="totals border-t-ghost pt-6" style="border-top: 1px dashed #ccc;">
+                                                        <div class="flex-between font-bold"><span>Total</span> <span>₹359</span></div>
+                                                    </div>
+                                                </div>
+                                                <div class="receipt-footer">
+                                                    <p id="previewGSTIN" style="margin: 2px 0; font-size: 9px;">GST: 10DYTPS7666L1ZG</p>
+                                                    <p id="previewFSSAI" style="margin: 2px 0; font-size: 9px;">FSSAI: 10422250000150</p>
+                                                    <div id="previewWifiContainer" class="mt-6 p-4 bg-ghost br-4" style="font-size: 8px;">
+                                                        📡 WiFi: <span id="previewWifiSSID">ROSHANI_GUEST</span> | Pass: <span id="previewWifiPass">12345678</span>
+                                                    </div>
+                                                    <p class="mt-10" style="font-size: 9px; font-weight: bold;">THANK YOU! VISIT AGAIN</p>
+                                                    <p id="previewPoweredBy" style="font-size: 8px; margin-top: 10px; opacity: 0.6;">Powered by Roshani ERP</p>
+                                                </div>
+                                            </div>
+                                            <p class="text-secondary-small mt-14 text-center">
+                                                <i data-lucide="info" class="icon-12"></i>
+                                                This is a simulation of how your thermal receipt will look.
+                                            </p>
+                                        </div>
+                                    </div> <!-- End Flex Side-by-Side -->
+
                                 </div>
                                 <p class="migration-text text-muted-small mb-14">Converts all Firebase Storage images to Base64 text in the database. Run this to finalize the move to text-only storage.</p>
                                 <button id="btnRunImageMigration" data-action="runImageMigration" class="btn-action-green btn-small w-full" title="Start image storage migration">⚡ Migrate Images</button>
                             </div>
                         </div>
 
-                        <!-- Delivery Fees -->
-                        <div class="glass-card p-20">
-                            <div class="flex-between flex-center mb-14">
-                                <h4>🚚 Delivery Fee Tiers</h4>
-                                <button id="btnAddFeeSlab" data-action="addFeeSlab" class="btn-secondary btn-small"
-                                    title="Add New Delivery Distance Tier">+ Add Tier</button>
-                            </div>
-                            <p class="text-secondary-small mb-14">Define charges based on KM distance from store</p>
 
-                            <div class="scroll-x">
-                                <table class="premium-table-v4">
-                                    <thead>
-                                        <tr>
-                                            <th>Up to (KM)</th>
-                                            <th>Charge (₹)</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="feeSlabsTable">
-                                        <!-- Dynamic -->
-                                    </tbody>
-                                </table>
+                    </div>
+                </div>
+
+                <!-- SETTLEMENTS TAB -->
+                <div id="tab-settlements" class="tab-content hidden">
+                    <div class="pro-card">
+                        <div class="flex-between mb-32 flex-wrap flex-gap-24">
+                            <div>
+                                <h2 class="font-heading fs-28">Financial Settlements</h2>
+                                <p class="text-muted">Reconcile revenue, commissions, and rider payouts</p>
+                            </div>
+                            <div class="flex-row flex-gap-12 flex-wrap">
+                                <div class="filter-group-v2">
+                                    <div class="date-input-wrapper">
+                                        <i data-lucide="calendar"></i>
+                                        <input type="date" id="settleFrom" class="minimal-date">
+                                    </div>
+                                    <span class="to-text">to</span>
+                                    <div class="date-input-wrapper">
+                                        <i data-lucide="calendar"></i>
+                                        <input type="date" id="settleTo" class="minimal-date">
+                                    </div>
+                                    <button class="btn-icon-v4 ml-8" onclick="renderSettlements()" title="Generate Report">
+                                        <i data-lucide="refresh-cw"></i>
+                                    </button>
+                                </div>
+                                <button class="btn-action-v4" data-action="exportSettlements">
+                                    <i data-lucide="download"></i> Export
+                                </button>
                             </div>
                         </div>
-                    </div>
 
+                        <div class="kpi-grid mb-32">
+                            <div class="kpi-card-pro" style="--primary: var(--success)">
+                                <span class="label">Total Revenue</span>
+                                <span class="value" id="settleTotalRevenue">₹0</span>
+                            </div>
+                            <div class="kpi-card-pro" style="--primary: var(--danger)">
+                                <span class="label">Platform Commission</span>
+                                <span class="value" id="settleTotalComm">₹0</span>
+                            </div>
+                            <div class="kpi-card-pro" style="--primary: var(--info)">
+                                <span class="label">Rider Payouts</span>
+                                <span class="value" id="settleTotalRider">₹0</span>
+                            </div>
+                            <div class="kpi-card-pro" style="--primary: #f39c12">
+                                <span class="label">Settled Amount</span>
+                                <span class="value" id="settleTotalSettled">₹0</span>
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-0 overflow-hidden">
+                            <table class="pro-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date/Order</th>
+                                        <th>Order Total</th>
+                                        <th>Platform Fee</th>
+                                        <th>Rider Payout</th>
+                                        <th>Shop Net</th>
+                                        <th>Status</th>
+                                        <th class="text-right">Audit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="settlementsTable">
+                                    <tr>
+                                        <td colspan="7" class="text-center p-40 text-muted">No settlement data available for this period.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
             <!-- CUSTOMERS TAB -->
             <div id="tab-customers" class="tab-content hidden">
@@ -1686,25 +1769,6 @@
                     </div>
                 </div>
 
-            </div>
-        </div>
-    </div>
-
-    <!-- DISH MODAL -->
-    <div id="dishModal" class="modal">
-        <div class="modal-content glass-card">
-            <div class="modal-header">
-                <h2 id="modalTitle" class="modal-title">Add New Dish</h2>
-                <button class="close-btn btn-hide-dish-modal">&times;</button>
-            </div>
-
-            <div class="modal-grid-2col">
-                <!-- Left: Media -->
-                <div>
-                    <div class="modal-media-upload">
-                        <img id="dishPreview" src="https://placehold.co/150x150?text=Pizza" class="modal-img-preview"
-                            alt="Dish Preview">
-                        <div class="modal-img-overlay">
                             <input type="file" id="dishFile" accept="image/*" class="hidden" title="Upload dish photo">
                             <button id="btnUpdateDishPhoto" class="btn-secondary update-photo-btn">Update Photo</button>
                         </div>
@@ -2042,6 +2106,7 @@
 
     <script src="receipt-templates.js?v=4.7.3"></script>
     <script type="module" src="js/main.js?v=4.7.3"></script>
+    <script type="module" src="js/onboarding.js"></script>
 </body>
 
 </html>

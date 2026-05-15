@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { User } from "@/types";
 import { subscribeToAuthChanges, signOut as authSignOut, updateProfile, signInWithGoogle as googleSignIn, handleRedirectResult } from "@/services/authService";
+import { requestNotificationPermission } from "@/services/notificationService";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated";
 
@@ -51,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (u) {
         setUser(u);
         setAuthState("authenticated");
+        // Request notification permission
+        requestNotificationPermission(u.id);
       } else if (!isRedirecting) {
         setUser(null);
         setAuthState("unauthenticated");
@@ -75,13 +78,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               phone: dbData.phone || prev.phone,
               walletBalance: dbData.wallet?.balance || 0,
               walletHistory: Object.entries(dbData.wallet?.history || {})
-                .map(([tid, t]: [string, any]) => ({ id: tid, ...t }))
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+                .map(([tid, t]: [string, any]) => {
+                  const timestamp = Date.parse(t.createdAt);
+                  return { id: tid, ...t, _ts: isNaN(timestamp) ? 0 : timestamp };
+                })
+                .sort((a, b) => b._ts - a._ts),
               loyaltyPoints: dbData.loyaltyPoints || 0,
               savedAddresses: dbData.savedAddresses || []
             };
           });
         }
+      }, (error) => {
+        console.error("[AuthContext] Firebase User Sync Error:", error);
       });
       return () => unsubscribe();
     }

@@ -7,50 +7,68 @@
      */
 
     "admins": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
       "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
-        ".write": "auth != null && (auth.token.email == 'nexorasoftware@gmail.com' || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+        ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
       }
     },
 
     "riders": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).exists())",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
       "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists())",
-        ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists())",
+        ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+        ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
         "kycStatus": {
-          ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)"
         },
         "verified": {
-          ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)"
         }
       },
       ".indexOn": ["email", "phone", "businessId"]
     },
 
     "businesses": {
-      ".read": true, // Public discovery
-      ".write": "auth != null && (auth.token.email == 'nexorasoftware@gmail.com' || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+      ".read": true,
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
 
       "$bid": {
         ".read": true,
-        ".write": "auth != null && (auth.token.email == 'nexorasoftware@gmail.com' || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('businessId').val() == $bid)",
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('businessId').val() == $bid)",
 
         "outlets": {
           "$oid": {
             ".read": true,
-            ".write": "auth != null && (auth.token.email == 'nexorasoftware@gmail.com' || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)",
+            ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)",
 
             "orders": {
-              ".read": true, // Users can track their order via ID
-              ".write": true, // Public checkout
+              ".read": true,
+              // Only allow creation of new orders by public, or full access for admins
+              ".write": "(!data.exists() && newData.exists()) || (auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid))",
               ".indexOn": ["createdAt", "status", "riderId", "phone"]
             },
             
             "inventory": {
               ".read": true,
-              ".write": "auth != null && (root.child('admins').child(auth.uid).exists())"
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+            }
+          }
+        }
+      }
+    },
+
+    "system": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+      
+      "botSessions": {
+        "$bid": {
+          "$oid": {
+            "$jid": {
+              // Bot sessions are private to the bot process and superadmins
+              ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+              ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
             }
           }
         }
@@ -60,48 +78,86 @@
     "slugs": {
       "outlets": {
         ".read": true,
-        ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
       }
     },
 
     "dishes": {
       ".read": true,
-      ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true",
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
       ".indexOn": ["category", "outlet"]
     },
 
     "outlets": {
       ".read": true,
-      ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true",
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
       ".indexOn": ["businessId", "name"]
     },
 
     "bot": {
       "$oid": {
-        ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)"
+        ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)",
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)"
       }
     },
     
     "customers": {
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
+        ".read": "auth != null && (auth.uid == $uid || auth.token.superadmin === true)",
+        ".write": "auth != null && (auth.uid == $uid || auth.token.superadmin === true)"
+      }
+    },
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
+        ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)"
+      },
+      ".indexOn": ["email", "phone", "name"]
+    },
+
+    "logs": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
+      "marketplaceAudit": {
+        ".write": true,
+        ".indexOn": ["userId", "timestamp"]
+      },
+      "botAudit": {
+        ".write": "auth != null",
+        ".indexOn": ["whatsappJid", "timestamp"]
+      },
+      "audit": {
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+      },
+      "riderErrors": {
+        ".write": "auth != null",
+        ".indexOn": ["riderId", "timestamp"]
       }
     },
 
     "Pizza-Shop": {
       ".read": true,
-      ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
     },
 
     "Cake-Shop": {
       ".read": true,
-      ".write": "auth != null && root.child('admins').child(auth.uid).child('isSuper').val() == true"
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
     },
-    "system": {
+
+    "platformConfig": {
       ".read": true,
-      ".write": "auth != null && (auth.token.email == 'nexorasoftware@gmail.com' || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+    },
+
+    "riderStats": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+    },
+
+    "superAdmin": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
     }
   }
 }

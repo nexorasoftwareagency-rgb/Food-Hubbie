@@ -30,18 +30,10 @@ import { OutletCard } from "@/components/cards/OutletCard";
 import { FoodCard } from "@/components/cards/FoodCard";
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader";
 import { useLocationContext } from "@/context/LocationContext";
+import { fetchCuisines, type Cuisine } from "@/services/configService";
 import { heroBanner } from "@/data/mockData";
 
-const categories = [
-  { name: "Pizza", icon: Pizza, color: "bg-red-100 text-red-600" },
-  { name: "Burger", icon: Beef, color: "bg-orange-100 text-orange-600" },
-  { name: "Biryani", icon: Soup, color: "bg-yellow-100 text-yellow-700" },
-  { name: "Desserts", icon: Cake, color: "bg-pink-100 text-pink-600" },
-  { name: "Drinks", icon: Coffee, color: "bg-blue-100 text-blue-600" },
-  { name: "Chinese", icon: UtensilsCrossed, color: "bg-green-100 text-green-600" },
-  { name: "Sandwich", icon: Sandwich, color: "bg-amber-100 text-amber-700" },
-  { name: "Salads", icon: Salad, color: "bg-emerald-100 text-emerald-700" },
-];
+
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -50,6 +42,7 @@ export default function Home() {
   const [bestSellers, setBestSellers] = useState<MenuItem[]>([]);
   const [recommended, setRecommended] = useState<MenuItem[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [cuisines, setCuisines] = useState<Cuisine[]>([]);
   const { state: locationState, requestLocation } = useLocationContext();
 
   const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]);
@@ -63,17 +56,19 @@ export default function Home() {
         setOutlets(sortedOutlets);
         
         // Fetch all items for the global menu
-        const [best, reco, revs, allItems] = await Promise.all([
+        const [best, reco, revs, allItems, cData] = await Promise.all([
           getGlobalBestSellers(4),
           getGlobalRecommended(4),
           fetchGlobalReviews(6),
-          fetchAllMenuItems()
+          fetchAllMenuItems(),
+          fetchCuisines()
         ]);
         
         setBestSellers(best);
         setRecommended(reco);
         setReviews(revs);
         setAllMenuItems(allItems);
+        setCuisines(cData);
       } catch (error) {
         console.error("Home data load error:", error);
       } finally {
@@ -183,26 +178,38 @@ export default function Home() {
             What's on your mind?
           </h2>
         </div>
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-4 md:gap-6">
-          {categories.map((cat, i) => (
-            <motion.div
-              key={cat.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              onClick={() => setLocation(`/search?q=${encodeURIComponent(cat.name)}`)}
-              className="flex flex-col items-center gap-3 cursor-pointer group"
-            >
-              <div
-                className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl flex items-center justify-center ${cat.color} group-hover:scale-105 transition-transform shadow-sm group-hover:shadow-md`}
-              >
-                <cat.icon className="w-8 h-8 md:w-10 md:h-10" />
+        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+          {loading ? (
+            Array(8).fill(0).map((_, i) => (
+              <div key={i} className="flex-shrink-0 animate-pulse">
+                <div className="w-20 h-20 bg-muted rounded-full mb-2" />
+                <div className="w-16 h-3 bg-muted rounded mx-auto" />
               </div>
-              <span className="text-xs md:text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors text-center">
-                {cat.name}
-              </span>
-            </motion.div>
-          ))}
+            ))
+          ) : (
+            cuisines.map((cat, i) => (
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+                onClick={() => setLocation(`/search?q=${encodeURIComponent(cat.name)}`)}
+                className="flex flex-col items-center gap-2 cursor-pointer group flex-shrink-0"
+              >
+                <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary transition-all shadow-sm">
+                  <img 
+                    src={cat.image} 
+                    alt={cat.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors" />
+                </div>
+                <span className="text-xs md:text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors text-center">
+                  {cat.name}
+                </span>
+              </motion.div>
+            ))
+          )}
         </div>
       </section>
 

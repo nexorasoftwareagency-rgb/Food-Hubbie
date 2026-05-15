@@ -11,18 +11,10 @@ import type { DeliveryFeeSlot } from "@/types";
  */
 export async function getApplicableDeliverySlabs(outletId: string): Promise<DeliveryFeeSlot[]> {
   try {
-    // 1. Try Outlet Specific
-    const outletRef = ref(db, `businesses/business_roshani/outlets/${outletId}/settings/Delivery/slabs`);
-    const outletSnap = await get(outletRef);
-    if (outletSnap.exists()) {
-      const slabs = outletSnap.val();
-      // Map 'km' from ShopAdmin to 'upToKm' for Marketplace compatibility
-      return slabs.map((s: any) => ({ upToKm: s.km, fee: s.fee }));
-    }
-
-    // 2. Try System Global
+    // 1. Fetch System Global Slabs (Controlled by Super Admin)
     const systemRef = ref(db, `system/settings/delivery/slabs`);
     const systemSnap = await get(systemRef);
+    
     if (systemSnap.exists()) {
       return systemSnap.val();
     }
@@ -30,7 +22,7 @@ export async function getApplicableDeliverySlabs(outletId: string): Promise<Deli
     console.warn("[DeliveryService] Error fetching slabs:", error);
   }
 
-  // 3. Fallback Defaults
+  // 2. Fallback Defaults if system settings are missing
   return [
     { upToKm: 2, fee: 20 },
     { upToKm: 5, fee: 40 },

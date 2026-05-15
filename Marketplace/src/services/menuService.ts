@@ -71,19 +71,23 @@ export async function fetchMenuByOutlet(outletId: string, businessId: string = "
       `Cake-Shop`   // Legacy Fallback
     ];
 
+    let outletName = "Restaurant";
     for (const path of paths) {
       const snap = await get(ref(db, path));
       if (snap.exists()) {
         const data = snap.val();
+        if (data.settings?.Store?.storeName) {
+          outletName = data.settings.Store.storeName;
+        }
         // Potential item nodes: dishes, menu/items, Menu/Items
-        const dishes = data.dishes || 
-                       (data.menu && data.menu.items) || 
+        const dishes = data.dishes ||
+                       (data.menu && data.menu.items) ||
                        (data.Menu && data.Menu.Items);
-        
+
         if (dishes) {
           const result: MenuItem[] = [];
           for (const id in dishes) {
-            result.push(mapLegacyDish(id, dishes[id], outletId, businessId));
+            result.push(mapLegacyDish(id, dishes[id], outletId, businessId, outletName));
           }
           if (result.length > 0) return result;
         }
@@ -95,14 +99,14 @@ export async function fetchMenuByOutlet(outletId: string, businessId: string = "
     if (rootSnap.exists()) {
        const allDishes = rootSnap.val();
        const result: MenuItem[] = [];
-       for (const id in allDishes) {
-         const dish = allDishes[id];
-         // Only include if it belongs to this outlet or is generic
-         if (!dish.outlet || dish.outlet.toLowerCase() === outletId.toLowerCase() || 
-             dish.outlet.toLowerCase().includes(outletId.toLowerCase())) {
-           result.push(mapLegacyDish(id, dish, outletId, businessId));
-         }
-       }
+        for (const id in allDishes) {
+          const dish = allDishes[id];
+          // Only include if it belongs to this outlet or is generic
+          if (!dish.outlet || dish.outlet.toLowerCase() === outletId.toLowerCase() ||
+              dish.outlet.toLowerCase().includes(outletId.toLowerCase())) {
+            result.push(mapLegacyDish(id, dish, outletId, businessId, "Restaurant"));
+          }
+        }
        return result;
     }
 
@@ -240,7 +244,7 @@ export async function fetchAllMenuItems(): Promise<MenuItem[]> {
         if (!processedIds.has(dId)) {
           const dish = allDishes[dId];
           const oId = dish.outlet || "Pizza-Shop";
-          const mapped = mapLegacyDish(dId, dish, oId, "business_roshani");
+          const mapped = mapLegacyDish(dId, dish, oId, "business_roshani", "Restaurant");
           result.push({
             ...mapped,
             outletName: "Roshani Restaurant"

@@ -14,6 +14,7 @@ type OrderContextValue = {
   placeOrder: (input: PlaceOrderInput) => Promise<string>;
   updateOrderStatus: (id: string, status: OrderStatus) => void;
   advanceOrderStatus: (id: string) => void;
+  markOrderAsReviewed: (id: string) => void;
   getOrderById: (id: string) => Order | undefined;
 };
 
@@ -66,6 +67,19 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const markOrderAsReviewed = useCallback(
+    (id: string) => {
+      setOrders((prev) => {
+        const updated = prev.map((o) =>
+          o.id === id ? { ...o, isReviewed: true } : o
+        );
+        persistOrders(updated);
+        return updated;
+      });
+    },
+    []
+  );
+
   const advanceOrderStatus = useCallback(
     (id: string) => {
       const order = orders.find((o) => o.id === id);
@@ -89,6 +103,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         placeOrder,
         updateOrderStatus,
         advanceOrderStatus,
+        markOrderAsReviewed,
         getOrderById,
       }}
     >

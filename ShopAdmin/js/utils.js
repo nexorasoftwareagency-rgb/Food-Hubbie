@@ -36,6 +36,18 @@ export const escapeHtml = (str) => {
         .replace(/'/g, '&#039;');
 };
 
+/**
+ * SECURITY: MITIGATE CSV INJECTION
+ * Prevents execution of formulas in Excel/Sheets when opening exported data.
+ */
+export const safeCSV = (val) => {
+    const str = String(val || "");
+    if (str.startsWith('=') || str.startsWith('+') || str.startsWith('-') || str.startsWith('@')) {
+        return "'" + str;
+    }
+    return str;
+};
+
 export const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371; // km
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -155,6 +167,34 @@ export const logAudit = async (action, details = {}) => {
         }
     }
 };
+
+/**
+ * ATOMIC ADMIN ACTION (Ecosystem Hardening)
+ * Bundles any DB updates with an audit log in a single transaction.
+ */
+export async function atomicAdminAction(updates, action, details = {}) {
+    try {
+        const user = auth.currentUser;
+        const auditId = Outlet.ref('logs/audit').push().key;
+        
+        // Inject Audit Log into the multi-path update
+        updates[`logs/audit/${auditId}`] = {
+            timestamp: ServerValue.TIMESTAMP,
+            adminEmail: user ? user.email : 'system',
+            uid: user ? user.uid : 'system',
+            action,
+            details,
+            outlet: Outlet.current
+        };
+
+        // Perform atomic update on the outlet root
+        await Outlet.ref('').update(updates);
+        console.log(`[Audit] Atomic Action Logged: ${action}`);
+    } catch (e) {
+        console.error(`[Audit] Atomic Action Failed: ${action}`, e);
+        throw e; // Rethrow to let the UI handle it
+    }
+}
 
 export const addRiderNotification = async (uid, title, sub, type = 'info') => {
     if (!uid) return;
