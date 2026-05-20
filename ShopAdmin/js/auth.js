@@ -48,13 +48,13 @@ export function initAuth() {
 
     // Add diagnostic button to login form (Gated for non-production/debug only)
     const isDebuggable = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || localStorage.getItem('DEBUG_MODE') === 'true';
-    const loginCard = document.querySelector('.login-card-v4');
+    const loginCard = document.querySelector('.login-card');
     if (loginCard && isDebuggable && !document.getElementById('diagnosticBtn')) {
         const diagBtn = document.createElement('button');
         diagBtn.id = 'diagnosticBtn';
         diagBtn.type = 'button';
-        diagBtn.innerText = '🔍 Run Diagnostics';
-        diagBtn.style.cssText = 'margin-top: 20px; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s;';
+        diagBtn.innerText = 'Run Diagnostics';
+        diagBtn.style.cssText = 'margin-top: 20px; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 12px; cursor: pointer; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s; width: 100%;';
         diagBtn.onmouseover = () => diagBtn.style.background = 'rgba(255,255,255,0.1)';
         diagBtn.onmouseout = () => diagBtn.style.background = 'rgba(255,255,255,0.05)';
         diagBtn.onclick = () => {
@@ -65,6 +65,21 @@ export function initAuth() {
             }
         };
         loginCard.appendChild(diagBtn);
+    }
+
+    // Password visibility toggle
+    const togglePassBtn = document.querySelector('.login-toggle-password');
+    const passInput = document.getElementById('loginPassword');
+    if (togglePassBtn && passInput) {
+        togglePassBtn.addEventListener('click', () => {
+            const isPassword = passInput.type === 'password';
+            passInput.type = isPassword ? 'text' : 'password';
+            const icon = togglePassBtn.querySelector('i');
+            if (icon) {
+                icon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+                if (window.lucide) window.lucide.createIcons({ root: togglePassBtn });
+            }
+        });
     }
 
     auth.onAuthStateChanged(async (user) => {
@@ -80,7 +95,10 @@ export function initAuth() {
             if (layout) layout.classList.add('hidden');
             if (loginBtn) {
                 loginBtn.disabled = false;
-                loginBtn.innerHTML = '<span>Access Dashboard</span> <div class="btn-stitch-v4"></div>';
+                const textEl = loginBtn.querySelector('.login-submit__text');
+                const loaderEl = loginBtn.querySelector('.login-submit__loader');
+                if (textEl) textEl.classList.remove('hidden');
+                if (loaderEl) loaderEl.classList.add('hidden');
             }
             localStorage.removeItem('adminIsLoggedIn');
             window.hideLoader?.();
@@ -358,7 +376,10 @@ export async function doLogin(email, pass) {
     try {
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<span>Verifying Credentials...</span> <div class="btn-stitch-v4"></div>';
+            const textEl = btn.querySelector('.login-submit__text');
+            const loaderEl = btn.querySelector('.login-submit__loader');
+            if (textEl) textEl.classList.add('hidden');
+            if (loaderEl) loaderEl.classList.remove('hidden');
         }
         if (errEl) errEl.classList.add('hidden');
         
@@ -378,8 +399,10 @@ export async function doLogin(email, pass) {
         
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<span>Access Dashboard</span> <div class="btn-stitch-v4"></div>';
-            if (window.lucide) window.lucide.createIcons({ root: btn.parentElement });
+            const textEl = btn.querySelector('.login-submit__text');
+            const loaderEl = btn.querySelector('.login-submit__loader');
+            if (textEl) textEl.classList.remove('hidden');
+            if (loaderEl) loaderEl.classList.add('hidden');
         }
     }
 }

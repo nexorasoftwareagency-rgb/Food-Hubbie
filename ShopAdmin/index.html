@@ -71,98 +71,142 @@
         </div>
     </div>
 
-    <!-- LOGIN (Ultra Premium v4) -->
-    <div id="authOverlay" class="login-container-v4" title="Admin Login Screen">
-        <div class="login-card-v4 animate-fade-in-up">
-            <form id="loginForm" class="login-form-v4" title="Sign into the Admin Dashboard">
-                <div class="login-logo-container">
-                    <div class="login-logo-v4">
-                        <i data-lucide="shield-check" class="icon-32"></i>
-                    </div>
-                </div>
-                
-                <div class="login-header-v4">
-                    <h2 id="loginTitle">Foodhubbie</h2>
-                    <p class="login-subtitle">Secure Admin Management Portal</p>
-                </div>
-                
-                <div class="login-input-group-v4">
-                    <label for="loginEmail">
-                        <i data-lucide="mail" class="icon-14"></i> Admin Email
-                    </label>
-                    <div class="input-wrapper-v4">
-                        <input type="email" id="loginEmail" class="login-input-v4" required placeholder="admin@roshani.com" autocomplete="username">
-                        <div class="input-stitch-v4"></div>
+    <!-- LOGIN (Premium Redesign) -->
+    <div id="authOverlay" class="login-screen" title="Admin Login Screen">
+        <div class="login-bg-animation">
+            <div class="login-bg-orb login-bg-orb--1"></div>
+            <div class="login-bg-orb login-bg-orb--2"></div>
+            <div class="login-bg-orb login-bg-orb--3"></div>
+            <div class="login-bg-grid"></div>
+        </div>
+
+        <div class="login-wrapper">
+            <div class="login-card">
+                <div class="login-card__header">
+                    <div class="login-brand">
+                        <div class="login-brand__icon">
+                            <i data-lucide="utensils-crossed"></i>
+                        </div>
+                        <div class="login-brand__text">
+                            <h1>Foodhubbie</h1>
+                            <span>Admin Management Portal</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="login-input-group-v4">
-                    <label for="loginPassword">
-                        <i data-lucide="lock" class="icon-14"></i> Secret Key
-                    </label>
-                    <div class="input-wrapper-v4">
-                        <input type="password" id="loginPassword" class="login-input-v4" required placeholder="••••••••" autocomplete="current-password">
-                        <div class="input-stitch-v4"></div>
+                <form id="loginForm" class="login-form" autocomplete="on">
+                    <div class="login-field">
+                        <label for="loginEmail">
+                            <i data-lucide="mail"></i>
+                            Email Address
+                        </label>
+                        <div class="login-input-wrap">
+                            <input type="email" id="loginEmail" class="login-input" required placeholder="admin@yourbusiness.com" autocomplete="username">
+                        </div>
                     </div>
-                </div>
 
-                <div class="login-actions-v4">
-                    <button id="loginBtn" type="submit" class="btn-login-v4">
-                        <span>Access Dashboard</span>
-                        <div class="btn-stitch-v4"></div>
+                    <div class="login-field">
+                        <label for="loginPassword">
+                            <i data-lucide="lock"></i>
+                            Password
+                        </label>
+                        <div class="login-input-wrap login-input-wrap--password">
+                            <input type="password" id="loginPassword" class="login-input" required placeholder="Enter your password" autocomplete="current-password">
+                            <button type="button" class="login-toggle-password" aria-label="Toggle password visibility">
+                                <i data-lucide="eye" class="login-toggle-password__icon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button id="loginBtn" type="submit" class="login-submit">
+                        <span class="login-submit__text">Sign In to Dashboard</span>
+                        <span class="login-submit__loader hidden">
+                            <svg class="login-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                            </svg>
+                            Signing in...
+                        </span>
                     </button>
-                </div>
 
-                <div id="loginError" class="login-error-v4 hidden">
-                    <i data-lucide="alert-circle" class="icon-16"></i>
-                    <span class="error-msg"></span>
-                </div>
-
-                <div class="login-footer-v4" style="flex-direction: column; gap: 12px; align-items: center;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span>Enterprise Security Level 4</span>
-                        <div class="security-dot"></div>
+                    <div id="loginError" class="login-error hidden">
+                        <i data-lucide="alert-circle"></i>
+                        <span class="error-msg"></span>
                     </div>
-                    <button type="button" class="btn-pro-transparent" onclick="window.open('./partner-onboarding.html', '_blank')" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8;">
-                        <i data-lucide="store" size="14"></i> Join as Partner
-                    </button>
-                    <button type="button" class="btn-pro-transparent" onclick="window.open('./partner-onboarding.html#status', '_blank')" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; margin-left: 8px;">
-                        <i data-lucide="search" size="14"></i> Check Status
-                    </button>
+                </form>
+
+                <div class="login-card__footer">
+                    <div class="login-security-badge">
+                        <i data-lucide="shield-check"></i>
+                        <span>Secured with Firebase Auth</span>
+                    </div>
+                    <div class="login-divider">
+                        <span>For Businesses</span>
+                    </div>
+                    <div class="login-partner-links">
+                        <a href="./partner-onboarding.html" target="_blank" rel="noopener">
+                            <i data-lucide="store"></i>
+                            Become a Partner
+                        </a>
+                        <a href="./partner-onboarding.html#status" target="_blank" rel="noopener">
+                            <i data-lucide="search"></i>
+                            Check Application Status
+                        </a>
+                    </div>
                 </div>
-            </form>
+            </div>
+        </div>
     </div>
 
     <!-- PENDING APPROVAL OVERLAY -->
-    <div id="pendingOverlay" class="login-container-v4 hidden" style="z-index: 10002; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
-        <div class="login-card-v4 text-center" style="max-width: 500px; padding: 50px;">
-            <div class="animate-pulse mb-30" style="width: 80px; height: 80px; background: rgba(245,158,11,0.1); color: #F59E0B; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; border: 2px solid #F59E0B;">
-                <i data-lucide="shield-alert" size="40"></i>
-            </div>
-            <h2 class="text-2xl font-black mb-12">Deployment in Progress</h2>
-            <p class="text-slate-400 mb-30">Your partner node has been registered and is currently awaiting Super Admin validation. Access to the full ERP suite will be granted once compliance checks are finalized.</p>
-            
-            <div class="status-timeline mb-30" style="text-align:left; border-left:2px solid rgba(255,255,255,0.05); padding-left:20px; margin-left:10px;">
-                <div class="mb-20" style="position:relative; opacity:1;">
-                    <div style="position:absolute; left:-27px; top:4px; width:12px; height:12px; border-radius:50%; background:#10B981; border:3px solid #1e293b"></div>
-                    <div class="font-bold text-sm">Account Registered</div>
-                    <div class="text-xs text-muted">Authentication layer established</div>
+    <div id="pendingOverlay" class="login-screen hidden">
+        <div class="login-bg-animation">
+            <div class="login-bg-orb login-bg-orb--1"></div>
+            <div class="login-bg-orb login-bg-orb--2"></div>
+            <div class="login-bg-orb login-bg-orb--3"></div>
+            <div class="login-bg-grid"></div>
+        </div>
+        <div class="login-wrapper">
+            <div class="login-card login-card--pending">
+                <div class="pending-icon">
+                    <div class="pending-icon__ring"></div>
+                    <i data-lucide="shield-alert"></i>
                 </div>
-                <div class="mb-20" style="position:relative; opacity:1;">
-                    <div style="position:absolute; left:-27px; top:4px; width:12px; height:12px; border-radius:50%; background:#F59E0B; border:3px solid #1e293b"></div>
-                    <div class="font-bold text-sm">Super Admin Approval</div>
-                    <div class="text-xs text-muted">Pending security and KYC audit</div>
+                <h2>Deployment in Progress</h2>
+                <p class="pending-description">
+                    Your partner node has been registered and is currently awaiting Super Admin validation. 
+                    Access to the full ERP suite will be granted once compliance checks are finalized.
+                </p>
+                
+                <div class="pending-timeline">
+                    <div class="pending-timeline__item pending-timeline__item--complete">
+                        <div class="pending-timeline__dot pending-timeline__dot--success"></div>
+                        <div class="pending-timeline__content">
+                            <div class="pending-timeline__title">Account Registered</div>
+                            <div class="pending-timeline__desc">Authentication layer established</div>
+                        </div>
+                    </div>
+                    <div class="pending-timeline__item pending-timeline__item--active">
+                        <div class="pending-timeline__dot pending-timeline__dot--warning"></div>
+                        <div class="pending-timeline__content">
+                            <div class="pending-timeline__title">Super Admin Approval</div>
+                            <div class="pending-timeline__desc">Pending security and KYC audit</div>
+                        </div>
+                    </div>
+                    <div class="pending-timeline__item pending-timeline__item--pending">
+                        <div class="pending-timeline__dot pending-timeline__dot--muted"></div>
+                        <div class="pending-timeline__content">
+                            <div class="pending-timeline__title">Live Infrastructure Provisioning</div>
+                            <div class="pending-timeline__desc">Awaiting database node initialization</div>
+                        </div>
+                    </div>
                 </div>
-                <div style="position:relative; opacity:0.4;">
-                    <div style="position:absolute; left:-27px; top:4px; width:12px; height:12px; border-radius:50%; background:white; border:3px solid #1e293b"></div>
-                    <div class="font-bold text-sm">Live Infrastructure Provisioning</div>
-                    <div class="text-xs text-muted">Awaiting database node initialization</div>
-                </div>
-            </div>
 
-            <button class="btn-pro-transparent" type="button" onclick="auth.signOut()">
-                <i data-lucide="log-out" size="14"></i> Logout
-            </button>
+                <button type="button" class="login-submit login-submit--secondary" onclick="auth.signOut()">
+                    <i data-lucide="log-out"></i>
+                    Sign Out
+                </button>
+            </div>
         </div>
     </div>
 
