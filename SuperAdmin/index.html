@@ -24,18 +24,20 @@
             <h2 class="text-xl font-black text-white mb-2">Enterprise Access</h2>
             <p class="text-muted mb-8 text-sm">Master administrative node initialization required</p>
             
-            <div class="form-group text-left">
-                <label class="text-xs font-bold uppercase tracking-widest text-muted mb-2 block">Administrative Email</label>
-                <input type="email" id="loginEmail" class="pro-input" placeholder="admin@foodhubbie.com">
-            </div>
-            <div class="form-group text-left mb-8">
-                <label class="text-xs font-bold uppercase tracking-widest text-muted mb-2 block">Master Passcode</label>
-                <input type="password" id="loginPassword" class="pro-input" placeholder="••••••••">
-            </div>
-            
-            <button id="btnLogin" class="btn-pro w-full justify-center h-50 text-base" onclick="doLogin()">
-                INITIALIZE SESSION <i data-lucide="arrow-right" size="18"></i>
-            </button>
+            <form id="loginForm" onsubmit="event.preventDefault(); doLogin();">
+                <div class="form-group text-left">
+                    <label class="text-xs font-bold uppercase tracking-widest text-muted mb-2 block" for="loginEmail">Administrative Email</label>
+                    <input type="email" id="loginEmail" class="pro-input" placeholder="admin@foodhubbie.com" autocomplete="username">
+                </div>
+                <div class="form-group text-left mb-8">
+                    <label class="text-xs font-bold uppercase tracking-widest text-muted mb-2 block" for="loginPassword">Master Passcode</label>
+                    <input type="password" id="loginPassword" class="pro-input" placeholder="Enter your password" autocomplete="current-password">
+                </div>
+                
+                <button type="submit" id="btnLogin" class="btn-pro w-full justify-center h-50 text-base">
+                    INITIALIZE SESSION <i data-lucide="arrow-right" size="18"></i>
+                </button>
+            </form>
             <p id="loginError" class="hidden text-danger mt-4 font-semibold text-xs text-center"></p>
         </div>
     </div>
@@ -360,7 +362,7 @@
                             </div>
                             <div class="col-span-2">
                                 <label class="label-pro">Admin Password</label>
-                                <input type="password" id="adminPass" class="auth-input input-pro" placeholder="Min 6 characters" required>
+                                <input type="password" id="adminPass" class="auth-input input-pro" placeholder="Min 6 characters" required autocomplete="new-password">
                             </div>
                             
                             <button type="submit" class="btn-pro col-span-2 h-50 justify-center text-base">
@@ -1012,7 +1014,7 @@
                                     <i data-lucide="list" size="14" style="display:inline-block;margin-right:4px;vertical-align:middle"></i> Table
                                 </button>
                                 <button id="btnKanbanView" class="px-3 rounded-md text-xs font-bold transition-all text-muted hover:text-foreground" onclick="setOrderView('kanban')">
-                                    <i data-lucide="layout-kanban" size="14" style="display:inline-block;margin-right:4px;vertical-align:middle"></i> Kanban
+                                    <i data-lucide="columns" size="14" style="display:inline-block;margin-right:4px;vertical-align:middle"></i> Kanban
                                 </button>
                             </div>
                             <select id="orderOutletFilter" class="auth-input" style="width:180px;margin:0" onchange="loadLiveOrders()">
@@ -1266,7 +1268,7 @@
                     </div>
                     <div class="col-span-2">
                         <label class="label-pro text-sm">Access Passcode</label>
-                        <input type="password" id="riderPass" class="auth-input input-pro text-sm" placeholder="System Entry Code">
+                        <input type="password" id="riderPass" class="auth-input input-pro text-sm" placeholder="System Entry Code" autocomplete="new-password">
                     </div>
 
                     <div class="col-span-2 border-t mb-2 mt-2">
@@ -1362,7 +1364,7 @@
                     </div>
                     <div>
                         <label class="label-pro text-sm">New Password (Optional)</label>
-                        <input type="password" id="editAdminPass" class="auth-input input-pro text-sm" placeholder="Leave blank to keep current">
+                        <input type="password" id="editAdminPass" class="auth-input input-pro text-sm" placeholder="Leave blank to keep current" autocomplete="new-password">
                     </div>
                 </div>
 
