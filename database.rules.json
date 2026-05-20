@@ -44,8 +44,7 @@
 
             "orders": {
               ".read": true,
-              // Only allow creation of new orders by public, or full access for admins
-              ".write": "(!data.exists() && newData.exists()) || (auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid))",
+              ".write": "(!data.exists() && newData.exists()) || (auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid || (root.child('riders').child(auth.uid).exists() && newData.child('riderId').val() == auth.uid)))",
               ".indexOn": ["createdAt", "status", "riderId", "phone"]
             },
             
@@ -151,8 +150,10 @@
     },
 
     "riderStats": {
-      ".read": true,
-      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+      "$riderId": {
+        ".read": true,
+        ".write": "auth != null && auth.uid == $riderId"
+      }
     },
 
     "superAdmin": {

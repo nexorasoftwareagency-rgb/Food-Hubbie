@@ -73,7 +73,7 @@ function checkAuth() {
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             try {
-                // Verify SuperAdmin status in DB
+                // Verify SuperAdmin status in DB first
                 const snap = await db.ref(`admins/${user.uid}`).once('value');
                 const adminData = snap.val();
                 
@@ -84,9 +84,20 @@ function checkAuth() {
                     initOnboardingManager();
                     logAdminAction('SESSION_INIT', { method: 'Firebase Auth' });
                 } else {
-                    console.error("Access Denied: Not a Super Admin");
-                    showToast("Unauthorized: Super Admin privileges required", "error");
-                    auth.signOut();
+                    // Fallback: check custom claims if DB record is missing
+                    const token = await user.getIdTokenResult(true);
+                    if (token.claims && token.claims.superadmin === true) {
+                        console.log("[SuperAdmin] Emergency access granted via custom claims");
+                        document.getElementById('loginOverlay').classList.add('hidden');
+                        document.getElementById('mainContainer').classList.remove('hidden');
+                        initStats();
+                        initOnboardingManager();
+                        logAdminAction('SESSION_INIT', { method: 'Custom Claims Fallback' });
+                    } else {
+                        console.error("Access Denied: Not a Super Admin");
+                        showToast("Unauthorized: Super Admin privileges required", "error");
+                        auth.signOut();
+                    }
                 }
             } catch (err) {
                 console.error("Auth Verification Error:", err);
@@ -2785,10 +2796,11 @@ window.approvePartner = async function(uid) {
             id: uid,
             email: adminEmail,
             role: 'Partner Admin',
-            outlet: oid,
-            bid: bid,
+            outletId: oid,
+            businessId: bid,
             name: req.ownerName,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            createdAt: ServerValue.TIMESTAMP
         };
 
         // Finalize Onboarding Request

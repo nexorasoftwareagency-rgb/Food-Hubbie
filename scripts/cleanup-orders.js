@@ -8,6 +8,10 @@ admin.initializeApp({
 
 const db = admin.database();
 
+// DRY_RUN=true (default) — only prints what would be deleted
+// DRY_RUN=false — actually deletes old orders
+const DRY_RUN = process.env.DRY_RUN !== 'false';
+
 async function cleanupOrders(path) {
   console.log(`\n🧹 Cleaning up: ${path}...`);
   const ref = db.ref(path);
@@ -42,6 +46,11 @@ async function cleanupOrders(path) {
   console.log(`  - Keeping: ${toKeep.length} orders`);
   console.log(`  - Deleting: ${toDelete.length} orders`);
 
+  if (DRY_RUN) {
+    console.log(`  [DRY RUN] Would delete: ${toDelete.map(o => o.id).join(', ')}`);
+    return;
+  }
+
   const updates = {};
   toDelete.forEach(o => {
     updates[o.id] = null;
@@ -53,11 +62,7 @@ async function cleanupOrders(path) {
 
 async function run() {
   try {
-    // 1. Cleanup Legacy Structures
-    await cleanupOrders('pizza/orders');
-    await cleanupOrders('cake/orders');
-
-    // 2. Cleanup New SaaS Structure
+    // Cleanup SaaS Structure only (legacy paths removed)
     const businessesSnap = await db.ref('businesses').once('value');
     if (businessesSnap.exists()) {
       const businesses = businessesSnap.val();
@@ -69,7 +74,12 @@ async function run() {
       }
     }
 
-    console.log('\n🌟 ALL CLEANUP TASKS FINISHED.');
+    if (DRY_RUN) {
+      console.log('\n⚠️  DRY RUN — No data was deleted.');
+      console.log('   Set DRY_RUN=false to actually delete old orders.');
+    } else {
+      console.log('\n🌟 ALL CLEANUP TASKS FINISHED.');
+    }
     process.exit(0);
   } catch (err) {
     console.error('\n❌ ERROR DURING CLEANUP:', err);

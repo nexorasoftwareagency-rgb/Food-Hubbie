@@ -3,7 +3,6 @@
  * FOODHUBBIE SAAS | ShopAdmin Firebase Config
  * ============================================================
  * PROJECT: food-hubbie (NEW — Triple Isolation)
- * PROJECT: food-hubbie (NEW — Triple Isolation)
  * ============================================================
  */
 

@@ -152,9 +152,11 @@ window.reachedOutlet = async (id, outlet, bid = null) => {
 
     // Gating Check: Proximity to Restaurant
     const outletCoords = window.outletCoords[outlet] || { lat: 0, lng: 0 };
+    const outletSettings = (window.outletSettings && window.outletSettings[outlet]) || {};
+    const maxDist = outletSettings.riderAcceptanceRadius || 1.0;
     const dist = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng) : 999;
     
-    if (dist > 1.0) {
+    if (dist > maxDist) {
         return window.showToast(`Too far from restaurant! (Distance: ${dist.toFixed(1)}km)`, "error");
     }
 
@@ -184,7 +186,9 @@ window.reachedDropLocation = async (id, outlet, bid = null) => {
         // Gating Check: Proximity to Customer
         if (o.lat && o.lng) {
             const dist = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, o.lat, o.lng) : 999;
-            if (dist > 1.0) {
+            const outletSettings = (window.outletSettings && window.outletSettings[outlet]) || {};
+            const maxDist = outletSettings.riderAcceptanceRadius || 1.0;
+            if (dist > maxDist) {
                 return window.showToast(`Too far from customer! (Distance: ${dist.toFixed(1)}km)`, "error");
             }
         }
@@ -271,7 +275,7 @@ window.ignoredPings = new Set();
 window.orderCache = { outlet_pizza: {}, outlet_cake: {} };
 window.outletCoords = { outlet_pizza: { lat: 25.887944, lng: 85.026194 }, outlet_cake: { lat: 25.887472, lng: 85.026861 } };
 
-// Load outlet coordinates from Firebase on init
+// Load outlet coordinates and settings from Firebase on init
 async function loadOutletCoords() {
     try {
         const bid = window.currentUser?.profile?.businessId || 'business_roshani';
@@ -279,6 +283,7 @@ async function loadOutletCoords() {
         const snap = await get(bizRef);
         const outlets = snap.val() || {};
         
+        window.outletSettings = {};
         Object.entries(outlets).forEach(([id, data]) => {
             if (data.settings && data.settings.Store) {
                 window.outletCoords[id] = {
@@ -286,8 +291,14 @@ async function loadOutletCoords() {
                     lng: parseFloat(data.settings.Store.lng) || 85.026194
                 };
             }
+            if (data.settings && data.settings.Delivery) {
+                window.outletSettings[id] = {
+                    riderAcceptanceRadius: parseFloat(data.settings.Delivery.riderAcceptanceRadius) || 1.0
+                };
+            }
         });
         console.log(`[Outlet] Coordinates loaded for ${bid}:`, window.outletCoords);
+        console.log(`[Outlet] Settings loaded for ${bid}:`, window.outletSettings);
     } catch (e) { console.warn("[Outlet] Error loading coordinates:", e); }
 }
 
@@ -368,12 +379,14 @@ async function setupPushNotifications(userId) {
     } catch (error) { logError("setupPushNotifications", error); }
 }
 
-onMessage(messaging, (payload) => {
-    if (payload.notification) {
-        window.showToast(`${payload.notification.title}: ${payload.notification.body}`, "info");
-        try { new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { }); } catch (e) { }
-    }
-});
+if (messaging) {
+    onMessage(messaging, (payload) => {
+        if (payload.notification) {
+            window.showToast(`${payload.notification.title}: ${payload.notification.body}`, "info");
+            try { new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { }); } catch (e) { }
+        }
+    });
+}
 
 
 
@@ -744,7 +757,7 @@ function initLocationTracking() {
                 lastUpdate: serverTimestamp()
             }).catch(() => { });
             
-            // Heartbeat update on the rider object itself
+            // Heartbeat update on the rider object itself (only when location is available)
             update(ref(db, `riders/${currentUser.profile.id}`), {
                 lastSeen: serverTimestamp()
             }).catch(() => { });
@@ -764,10 +777,12 @@ window.acceptOrder = async (id, outletId, bizId = null) => {
     if (!window.currentUser) return window.showToast("Authentication error. Please login again.", "error");
     if (!window.riderLocation) return window.showToast("GPS Error. Ensure location is ON.", "error");
 
-    // Proximity policy: Must be within 1km of outlet to accept
+    // Proximity policy: Must be within configured radius of outlet to accept
     const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
+    const outletSettings = (window.outletSettings && window.outletSettings[outletId]) || {};
+    const maxDist = outletSettings.riderAcceptanceRadius || 1.0;
     const distFromRest = window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng);
-    if (distFromRest > 1.0) return window.showToast(`Must be within 1km of outlet! (You are ${distFromRest.toFixed(1)}km away)`, "error");
+    if (distFromRest > maxDist) return window.showToast(`Must be within ${maxDist.toFixed(1)}km of outlet! (You are ${distFromRest.toFixed(1)}km away)`, "error");
 
     try {
         const orderPath = `businesses/${targetBiz}/outlets/${outletId}/orders/${id}`;
@@ -915,11 +930,11 @@ window.finalizeDeliverySequence = async (orderPath, matchesFallback, order, paym
     const riderId = window.currentUser.profile.id;
     const commission = Number(order.deliveryFee || 0);
     const pathParts = orderPath.split('/');
-    const outletId = pathParts.includes('outlets') ? pathParts[3] : (pathParts[0] || 'outlet_pizza');
+    const outletId = pathParts.includes('outlets') ? pathParts[pathParts.indexOf('outlets') + 1] : (pathParts[0] || 'outlet_pizza');
     const txId = `RDX_${Date.now()}_${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
-    // 1. Update Legacy Stats
-    await runTransaction(ref(db, resolvePath(`riderStats/${riderId}`, outletId)), (current) => {
+    // 1. Update Legacy Stats — write directly to root riderStats/${riderId}
+    await runTransaction(ref(db, `riderStats/${riderId}`), (current) => {
         if (!current) return { totalOrders: 1, totalEarnings: commission };
         return { ...current, totalOrders: (current.totalOrders || 0) + 1, totalEarnings: (current.totalEarnings || 0) + commission };
     });
@@ -987,15 +1002,16 @@ window.emergencyOverride = async () => {
         window.closeOTPPanel();
         window.activeOrderForPayment = { path: orderPath, data: order, matchesFallback: true };
         document.getElementById('paymentTotalTxt').innerText = `Total to collect: ₹${order.total || 0}`;
-        document.getElementById('paymentPanel').classList.remove('hidden');
+        document.getElementById('paymentPanel').classList.add('active');
+        if (window.lucide) window.lucide.createIcons({ root: document.getElementById('paymentPanel') });
     }
 };
 
 window.regenerateOTP = async () => {
     if (!currentOrderId) return;
     const now = Date.now();
-    const outletId = window._currentOrderOutlet || 'pizza';
-    const otpAttemptsPath = `${outletId}/otpAttempts/${currentOrderId}`;
+    const outletId = window._currentOrderOutlet || 'outlet_pizza';
+    const otpAttemptsPath = resolvePath(`otpAttempts/${currentOrderId}`, outletId);
 
     const attemptsSnap = await get(ref(db, otpAttemptsPath));
     const attemptData = attemptsSnap.val() || {};
