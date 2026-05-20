@@ -150,14 +150,13 @@ window.reachedOutlet = async (id, outlet, bid = null) => {
     window.haptic([50, 30, 50]);
     const targetBiz = bid || window.activeOrderBusiness || 'business_roshani';
 
-    // Gating Check: Proximity to Restaurant
+    // Gating Check: Proximity to Restaurant (1000m)
     const outletCoords = window.outletCoords[outlet] || { lat: 0, lng: 0 };
-    const outletSettings = (window.outletSettings && window.outletSettings[outlet]) || {};
-    const maxDist = outletSettings.riderAcceptanceRadius || 1.0;
+    const maxDist = 1.0; // 1000 meters
     const dist = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng) : 999;
     
     if (dist > maxDist) {
-        return window.showToast(`Too far from restaurant! (Distance: ${dist.toFixed(1)}km)`, "error");
+        return window.showToast(`Too far from restaurant! Must be within 1km. (Distance: ${(dist*1000).toFixed(0)}m)`, "error");
     }
 
     try {
@@ -555,6 +554,14 @@ window.confirmPickup = async () => {
     const id = window.activeOrderId;
     const outletId = window.activeOrderOutlet || 'outlet_pizza';
     const bizId = window.activeOrderBusiness || 'business_roshani';
+
+    // Proximity gate: Must be within 300m of outlet to pickup
+    const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
+    const distToOutlet = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng) : 999;
+    if (distToOutlet > 0.3) {
+        return window.showToast(`Must be within 300m of outlet to pickup! (You are ${(distToOutlet*1000).toFixed(0)}m away)`, "error");
+    }
+
     const orderPath = resolvePath(`orders/${id}`, outletId, bizId);
 
     try {
@@ -777,12 +784,11 @@ window.acceptOrder = async (id, outletId, bizId = null) => {
     if (!window.currentUser) return window.showToast("Authentication error. Please login again.", "error");
     if (!window.riderLocation) return window.showToast("GPS Error. Ensure location is ON.", "error");
 
-    // Proximity policy: Must be within configured radius of outlet to accept
+    // Proximity policy: Must be within 1000m of outlet to accept
     const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
-    const outletSettings = (window.outletSettings && window.outletSettings[outletId]) || {};
-    const maxDist = outletSettings.riderAcceptanceRadius || 1.0;
+    const maxDist = 1.0; // 1000 meters
     const distFromRest = window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng);
-    if (distFromRest > maxDist) return window.showToast(`Must be within ${maxDist.toFixed(1)}km of outlet! (You are ${distFromRest.toFixed(1)}km away)`, "error");
+    if (distFromRest > maxDist) return window.showToast(`Must be within 1km of outlet to accept! (You are ${(distFromRest*1000).toFixed(0)}m away)`, "error");
 
     try {
         const orderPath = `businesses/${targetBiz}/outlets/${outletId}/orders/${id}`;
@@ -1591,7 +1597,7 @@ window._doRenderAllOrders = () => {
         // 1. UNASSIGNED - STRICT FILTERING
         const allowedUnassignedStatus = ["ready", "cooked", "packed"];
         if (!o.assignedRider && allowedUnassignedStatus.includes(status)) {
-            // PROXIMITY CHECK (1km)
+            // PROXIMITY CHECK (1000m - matches accept gate)
             const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
             const distToOutlet = window.riderLocation ? window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng) : 999;
             
