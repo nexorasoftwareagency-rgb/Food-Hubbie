@@ -7,7 +7,12 @@ admin.initializeApp({
 });
 
 const email = "Nexorasoftwareagency@gmail.com";
-const password = "NexoraNs@9724649971";
+const password = process.env.SUPERADMIN_PASSWORD;
+if (!password) {
+  console.error('Error: SUPERADMIN_PASSWORD environment variable is required.');
+  console.error('Usage: SUPERADMIN_PASSWORD="your-secure-password" node scripts/create-superadmin.js');
+  process.exit(1);
+}
 const displayName = "Username";
 
 async function createSuperAdmin() {

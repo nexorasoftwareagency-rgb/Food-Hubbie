@@ -73,7 +73,9 @@ button_audit.js
 add_nilesh.js
 
 # Old documentation (replaced by new SaaS docs)
+Credential.md
 COMPREHENSIVE_FIX_SUMMARY.md
+RIDER_CREDENTIALS_HELP.md
 FINAL_CHECKLIST.md
 FINAL_DEPLOYMENT_SUMMARY.md
 FIXES_VERIFICATION.md

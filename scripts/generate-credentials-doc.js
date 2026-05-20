@@ -31,8 +31,8 @@ async function generateDoc() {
     content += "| Name | Email | Password | Role |\n";
     content += "| :--- | :--- | :--- | :--- |\n";
     
-    // SuperAdmin from script
-    content += "| Username | Nexorasoftwareagency@gmail.com | NexoraNs@9724649971 | SuperAdmin |\n";
+    // SuperAdmin from script — password must be set via env var, never hardcoded
+    content += "| Username | Nexorasoftwareagency@gmail.com | [SET VIA FIREBASE CONSOLE] | SuperAdmin |\n";
     
     // Other admins from DB
     content += "\n## 🏬 Shop Admin Credentials\n\n";
