@@ -51,11 +51,6 @@
             
             <nav>
                 <div class="nav-group-label">Ecosystem Overview</div>
-                <div class="nav-item active" data-tab="dashboard">
-                    <i data-lucide="layout-dashboard" size="18"></i>
-                    <span>Network Control</span>
-                </div>
-                <nav class="sidebar-nav">
                 <a href="#" class="nav-link active" data-tab="dashboard">
                     <i data-lucide="layout-dashboard"></i>
                     <span>Ecosystem Overview</span>
@@ -77,65 +72,54 @@
                     <i data-lucide="bar-chart-3"></i>
                     <span>Global Analytics</span>
                 </a>
-            </nav>
-                <div class="nav-item" data-tab="businesses">
-                    <i data-lucide="building-2" size="18"></i>
-                    <span>Ecosystem Partners</span>
-                </div>
-                <div class="nav-item" data-tab="reconciliation">
-                    <i data-lucide="wallet" size="18"></i>
-                    <span>Financial Control</span>
-                </div>
-                <div class="nav-item" data-tab="inventory">
-                    <i data-lucide="package" size="18"></i>
-                    <span>Inventory Control</span>
-                </div>
-                <div class="nav-item" data-tab="promotions">
-                    <i data-lucide="ticket" size="18"></i>
-                    <span>Promotions Center</span>
-                </div>
-                <div class="nav-item" data-tab="users">
-                    <i data-lucide="users" size="18"></i>
-                    <span>User Registry</span>
-                </div>
-
-                <div class="nav-group-label">Logistics & Fleet</div>
-                <div class="nav-item" data-tab="riders">
-                    <i data-lucide="bike" size="18"></i>
+                <a href="#" class="nav-link" data-tab="riders">
+                    <i data-lucide="bike"></i>
                     <span>Rider Management</span>
-                </div>
-                <div class="nav-item" data-tab="delivery">
-                    <i data-lucide="map" size="18"></i>
+                </a>
+                <a href="#" class="nav-link" data-tab="delivery">
+                    <i data-lucide="map"></i>
                     <span>Service Slabs</span>
-                </div>
-                <div class="nav-item" data-tab="reports">
-                    <i data-lucide="bar-chart-3" size="18"></i>
-                    <span>Ecosystem Reports</span>
-                </div>
+                </a>
+                <a href="#" class="nav-link" data-tab="inventory">
+                    <i data-lucide="package"></i>
+                    <span>Inventory Control</span>
+                </a>
+                <a href="#" class="nav-link" data-tab="promotions">
+                    <i data-lucide="ticket"></i>
+                    <span>Promotions Center</span>
+                </a>
+                <a href="#" class="nav-link" data-tab="users">
+                    <i data-lucide="users"></i>
+                    <span>User Registry</span>
+                </a>
 
                 <div class="nav-group-label">Growth & Engagement</div>
-                <div class="nav-item" data-tab="liveorders">
-                    <i data-lucide="clock" size="18"></i>
+                <a href="#" class="nav-link" data-tab="liveorders">
+                    <i data-lucide="clock"></i>
                     <span>Live Orders</span>
-                </div>
-                <div class="nav-item" data-tab="reviews">
-                    <i data-lucide="star" size="18"></i>
+                </a>
+                <a href="#" class="nav-link" data-tab="reviews">
+                    <i data-lucide="star"></i>
                     <span>Ratings & Reviews</span>
-                </div>
-                <div class="nav-item" data-tab="broadcast">
-                    <i data-lucide="bell-ring" size="18"></i>
+                </a>
+                <a href="#" class="nav-link" data-tab="broadcast">
+                    <i data-lucide="bell-ring"></i>
                     <span>Broadcast Center</span>
-                </div>
+                </a>
 
                 <div class="nav-group-label">System Core</div>
-                <div class="nav-item" data-tab="audit">
-                    <i data-lucide="terminal" size="18"></i>
+                <a href="#" class="nav-link" data-tab="audit">
+                    <i data-lucide="terminal"></i>
                     <span>Security Audit</span>
-                </div>
-                <div class="nav-item" data-tab="settings">
-                    <i data-lucide="cpu" size="18"></i>
+                </a>
+                <a href="#" class="nav-link" data-tab="reports">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Ecosystem Reports</span>
+                </a>
+                <a href="#" class="nav-link" data-tab="settings">
+                    <i data-lucide="cpu"></i>
                     <span>Infrastructure</span>
-                </div>
+                </a>
             </nav>
 
             <div class="pro-profile">
@@ -144,7 +128,7 @@
                     <p class="font-bold text-sm">Root Admin</p>
                     <p class="text-xs text-slate">Master Session</p>
                 </div>
-                <i data-lucide="log-out" size="16" class="cursor-pointer text-slate" onclick="localStorage.clear(); location.reload();"></i>
+                <i data-lucide="log-out" size="16" class="cursor-pointer text-slate" onclick="auth.signOut().catch(()=>{}); location.reload();"></i>
             </div>
         </aside>
 
@@ -1477,6 +1461,7 @@
                 </div>
             </form>
         </div>
+    </div>
     <!-- Edit Commission Modal -->
     <div id="modalCommission" class="auth-overlay hidden bg-overlay backdrop-blur">
         <div class="pro-card w-full max-w-450">

@@ -149,7 +149,7 @@ async function atomicAdminAction(updates, action, details = {}) {
 }
 
 // --- UI Navigation ---
-const tabs = document.querySelectorAll('.nav-item');
+const tabs = document.querySelectorAll('.nav-link');
 const panes = document.querySelectorAll('.tab-pane');
 const surface = document.getElementById('mainSurface');
 const tabSubtitle = document.getElementById('tabSubtitle');
@@ -625,8 +625,45 @@ window.updateOutlet = async function() {
     try {
         const updates = {};
         
-        // 1. Prepare Outlet Updates
         updates[`businesses/${editingBizId}/outlets/${editingOutletId}/name`] = name;
+        updates[`businesses/${editingBizId}/outlets/${editingOutletId}/meta`] = {
+            name: name,
+            slug: slug,
+            address: address,
+            lat: lat,
+            lng: lng,
+            adminPhone: phone,
+            updatedAt: new Date().toISOString()
+        };
+        updates[`businesses/${editingBizId}/outlets/${editingOutletId}/settings/Store`] = {
+            storeName: name,
+            address: address,
+            lat: lat,
+            lng: lng,
+            updatedAt: new Date().toISOString()
+        };
+
+        if (newPass && newPass.length >= 6) {
+            console.log("[SuperAdmin] Password change requested. This requires Cloud Function execution.");
+        }
+
+        updates[`slugs/outlets/${slug}`] = {
+            businessId: editingBizId,
+            outletId: editingOutletId
+        };
+
+        await atomicAdminAction(updates, 'ECOSYSTEM_NODE_UPDATE', {
+            businessId: editingBizId,
+            outletId: editingOutletId,
+            fields: ['name', 'slug', 'address', 'location', 'phone']
+        });
+
+        alert("✅ Node updates deployed atomically to ecosystem.");
+        hideOutletModal();
+    } catch (err) {
+        alert("❌ Update failed: " + err.message);
+    }
+};
 
 // --- Commission Management ---
 window.showCommissionModal = function(bid, perc, fixed) {
@@ -667,49 +704,6 @@ window.saveCommission = async function() {
     } catch (err) {
         console.error(err);
         showToast("❌ Update failed: " + err.message, "error");
-    }
-};
-
-window.updateOutlet = async function() {
-        updates[`businesses/${editingBizId}/outlets/${editingOutletId}/meta`] = {
-            name: name,
-            slug: slug,
-            address: address,
-            lat: lat,
-            lng: lng,
-            adminPhone: phone,
-            updatedAt: new Date().toISOString()
-        };
-        updates[`businesses/${editingBizId}/outlets/${editingOutletId}/settings/Store`] = {
-            storeName: name,
-            address: address,
-            lat: lat,
-            lng: lng,
-            updatedAt: new Date().toISOString()
-        };
-
-        // 2. Handle Password Update (Metadata only for now, as Auth requires server-side)
-        if (newPass && newPass.length >= 6) {
-            console.log("[SuperAdmin] Password change requested. This requires Cloud Function execution.");
-        }
-
-        // 3. Sync Slug
-        updates[`slugs/outlets/${slug}`] = {
-            businessId: editingBizId,
-            outletId: editingOutletId
-        };
-
-        // 4. Execute Atomic Update + Audit
-        await atomicAdminAction(updates, 'ECOSYSTEM_NODE_UPDATE', {
-            businessId: editingBizId,
-            outletId: editingOutletId,
-            fields: ['name', 'slug', 'address', 'location', 'phone']
-        });
-
-        alert("✅ Node updates deployed atomically to ecosystem.");
-        hideOutletModal();
-    } catch (err) {
-        alert("❌ Update failed: " + err.message);
     }
 };
 
@@ -2761,7 +2755,7 @@ window.approvePartner = async function(uid) {
             owner: req.ownerName,
             address: req.address,
             status: 'ACTIVE',
-            createdAt: ServerValue.TIMESTAMP
+            createdAt: firebase.database.ServerValue.TIMESTAMP
         };
 
         // Outlet Node
@@ -2800,7 +2794,7 @@ window.approvePartner = async function(uid) {
             businessId: bid,
             name: req.ownerName,
             status: 'ACTIVE',
-            createdAt: ServerValue.TIMESTAMP
+            createdAt: firebase.database.ServerValue.TIMESTAMP
         };
 
         // Finalize Onboarding Request
@@ -2808,7 +2802,7 @@ window.approvePartner = async function(uid) {
         updates[`onboarding_history/${uid}`] = {
             ...req,
             status: 'APPROVED',
-            processedAt: ServerValue.TIMESTAMP,
+            processedAt: firebase.database.ServerValue.TIMESTAMP,
             bid: bid,
             oid: oid
         };

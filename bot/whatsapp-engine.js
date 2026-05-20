@@ -5,7 +5,7 @@
  * Implements the interactive ordering flow with Global Discovery.
  */
 
-const { getData, saveUserProfile, getUserProfile, setData, updateData, pushData, getGlobalData, BUSINESS_ID, OUTLET_ID } = require('./firebase');
+const { getData, saveUserProfile, getUserProfile, setData, updateData, pushData, getGlobalData, BUSINESS_ID, OUTLET_ID, db } = require('./firebase');
 const { formatJid, isShopOpen, calculateDistance, calculateDeliveryFee, generateOTP } = require('../shared/utils');
 const { logBotAudit } = require('./audit');
 
@@ -620,8 +620,9 @@ async function handleFinalCheckout(sock, jid, user, text) {
       outletId: oid
     };
 
-    // Save order
-    await setData(`orders/${orderId}`, finalOrder, oid);
+    // Save order to the correct business/outlet path
+    const orderPath = `businesses/${bid}/outlets/${oid}/orders/${orderId}`;
+    await db.ref(orderPath).set(finalOrder);
     
     // Update user profile
     await saveUserProfile(jid, {
@@ -631,7 +632,16 @@ async function handleFinalCheckout(sock, jid, user, text) {
       location: user.location
     }, oid);
 
-    await sock.sendMessage(jid, { text: success });
+    let successMsg = `✅ *ORDER PLACED SUCCESSFULLY!* 🎉\n━━━━━━━━━━━━━━━━━━━━\n`;
+    successMsg += `🆔 *Order ID:* ${orderId}\n`;
+    successMsg += `👤 *Name:* ${user.name}\n`;
+    successMsg += `📍 *Address:* ${user.address}\n`;
+    successMsg += `💰 *Total:* ₹${total} (incl. ₹${user.deliveryFee || 0} delivery)\n`;
+    successMsg += `💳 *Payment:* Cash on Delivery\n`;
+    successMsg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    successMsg += `You'll receive updates as your order progresses. Thank you! 🙏`;
+
+    await sock.sendMessage(jid, { text: successMsg });
     
     // 🚀 AUDIT LOG
     await logBotAudit('BOT_ORDER_PLACED', {

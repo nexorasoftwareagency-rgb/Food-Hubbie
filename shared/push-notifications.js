@@ -66,7 +66,7 @@ async function notifyAdmins(admin, db, businessId, outletId, payload) {
         for (const uid in admins) {
             const adminUser = admins[uid];
             // Only notify if they belong to this outlet and have a token
-            if (adminUser.outlet === outletId && adminUser.fcmToken) {
+            if ((adminUser.outletId === outletId || adminUser.outlet === outletId) && adminUser.fcmToken) {
                 promises.push(sendPushNotification(admin, adminUser.fcmToken, payload));
             }
         }
