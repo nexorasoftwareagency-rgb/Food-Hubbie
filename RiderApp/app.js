@@ -32,12 +32,18 @@ let app, auth, db, dbStorage, messaging;
 try {
     app = initializeApp(firebaseConfig);
     
-    // Initialize App Check (Phase 2.16)
-    initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(reCaptchaSiteKey),
-        isTokenAutoRefreshEnabled: true
-    });
-    console.log("[App Check] Activated for Rider Portal");
+    // Initialize App Check with error handling
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    try {
+        initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(reCaptchaSiteKey),
+            isTokenAutoRefreshEnabled: true,
+            debug: isLocalhost
+        });
+        console.log("[App Check] Activated for Rider Portal");
+    } catch (appCheckErr) {
+        console.warn("[App Check] Initialization failed, continuing without App Check:", appCheckErr.message);
+    }
 
     auth = getAuth(app);
     db = getDatabase(app);
