@@ -463,12 +463,22 @@ window.login = async () => {
     const identifier = document.getElementById('email').value.trim();
     const pass = document.getElementById('password').value;
     const errEl = document.getElementById('loginError');
+    const btn = document.getElementById('loginBtn');
+    
     if (errEl) errEl.classList.add('hidden');
     if (!identifier || !pass) return;
 
     let loginEmail = /^\d{10}$/.test(identifier) ? `${identifier}@rider.com` : identifier;
 
     try {
+        if (btn) {
+            btn.disabled = true;
+            const textEl = btn.querySelector('.auth-submit__text');
+            const loaderEl = btn.querySelector('.auth-submit__loader');
+            if (textEl) textEl.classList.add('hidden');
+            if (loaderEl) loaderEl.classList.remove('hidden');
+        }
+        
         await signInWithEmailAndPassword(auth, loginEmail, pass);
         localStorage.setItem('isLoggedIn', 'true');
     } catch (e) {
@@ -481,9 +491,40 @@ window.login = async () => {
         } else if (e.code === 'auth/network-request-failed') {
             msg = "Network error. Check internet connection.";
         }
-        window.showToast(msg, "error");
+        
+        if (errEl) {
+            errEl.textContent = msg;
+            errEl.classList.remove('hidden');
+        } else {
+            window.showToast(msg, "error");
+        }
+        
+        if (btn) {
+            btn.disabled = false;
+            const textEl = btn.querySelector('.auth-submit__text');
+            const loaderEl = btn.querySelector('.auth-submit__loader');
+            if (textEl) textEl.classList.remove('hidden');
+            if (loaderEl) loaderEl.classList.add('hidden');
+        }
     }
 };
+
+// Password visibility toggle
+document.addEventListener('DOMContentLoaded', () => {
+    const togglePassBtn = document.querySelector('.auth-toggle-password');
+    const passInput = document.getElementById('password');
+    if (togglePassBtn && passInput) {
+        togglePassBtn.addEventListener('click', () => {
+            const isPassword = passInput.type === 'password';
+            passInput.type = isPassword ? 'text' : 'password';
+            const icon = togglePassBtn.querySelector('i');
+            if (icon) {
+                icon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+                if (window.lucide) window.lucide.createIcons({ root: togglePassBtn });
+            }
+        });
+    }
+});
 
 // PULL TO REFRESH (MOBILE)
 let touchStart = -1;
@@ -2156,7 +2197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnCloseSettlement')?.addEventListener('click', window.closeSettlementHistory);
 
     // Login & Sync Actions
-    document.getElementById('loginBtn')?.addEventListener('click', window.login);
+    // Login form is handled via onsubmit in HTML
     document.getElementById('btnRefreshApp')?.addEventListener('click', (e) => {
         console.log("[UI] Nuclear Refresh Triggered via Button");
         window.completeSiteRefresh();

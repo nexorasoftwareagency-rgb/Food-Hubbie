@@ -9,7 +9,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="msapplication-TileColor" content="#f36b21">
-    <title>Roshani Pizza | Rider Portal</title>
+    <title>Foodhubbie | Rider Delivery Portal</title>
 
     <script>
         // Seamless Loading Engine
@@ -91,31 +91,76 @@
 
     <!-- Unified Auth Section -->
     <div id="auth-section" class="auth-page hidden">
-        <div class="login-card">
-            <div class="login-logo-box">
-                <i data-lucide="zap"></i>
+        <div class="auth-bg-animation">
+            <div class="auth-bg-orb auth-bg-orb--1"></div>
+            <div class="auth-bg-orb auth-bg-orb--2"></div>
+            <div class="auth-bg-orb auth-bg-orb--3"></div>
+            <div class="auth-bg-grid"></div>
+        </div>
+
+        <div class="auth-wrapper">
+            <div class="auth-card">
+                <div class="auth-card__header">
+                    <div class="auth-brand">
+                        <div class="auth-brand__icon">
+                            <i data-lucide="bike"></i>
+                        </div>
+                        <div class="auth-brand__text">
+                            <h1>Foodhubbie</h1>
+                            <span>Rider Delivery Portal</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="loginForm" onsubmit="event.preventDefault(); window.login();">
+                    <div class="auth-field">
+                        <label for="email">
+                            <i data-lucide="phone"></i>
+                            Mobile Number or Email
+                        </label>
+                        <div class="auth-input-wrap">
+                            <input type="text" id="email" placeholder="Enter your mobile or email" autocomplete="username" required>
+                        </div>
+                    </div>
+
+                    <div class="auth-field">
+                        <label for="password">
+                            <i data-lucide="lock"></i>
+                            Access Password
+                        </label>
+                        <div class="auth-input-wrap auth-input-wrap--password">
+                            <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+                            <button type="button" class="auth-toggle-password" aria-label="Toggle password visibility">
+                                <i data-lucide="eye" class="auth-toggle-password__icon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="auth-submit" id="loginBtn">
+                        <span class="auth-submit__text">Sign In & Start Delivering</span>
+                        <span class="auth-submit__loader hidden">
+                            <svg class="auth-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                            </svg>
+                            Authenticating...
+                        </span>
+                    </button>
+
+                    <div id="loginError" class="auth-error hidden"></div>
+                </form>
+
+                <div class="auth-card__footer">
+                    <div class="auth-security-badge">
+                        <i data-lucide="shield-check"></i>
+                        <span>Secured with Firebase Auth</span>
+                    </div>
+                    <div class="auth-divider">
+                        <span>Need Help?</span>
+                    </div>
+                    <p class="auth-help-text">Contact your admin if you forgot your credentials or need account setup.</p>
+                </div>
             </div>
-            <h2>ROSHANI RIDER</h2>
-            <p>Secured Access Portal</p>
-            <form id="loginForm" onsubmit="event.preventDefault(); window.login();">
-                <div class="input-group">
-                    <label for="email">Mobile Number / Email</label>
-                    <div class="input-wrapper">
-                        <i data-lucide="phone"></i>
-                        <input type="text" id="email" placeholder="Enter mobile or email" autocomplete="username" required>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label for="password">Access Password</label>
-                    <div class="input-wrapper">
-                        <i data-lucide="lock"></i>
-                        <input type="password" id="password" placeholder="Enter secure password" autocomplete="current-password" required>
-                    </div>
-                </div>
-                <button type="submit" class="btn-primary full-width mt-10" id="loginBtn">AUTHENTICATE & START</button>
-            </form>
-            <p id="loginError" class="error-msg hidden"></p>
-            <p class="text-muted text-xtra-small mt-20">Contact Admin if you forgot your credentials</p>
         </div>
     </div>
 
@@ -128,7 +173,7 @@
                     <i data-lucide="menu"></i>
                 </div>
                 <div class="brand-group">
-                    <h2 class="app-logo">ROSHANI RIDER</h2>
+                    <h2 class="app-logo">FOODHUBBIE RIDER</h2>
                 </div>
                 <div class="header-actions">
                     <div id="btnRefreshApp" class="icon-btn mr-10" title="Refresh Application">
