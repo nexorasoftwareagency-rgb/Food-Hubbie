@@ -274,13 +274,15 @@ function initStats() {
                 });
             });
 
+            const outletIds = Object.keys(outlets);
             bizList.push({
                 id,
                 name: biz.name || id,
                 owner: biz.owner || 'N/A',
                 outlets: outletCount,
                 status: biz.status || 'Active',
-                commission: biz.commission || { percentage: 0, fixed: 0 }
+                commission: biz.commission || { percentage: 0, fixed: 0 },
+                firstOutlet: outletIds[0] || null
             });
         });
 
@@ -392,7 +394,7 @@ function renderBusinessList(list) {
                     <button class="btn-pro-icon" title="Edit Commission" onclick="showCommissionModal('${safeText(b.id)}', ${b.commission.percentage}, ${b.commission.fixed})">
                         <i data-lucide="percent" size="16" color="#F97316"></i>
                     </button>
-                    <button class="btn-pro-icon" title="Node Configuration" onclick="showOutletModal('${safeText(b.id)}', 'node_01')">
+                    <button class="btn-pro-icon" title="Node Configuration" onclick="showOutletModal('${safeText(b.id)}', '${b.firstOutlet || ''}')">
                         <i data-lucide="settings" size="16"></i>
                     </button>
                 </div>
@@ -584,6 +586,8 @@ let editingOutletId = null;
 window.showOutletModal = async function(bid, oid) {
     editingBizId = bid;
     editingOutletId = oid;
+    
+    if (!oid) return alert("No outlet nodes found for this business!");
     
     try {
         const snap = await db.ref(`businesses/${bid}/outlets/${oid}`).get();
