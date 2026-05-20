@@ -170,6 +170,11 @@
                     </button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-btn" data-section="ledger">
+                        <i data-lucide="wallet"></i> <span>Earnings Ledger</span>
+                    </button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-btn" data-section="profile">
                         <i data-lucide="user"></i> <span>My Profile</span>
                     </button>
@@ -242,6 +247,38 @@
                 </div>
 
                 <div id="dashboardActiveDeliveryView"></div>
+            </section>
+
+            <section id="sec-ledger" class="view-section">
+                <div class="earnings-hero">
+                    <div class="hero-label">TOTAL LEDGER BALANCE</div>
+                    <div class="hero-amount" id="l-total-balance">₹0</div>
+                    <div class="hero-stats">
+                        <div class="stat-mini">
+                            <span id="l-today-earning">₹0</span>
+                            <label>Today</label>
+                        </div>
+                        <div class="stat-mini">
+                            <span id="l-pending-settlement">₹0</span>
+                            <label>Unsettled Cash</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="premium-dashboard-card mt-15">
+                    <div class="flex-between flex-center mb-15">
+                        <h3 class="font-bold">Transaction History</h3>
+                        <div class="filter-pills">
+                            <span class="badge-info active">ALL</span>
+                        </div>
+                    </div>
+                    <div id="ledgerList" class="ledger-stack">
+                        <div class="text-center p-40 text-muted">
+                            <i data-lucide="database" style="width:40px; height:40px; opacity:0.2; margin-bottom:10px;"></i>
+                            <p>Loading ledger records...</p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section id="sec-available" class="view-section">
@@ -405,7 +442,7 @@
             <button class="nav-item" data-section="active">
                 <i data-lucide="map-pin"></i><span>LIVE</span>
             </button>
-            <button class="nav-item" data-section="earnings">
+            <button class="nav-item" data-section="ledger">
                 <i data-lucide="wallet"></i><span>WALLET</span>
             </button>
         </nav>

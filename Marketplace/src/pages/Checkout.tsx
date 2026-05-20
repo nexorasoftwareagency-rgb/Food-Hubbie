@@ -15,6 +15,8 @@ import { fetchOutletById } from "@/services/outletService";
 import type { Outlet } from "@/types";
 import { fetchSurgeConfig, fetchGlobalDiscount, validateCoupon, type SurgeConfig, type GlobalDiscount } from "@/services/promotionService";
 import { Tag, X, Loader2, Star } from "lucide-react";
+import { db, ref } from "@/lib/firebase";
+import { push } from "firebase/database";
 
 const paymentMethods: { id: PaymentMethod; name: string; icon: typeof ShieldCheck }[] = [
   { id: "upi", name: "UPI", icon: ShieldCheck },
@@ -109,8 +111,24 @@ export default function Checkout() {
     }
   };
 
+  const PHONE_REGEX = /^[6-9]\d{9}$/;
+
   const handlePlaceOrder = async () => {
     if (!user) return;
+
+    // 0. Validate form inputs
+    if (!form.name.trim()) {
+      alert("Please enter your full name.");
+      return;
+    }
+    if (!PHONE_REGEX.test(form.phone.replace(/\s/g, ""))) {
+      alert("Please enter a valid 10-digit Indian phone number.");
+      return;
+    }
+    if (!form.address.trim()) {
+      alert("Please enter your delivery address.");
+      return;
+    }
 
     // 1. Validate wallet balance if selected
     if (paymentMethod === "wallet") {
@@ -129,44 +147,72 @@ export default function Checkout() {
       // 2. Calculate Bonus (2% of net food value - excluding delivery and taxes)
       const bonusAmount = projectedBonus;
 
-      // 3. Place the order in database
-      const orderId = await placeOrder({
-        outletId: cartState.outletId ?? "",
-        items: cartState.items,
-        subtotal: summary.subtotal,
-        deliveryFee: summary.deliveryFee,
-        taxes: summary.taxes,
-        total: summary.total,
-        discount: summary.savings,
-        couponCode: cartState.appliedCoupon?.code,
-        couponDiscount,
-        globalDiscountAmount,
-        paymentMethod,
-        deliveryAddress: form,
-        platformFee: summary.platformFee,
-        cashbackBonus: bonusAmount,
-      });
+      // 3. Pre-generate order ID for wallet transaction traceability
+      const bid = "business_roshani";
+      const pregeneratedOrderId = push(ref(db, `businesses/${bid}/outlets/${cartState.outletId ?? ""}/orders`)).key || "";
 
-      // 4. Deduct from wallet if payment method is wallet
+      // 4. Debit wallet BEFORE writing order (prevents order-exists-but-unpaid states)
       if (paymentMethod === "wallet") {
         try {
           await walletService.debitWallet(
             user.id,
             summary.total,
-            `Paid for Order #${orderId.slice(-6).toUpperCase()}`,
-            orderId
+            `Paid for Order #${pregeneratedOrderId.slice(-6).toUpperCase()}`,
+            pregeneratedOrderId
           );
-        } catch (walletErr) {
-          console.error("Wallet debit failed after order placement:", walletErr);
-          const { updateOrderStatus } = await import("@/services/orderService");
-          await updateOrderStatus(orderId, "Cancelled", "Payment Failed");
-          alert("Wallet payment failed. Order cancelled.");
+        } catch (walletErr: any) {
+          console.error("Wallet debit failed:", walletErr);
+          if (walletErr?.message === "INSUFFICIENT_FUNDS") {
+            alert("Insufficient wallet balance. Please choose another payment method.");
+          } else {
+            alert("Wallet payment failed. Please try again.");
+          }
           setIsProcessing(false);
           return;
         }
       }
 
-      // 5. Credit Cashback Bonus (Loyalty Reward)
+      // 5. Place the order in database
+      let orderId: string;
+      try {
+        orderId = await placeOrder({
+          pregeneratedOrderId,
+          outletId: cartState.outletId ?? "",
+          items: cartState.items,
+          subtotal: summary.subtotal,
+          deliveryFee: summary.deliveryFee,
+          taxes: summary.taxes,
+          total: summary.total,
+          discount: summary.savings,
+          couponCode: cartState.appliedCoupon?.code,
+          couponDiscount,
+          globalDiscountAmount,
+          paymentMethod,
+          deliveryAddress: form,
+          platformFee: summary.platformFee,
+          cashbackBonus: bonusAmount,
+        });
+      } catch (orderErr) {
+        console.error("Order write failed after wallet debit, initiating refund:", orderErr);
+        // Rollback: refund wallet if we already debited
+        if (paymentMethod === "wallet") {
+          try {
+            await walletService.creditWallet(
+              user.id,
+              summary.total,
+              `Refund: Order placement failed (#${pregeneratedOrderId.slice(-6).toUpperCase()})`,
+              pregeneratedOrderId
+            );
+          } catch (refundErr) {
+            console.error("CRITICAL: Wallet refund also failed:", refundErr);
+          }
+        }
+        alert("Something went wrong while placing your order. Your wallet has been refunded.");
+        setIsProcessing(false);
+        return;
+      }
+
+      // 6. Credit Cashback Bonus (Loyalty Reward)
       if (bonusAmount > 0) {
         try {
           await walletService.creditWallet(
@@ -193,6 +239,15 @@ export default function Checkout() {
     }
   };
 
+  // Early returns for loading/unauthenticated states BEFORE accessing user properties
+  if (authState === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (cartState.items.length === 0 && !isProcessing) {
     return (
       <div className="container mx-auto p-8 text-center">
@@ -204,7 +259,7 @@ export default function Checkout() {
     );
   }
 
-  if (authState === "unauthenticated") {
+  if (authState === "unauthenticated" || !user) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6">
@@ -251,32 +306,32 @@ export default function Checkout() {
               </div>
 
               <div className="p-6">
-                {/* Saved addresses quick-pick */}
-                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-                      {(user.savedAddresses || []).map((addr) => (
-                        <button
-                          key={addr.id}
-                          onClick={() =>
-                            setForm((prev) => ({
-                              ...prev,
-                              address: addr.address,
-                              landmark: addr.landmark ?? "",
-                            }))
-                          }
-                          className={`flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
-                            form.address === addr.address
-                              ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
-                              : "border-border bg-muted/50 hover:bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <MapPin className="h-3 w-3" />
-                          {addr.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                {user.savedAddresses && user.savedAddresses.length > 0 && (
+                  <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                    {user.savedAddresses.map((addr) => (
+                      <button
+                        key={addr.id}
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            address: addr.address,
+                            landmark: addr.landmark ?? "",
+                          }))
+                        }
+                        className={`flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
+                          form.address === addr.address
+                            ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                            : "border-border bg-muted/50 hover:bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <MapPin className="h-3 w-3" />
+                        {addr.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-                  <div className="space-y-4">
+                <div className="space-y-4">
                     {(
                       [
                         { key: "name", label: "Full Name", type: "text", placeholder: "e.g. John Doe" },

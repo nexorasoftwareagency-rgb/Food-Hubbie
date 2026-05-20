@@ -23,44 +23,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>("loading");
 
   useEffect(() => {
-    let isRedirecting = true;
-    let lastUser: User | null = null;
-    let hasStateChanged = false;
+    let active = true;
+    let unsubscribe: (() => void) | null = null;
 
     const initAuth = async () => {
       try {
         const redirectUser = await handleRedirectResult();
-        if (redirectUser) {
+        if (active && redirectUser) {
           setUser(redirectUser);
           setAuthState("authenticated");
+          requestNotificationPermission(redirectUser.id);
         }
       } catch (err) {
         console.error("Redirect processing failed:", err);
-      } finally {
-        isRedirecting = false;
-        if (!lastUser && hasStateChanged && !user) {
-          setAuthState("unauthenticated");
-        }
+      }
+
+      if (active) {
+        unsubscribe = subscribeToAuthChanges((u) => {
+          if (!active) return;
+          if (u) {
+            setUser(u);
+            setAuthState("authenticated");
+            requestNotificationPermission(u.id);
+          } else {
+            setUser(null);
+            setAuthState("unauthenticated");
+          }
+        });
       }
     };
 
     initAuth();
 
-    const unsubscribe = subscribeToAuthChanges((u) => {
-      lastUser = u;
-      hasStateChanged = true;
-      if (u) {
-        setUser(u);
-        setAuthState("authenticated");
-        // Request notification permission
-        requestNotificationPermission(u.id);
-      } else if (!isRedirecting) {
-        setUser(null);
-        setAuthState("unauthenticated");
-      }
-    });
-    
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Sync profile data from Realtime Database

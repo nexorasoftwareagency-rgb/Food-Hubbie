@@ -117,8 +117,10 @@ export type OrderStatus =
   | "Placed"
   | "Confirmed"
   | "Preparing"
-  | "Packed"
+  | "Cooked"
+  | "Ready"
   | "Out for Delivery"
+  | "Reached Drop Location"
   | "Delivered"
   | "Cancelled";
 
@@ -207,7 +209,7 @@ export type User = {
   avatar?: string;
   loyaltyPoints: number;
   walletBalance: number;
-  recentTransactions: WalletTransaction[]; // Lightweight alternative
+  walletHistory: WalletTransaction[];
   savedAddresses: UserAddress[];
   createdAt: string;
 };

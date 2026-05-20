@@ -162,7 +162,25 @@ export async function generateCustomReport() {
             }
         });
 
-        console.log(`[Report] Processed ${salesData.length} orders matching range.`);
+        // --- ADVANCED BI ANALYTICS ---
+        const customerRepeatMap = {};
+        let repeatCustomers = 0;
+        const categoryStats = {};
+
+        salesData.forEach(o => {
+            // Track Repeat Customers
+            if (o.phone) {
+                customerRepeatMap[o.phone] = (customerRepeatMap[o.phone] || 0) + 1;
+                if (customerRepeatMap[o.phone] === 2) repeatCustomers++;
+            }
+
+            // Track Category Contribution
+            const items = o.cart || o.items || [];
+            items.forEach(i => {
+                const cat = i.category || 'General';
+                categoryStats[cat] = (categoryStats[cat] || 0) + (parseFloat(i.price || 0) * (i.qty || 1));
+            });
+        });
 
         // Update KPI Cards & Period
         const fromDate = from ? formatDate(new Date(from + 'T00:00:00')) : "Start";
@@ -170,49 +188,81 @@ export async function generateCustomReport() {
         const periodEl = document.getElementById("reportPeriod");
         if (periodEl) periodEl.innerText = `${fromDate} to ${toDate}`;
 
+        // Update Advanced BI Stats
         const revEl = document.getElementById("reportRevenue");
         const ordEl = document.getElementById("reportOrders");
         const avgEl = document.getElementById("reportAvg");
-
+        
         if (revEl) revEl.innerText = "₹" + totalRev.toLocaleString();
         if (ordEl) ordEl.innerText = totalOrd;
         if (avgEl) avgEl.innerText = "₹" + (totalOrd > 0 ? Math.round(totalRev / totalOrd) : 0);
 
+        // Inject New BI Indicators if elements exist
+        const repeatEl = document.getElementById("reportRepeatRate");
+        if (repeatEl) {
+            const rate = totalOrd > 0 ? ((repeatCustomers / Object.keys(customerRepeatMap).length) * 100).toFixed(1) : 0;
+            repeatEl.innerText = `${rate}%`;
+        }
+
         // Sort by date descending
         salesData.sort((a, b) => b.createdAt - a.createdAt);
 
-        // Render Table
-        tableBody.innerHTML = salesData.map(o => `
-            <tr class="premium-row-v4">
-                <td data-label="Date">
-                    <div class="identity-info-v4">
-                        <span class="name">${formatDate(o.createdAt)}</span>
-                        <span class="sub">#${escapeHtml(o.orderId || o.id.slice(-5))}</span>
-                    </div>
-                </td>
-                <td data-label="Customer">
-                    <div class="identity-info-v4">
-                        <span class="name">${escapeHtml(o.customerName || 'Guest')}</span>
-                        <span class="sub">${escapeHtml(o.phone || '')}</span>
-                    </div>
-                </td>
-                <td data-label="Total">
-                    <span class="font-bold text-orange">₹${o.total || 0}</span>
-                </td>
-                <td data-label="Method">
-                    <span class="badge-payment">${escapeHtml(o.paymentMethod || 'COD')}</span>
-                </td>
-                 <td data-label="Items">
-                      ${(() => {
-                          const rawItems = o.cart || o.items || [];
-                          const itemsList = Array.isArray(rawItems) ? rawItems : Object.values(rawItems);
-                          const finalItems = itemsList.length ? itemsList : (o.item ? [{name: o.item, qty: 1}] : []);
-                          const displayStr = finalItems.length ? finalItems.map(i => `${escapeHtml(i.name || i.item || 'Item')} x${i.qty || i.quantity || 1}`).join(', ') : 'No items';
-                          return `<div class="text-muted-small text-truncate" style="max-width:250px;" title="${displayStr}">${displayStr}</div>`;
-                      })()}
-                 </td>
-            </tr>
-        `).join('') || "<tr><td colspan='5' class='report-cell text-center py-30 text-muted'>No orders found for this range</td></tr>";
+        // --- NON-BLOCKING CHUNKED RENDERING (Strong Backend Pattern) ---
+        tableBody.innerHTML = "";
+        const CHUNK_SIZE = 20;
+        let index = 0;
+
+        const renderChunk = () => {
+            const end = Math.min(index + CHUNK_SIZE, salesData.length);
+            const chunk = salesData.slice(index, end);
+            
+            const html = chunk.map(o => `
+                <tr class="premium-row-v4">
+                    <td data-label="Date">
+                        <div class="identity-info-v4">
+                            <span class="name">${formatDate(o.createdAt)}</span>
+                            <span class="sub">#${escapeHtml(o.orderId || o.id.slice(-5))}</span>
+                        </div>
+                    </td>
+                    <td data-label="Customer">
+                        <div class="identity-info-v4">
+                            <span class="name">${escapeHtml(o.customerName || 'Guest')}</span>
+                            <span class="sub">${escapeHtml(o.phone || '')}</span>
+                        </div>
+                    </td>
+                    <td data-label="Total">
+                        <span class="font-bold text-orange">₹${o.total || 0}</span>
+                    </td>
+                    <td data-label="Method">
+                        <span class="badge-payment">${escapeHtml(o.paymentMethod || 'COD')}</span>
+                    </td>
+                     <td data-label="Items">
+                          ${(() => {
+                              const rawItems = o.cart || o.items || [];
+                              const itemsList = Array.isArray(rawItems) ? rawItems : Object.values(rawItems);
+                              const finalItems = itemsList.length ? itemsList : (o.item ? [{name: o.item, qty: 1}] : []);
+                              const displayStr = finalItems.length ? finalItems.map(i => `${escapeHtml(i.name || i.item || 'Item')} x${i.qty || i.quantity || 1}`).join(', ') : 'No items';
+                              return `<div class="text-muted-small text-truncate" style="max-width:250px;" title="${displayStr}">${displayStr}</div>`;
+                          })()}
+                     </td>
+                </tr>
+            `).join('');
+
+            tableBody.insertAdjacentHTML('beforeend', html);
+            index = end;
+
+            if (index < salesData.length) {
+                requestAnimationFrame(renderChunk);
+            } else {
+                if (window.lucide) window.lucide.createIcons({ root: tableBody });
+            }
+        };
+
+        if (salesData.length > 0) {
+            renderChunk();
+        } else {
+            tableBody.innerHTML = "<tr><td colspan='5' class='report-cell text-center py-30 text-muted'>No orders found for this range</td></tr>";
+        }
 
         // Render visual chart
         renderRevenueChart(salesData);

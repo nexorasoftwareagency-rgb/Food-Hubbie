@@ -1,12 +1,14 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from "react";
 import type { Order, OrderStatus } from "@/types";
 import {
   loadOrders,
   persistOrders,
   nextStatus,
   submitOrder,
+  fetchOrdersFromFirebase,
   type PlaceOrderInput,
 } from "@/services/orderService";
+import { useAuth } from "./AuthContext";
 
 type OrderContextValue = {
   currentOrder: Order | null;
@@ -21,8 +23,28 @@ type OrderContextValue = {
 const OrderContext = createContext<OrderContextValue | null>(null);
 
 export function OrderProvider({ children }: { children: ReactNode }) {
+  const { user, authState } = useAuth();
   const [orders, setOrders] = useState<Order[]>(() => loadOrders());
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    if (authState === "authenticated" && user?.id) {
+      const loadUserOrders = async () => {
+        try {
+          const fbOrders = await fetchOrdersFromFirebase(user.id);
+          setOrders(fbOrders);
+          persistOrders(fbOrders);
+        } catch (err) {
+          console.error("[OrderContext] Failed to fetch orders from Firebase:", err);
+        }
+      };
+      loadUserOrders();
+    } else if (authState === "unauthenticated") {
+      setOrders([]);
+      persistOrders([]);
+      setCurrentOrder(null);
+    }
+  }, [authState, user?.id]);
 
   const placeOrder = useCallback(async (input: PlaceOrderInput): Promise<string> => {
     try {

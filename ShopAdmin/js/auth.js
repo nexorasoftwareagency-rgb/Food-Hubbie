@@ -111,29 +111,20 @@ export function initAuth() {
             adminData = adminSnap.val();
             console.log("[Auth] Admin Data Received:", adminData ? "OK" : "MISSING");
             
-            // --- Tiered Access Logic Injection ---
-            const email = user.email.toLowerCase();
-            const SUPREME_ADMIN = "nexorasoftware@gmail.com";
-            const SUPER_ADMIN = "roshanisudha@gmail.com";
-
-            if (email === SUPREME_ADMIN) {
-                console.log("[Auth] Supreme Admin Detected");
-                if (!adminData) adminData = { name: "Supreme Admin", email: SUPREME_ADMIN };
-                adminData.isSuper = true;
-                adminData.isSupreme = true;
-                adminData.role = "Supreme Admin";
-                // Supreme admin can access any outlet, default to pizza if none set
-                if (!adminData.outlet) adminData.outlet = "pizza"; 
-            } else if (email === SUPER_ADMIN) {
-                console.log("[Auth] Super Admin Detected");
-                if (!adminData) adminData = { name: "Super Admin", email: SUPER_ADMIN };
-                adminData.isSuper = true;
-                adminData.role = "Super Admin";
-                // Super admin can access pizza and cake
-            } else if (adminData) {
-                // Regular Admin: Enforce outlet isolation
-                adminData.isSuper = false;
-                adminData.isSupreme = false;
+            // --- Tiered Access via Firebase Custom Claims ONLY ---
+            try {
+                const token = await user.getIdTokenResult(true); // force-refresh
+                if (token.claims.superadmin === true) {
+                    if (!adminData) adminData = { name: "Super Admin", email: user.email };
+                    adminData.isSuper = true;
+                    adminData.role = adminData.role || "Super Admin";
+                    if (!adminData.outlet) adminData.outlet = "outlet_pizza";
+                } else if (adminData) {
+                    adminData.isSuper = false;
+                    adminData.isSupreme = false;
+                }
+            } catch (claimsErr) {
+                console.error("[Auth] Claims fetch failed:", claimsErr);
             }
 
             if (!adminData) {
@@ -212,6 +203,10 @@ export function initAuth() {
         window.currentOutlet = savedOutlet.toLowerCase();
         state.currentOutlet = window.currentOutlet;
 
+        // Set Business ID for SaaS Multi-tenancy
+        window.currentBusinessId = adminData.businessId || 'business_roshani';
+        sessionStorage.setItem('adminBusinessId', window.currentBusinessId);
+
         // Handle Multi-Outlet Logic (Supreme/Super Admin)
         if (adminData.isSuper || adminData.isSupreme) {
             const switcher = document.getElementById('outletSwitcher');
@@ -255,6 +250,11 @@ export function initAuth() {
             }
         }
 
+        // --- Role-based Sidebar Access Gating ---
+        const partnerMenu = document.getElementById('menu-partners');
+        if (partnerMenu) {
+            partnerMenu.classList.toggle('hidden', !(adminData.isSuper || adminData.isSupreme));
+        }
 
         // Show UI
         const authOverlay = document.getElementById("authOverlay");

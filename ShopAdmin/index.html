@@ -126,152 +126,14 @@
                     <button type="button" class="btn-pro-transparent" onclick="window.open('./partner-onboarding.html', '_blank')" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8;">
                         <i data-lucide="store" size="14"></i> Join as Partner
                     </button>
+                    <button type="button" class="btn-pro-transparent" onclick="window.open('./partner-onboarding.html#status', '_blank')" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; margin-left: 8px;">
+                        <i data-lucide="search" size="14"></i> Check Status
+                    </button>
                 </div>
             </form>
-        </div>
     </div>
 
-    <!-- ONBOARDING WIZARD (Ultra Premium v4) -->
-    <div id="onboardingOverlay" class="login-container-v4 hidden" style="z-index: 10001;">
-        <div class="login-card-v4" style="max-width: 600px; padding: 40px;">
-            <div class="onboarding-steps mb-30" style="display:flex; justify-content:space-between; position:relative;">
-                <div class="step-line" style="position:absolute; top:18px; left:0; right:0; height:2px; background:rgba(255,255,255,0.1); z-index:0;">
-                    <div id="stepProgress" style="width:0%; height:100%; background:var(--accent); transition: width 0.4s ease;"></div>
-                </div>
-                <div class="step-item active" id="step1-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); color:var(--accent); font-weight:900;">1</div>
-                <div class="step-item" id="step2-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">2</div>
-                <div class="step-item" id="step3-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">3</div>
-                <div class="step-item" id="step4-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">4</div>
-                <div class="step-item" id="step5-indicator" style="z-index:1; position:relative; background:var(--bg-card); padding:8px; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.1); color:#94a3b8; font-weight:900;">5</div>
-            </div>
-
-            <div id="onboardingContent">
-                <!-- ... existing steps ... -->
-                <!-- Step 1: Account Creation -->
-                <div id="onboardStep1" class="onboard-pane">
-                    <h2 class="mb-8">Partner Authentication</h2>
-                    <p class="text-muted mb-24">Create your primary administrative gateway account.</p>
-                    <div class="login-input-group-v4">
-                        <label><i data-lucide="mail"></i> Email Address</label>
-                        <input type="email" id="obEmail" class="login-input-v4" placeholder="owner@restaurant.com">
-                    </div>
-                    <div class="login-input-group-v4">
-                        <label><i data-lucide="lock"></i> Choose Password</label>
-                        <input type="password" id="obPass" class="login-input-v4" placeholder="••••••••">
-                    </div>
-                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
-                        <button class="btn-pro-transparent" type="button" onclick="hideOnboardingFlow()" style="flex:1">Back to Login</button>
-                        <button class="btn-login-v4" type="button" onclick="validateStep1()" style="flex:2">
-                            <span>Next: Business Profile</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Step 2: Business Profile -->
-                <div id="onboardStep2" class="onboard-pane hidden">
-                    <h2 class="mb-8">Business Node Details</h2>
-                    <p class="text-muted mb-24">Tell us about your restaurant entity.</p>
-                    <div class="grid grid-cols-2 gap-12" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <div class="login-input-group-v4">
-                            <label>Restaurant Name</label>
-                            <input type="text" id="obBizName" class="login-input-v4" placeholder="e.g. Tasty Bites">
-                        </div>
-                        <div class="login-input-group-v4">
-                            <label>Owner Name</label>
-                            <input type="text" id="obOwnerName" class="login-input-v4" placeholder="Full Name">
-                        </div>
-                    </div>
-                    <div class="login-input-group-v4">
-                        <label>Business Address</label>
-                        <textarea id="obAddress" class="login-input-v4" style="height:80px; padding:12px; margin-bottom:0;" placeholder="Complete street address..."></textarea>
-                    </div>
-                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
-                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(1)" style="flex:1">Back</button>
-                        <button class="btn-login-v4" type="button" onclick="validateStep2()" style="flex:2">
-                            <span>Next: KYC Vault</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Step 3: KYC Vault -->
-                <div id="onboardStep3" class="onboard-pane hidden">
-                    <h2 class="mb-8">Ecosystem Compliance</h2>
-                    <p class="text-muted mb-24">Upload mandatory regulatory documents for verification.</p>
-                    <div class="kyc-upload-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                        <div class="kyc-card p-16 rounded-xl border-white-op-1 text-center" style="background:rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 12px;">
-                            <i data-lucide="file-text" class="mb-12 text-accent" style="display:block; margin: 0 auto 12px;"></i>
-                            <div class="text-sm font-bold">FSSAI License</div>
-                            <input type="file" id="obFssai" class="hidden" onchange="handleKYCUpload('fssai', this)">
-                            <button class="btn-pro-sm mt-8" type="button" onclick="document.getElementById('obFssai').click()">Upload File</button>
-                            <div id="fssaiStatus" class="text-xs text-muted mt-4">Pending</div>
-                        </div>
-                        <div class="kyc-card p-16 rounded-xl border-white-op-1 text-center" style="background:rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 12px;">
-                            <i data-lucide="landmark" class="mb-12 text-accent" style="display:block; margin: 0 auto 12px;"></i>
-                            <div class="text-sm font-bold">GST Certificate</div>
-                            <input type="file" id="obGst" class="hidden" onchange="handleKYCUpload('gst', this)">
-                            <button class="btn-pro-sm mt-8" type="button" onclick="document.getElementById('obGst').click()">Upload File</button>
-                            <div id="gstStatus" class="text-xs text-muted mt-4">Pending</div>
-                        </div>
-                    </div>
-                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
-                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(2)" style="flex:1">Back</button>
-                        <button class="btn-login-v4" type="button" onclick="validateStep3()" style="flex:2">
-                            <span>Next: Final Review</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Step 4: Menu Architecture -->
-                <div id="onboardStep4" class="onboard-pane hidden">
-                    <h2 class="mb-8">Menu Architecture</h2>
-                    <p class="text-muted mb-24">Define your core culinary offerings and starter categories.</p>
-                    <div class="login-input-group-v4">
-                        <label>Primary Cuisine</label>
-                        <select id="obCuisine" class="login-input-v4">
-                            <option value="multi">Multi-Cuisine</option>
-                            <option value="italian">Italian / Pizza</option>
-                            <option value="bakery">Bakery / Cakes</option>
-                            <option value="indian">North Indian</option>
-                            <option value="south_indian">South Indian</option>
-                            <option value="chinese">Chinese / Thai</option>
-                        </select>
-                    </div>
-                    <div class="login-input-group-v4">
-                        <label>Starter Categories (Comma separated)</label>
-                        <input type="text" id="obCategories" class="login-input-v4" placeholder="e.g. Starters, Main Course, Desserts">
-                    </div>
-                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
-                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(3)" style="flex:1">Back</button>
-                        <button class="btn-login-v4" type="button" onclick="validateStep4()" style="flex:2">
-                            <span>Next: Final Review</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Step 5: Final Review -->
-                <div id="onboardStep5" class="onboard-pane hidden">
-                    <h2 class="mb-8">Onboarding Confirmation</h2>
-                    <p class="text-muted mb-24">Review your details before submitting for infrastructure provisioning.</p>
-                    <div class="summary-card p-20 rounded-xl bg-black-op-4 font-mono text-xs mb-24" style="background:rgba(0,0,0,0.4); padding:20px; border-radius:12px;">
-                        <div class="mb-4" style="color:var(--accent)">> ENTITY: <span id="sumBizName">--</span></div>
-                        <div class="mb-4" style="color:var(--accent)">> OWNER: <span id="sumOwner">--</span></div>
-                        <div class="mb-4" style="color:var(--accent)">> EMAIL: <span id="sumEmail">--</span></div>
-                        <div class="mb-4" style="color:var(--accent)">> CUISINE: <span id="sumCuisine">--</span></div>
-                        <div class="mb-4" style="color:var(--accent)">> DOCUMENTS: <span id="sumKyc">PENDING</span></div>
-                        <div class="mt-12 text-muted animate-pulse">_ Awaiting kernel submission...</div>
-                    </div>
-                    <div class="flex gap-12 mt-30" style="display:flex; gap:12px; margin-top:30px;">
-                        <button class="btn-pro-transparent" type="button" onclick="moveOnboard(4)" style="flex:1">Back</button>
-                        <button class="btn-login-v4" type="button" id="submitOnboardBtn" onclick="finalizeOnboarding()" style="flex:2">
-                            <span>Initialize Registration 🚀</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- PENDING APPROVAL SCREEN -->
+    <!-- PENDING APPROVAL OVERLAY -->
     <div id="pendingOverlay" class="login-container-v4 hidden" style="z-index: 10002; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
         <div class="login-card-v4 text-center" style="max-width: 500px; padding: 50px;">
             <div class="animate-pulse mb-30" style="width: 80px; height: 80px; background: rgba(245,158,11,0.1); color: #F59E0B; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; border: 2px solid #F59E0B;">
@@ -298,7 +160,7 @@
                 </div>
             </div>
 
-            <button class="btn-pro-transparent" type="button" onclick="userLogout()">
+            <button class="btn-pro-transparent" type="button" onclick="auth.signOut()">
                 <i data-lucide="log-out" size="14"></i> Logout
             </button>
         </div>
@@ -382,6 +244,12 @@
                         <i data-lucide="bike"></i> <span>Rider Fleet</span>
                     </button>
                 </li>
+                <li class="nav-item" id="menu-partners">
+                    <button class="nav-link nav-btn" data-action="switchTab" data-tab="partners" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
+                        <i data-lucide="store"></i> <span>Partner Requests</span>
+                        <span id="partner-request-badge" class="badge-v4 danger hidden" style="margin-left:auto; background:var(--error); color:white; font-size:10px; padding:2px 6px; border-radius:10px;">0</span>
+                    </button>
+                </li>
                 <li class="nav-item" id="menu-liveTracker">
                     <button class="nav-link nav-btn" data-action="switchTab" data-tab="liveTracker" style="width:100%; text-align:left; background:none; border:none; padding:12px 16px; display:flex; align-items:center; gap:12px; color:inherit; cursor:pointer;">
                         <i data-lucide="map-pin"></i> <span>Live Map</span>
@@ -443,6 +311,12 @@
                     </div>
 
                     <div class="top-bar-actions flex-row flex-center flex-gap-12">
+                        <!-- Wallet Balance Pill -->
+                        <div class="wallet-pill-v4" data-action="switchTab" data-tab="settlements" style="cursor:pointer; display:flex; align-items:center; gap:8px; padding:6px 14px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.2); border-radius:12px; color:var(--success);">
+                            <i data-lucide="wallet" size="14"></i>
+                            <span id="walletBalance" class="font-700" style="font-size:13px;">₹0.00</span>
+                        </div>
+
                         <div class="notif-trigger-pro" data-action="switchTab" data-tab="notifications" style="position:relative; cursor:pointer;">
                             <i data-lucide="bell" style="color:var(--text-muted);"></i>
                             <span id="notifBadge" class="badge-danger pro-badge" style="position:absolute; top:-5px; right:-5px; font-size:8px; padding:2px 4px; display:none;">0</span>
@@ -732,6 +606,41 @@
                             </thead>
                             <tbody id="ridersTable"></tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- PARTNER REQUESTS TAB -->
+                <div id="tab-partners" class="tab-content hidden">
+                    <div class="pro-card">
+                        <div class="flex-between mb-24">
+                            <h3 class="font-heading">Partner Onboarding</h3>
+                            <div class="flex-row flex-gap-12">
+                                <input type="text" id="partnerSearch" class="form-input-v4" placeholder="Search applications..." style="width:240px;">
+                                <div class="badge-v4 info" id="partner-stat-pending">0 Pending</div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive-v4">
+                            <table class="pro-table">
+                                <thead>
+                                    <tr>
+                                        <th>Outlet Details</th>
+                                        <th>Contact Info</th>
+                                        <th>KYC Documents</th>
+                                        <th>Date Filed</th>
+                                        <th class="text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="partnersTable">
+                                    <tr>
+                                        <td colspan="5" class="text-center p-40 text-muted">
+                                            <div class="loading-spinner mb-14 m-auto"></div>
+                                            Searching for partnership requests...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -2104,9 +2013,30 @@
         </div>
     </div>
 
+    <!-- RIDER LEDGER MODAL -->
+    <div id="riderLedgerModal" class="modal">
+        <div class="modal-content glass-card max-w-600">
+            <div class="modal-header">
+                <div class="flex-row flex-center flex-gap-10">
+                    <div class="status-icon info p-8"><i data-lucide="file-text" class="icon-18"></i></div>
+                    <h3 id="riderLedgerTitle" class="modal-title">Rider Transaction Ledger</h3>
+                </div>
+                <button class="close-btn" data-action="closeModal">&times;</button>
+            </div>
+            <div class="modal-body p-20">
+                <p class="text-muted-small mb-16">Detailed record of earnings, cash collections, and settlements. All entries are immutable and synced in real-time.</p>
+                <div id="riderLedgerList" class="ledger-container scroll-y" style="max-height: 450px;">
+                    <!-- Ledger items injected here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-action="closeModal">Close Ledger</button>
+            </div>
+        </div>
+    </div>
+
     <script src="receipt-templates.js?v=4.7.3"></script>
     <script type="module" src="js/main.js?v=4.7.3"></script>
-    <script type="module" src="js/onboarding.js"></script>
 </body>
 
 </html>

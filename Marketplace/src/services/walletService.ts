@@ -1,4 +1,5 @@
 import { ref, update, push, get, runTransaction, serverTimestamp } from "firebase/database";
+import { db } from "@/lib/firebase";
 import { WalletTransaction } from "@/types";
 import { logMarketplaceAudit } from "./auditService";
 

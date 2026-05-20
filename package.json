@@ -4,10 +4,7 @@
   "description": "Foodhubbie — Multi-Tenant Restaurant SaaS Platform",
   "private": true,
   "workspaces": [
-    "ShopAdmin",
-    "RiderApp",
     "Marketplace",
-    "SuperAdmin",
     "bot",
     "shared",
     "config"

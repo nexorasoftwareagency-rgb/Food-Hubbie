@@ -119,7 +119,7 @@
     "logs": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
       "marketplaceAudit": {
-        ".write": true,
+        ".write": "auth != null",
         ".indexOn": ["userId", "timestamp"]
       },
       "botAudit": {
@@ -137,12 +137,12 @@
 
     "Pizza-Shop": {
       ".read": true,
-      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+      ".write": false
     },
 
     "Cake-Shop": {
       ".read": true,
-      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+      ".write": false
     },
 
     "platformConfig": {
@@ -156,7 +156,7 @@
     },
 
     "superAdmin": {
-      ".read": true,
+      ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
       ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
     }
   }

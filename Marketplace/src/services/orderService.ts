@@ -9,7 +9,7 @@ import { logMarketplaceAudit } from "./auditService";
 
 const STORAGE_KEY = "foodhubbie_orders";
 
-export const STATUS_PIPELINE = ["Placed", "Confirmed", "Preparing", "Packed", "Out for Delivery", "Delivered"];
+export const STATUS_PIPELINE = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Out for Delivery", "Reached Drop Location", "Delivered"];
 
 export function statusIndex(status: string): number {
   return STATUS_PIPELINE.indexOf(status);
@@ -75,12 +75,15 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
       percentage: commissionConfig.percentage,
       fixed: commissionConfig.fixed,
       calculatedAt: now
-    }
+    },
+    userId: auth.currentUser?.uid || "anonymous"
   };
 
   try {
     const path = `businesses/${bid}/outlets/${input.outletId}/orders`;
-    const newOrderRef = push(ref(db, path));
+    const newOrderRef = input.pregeneratedOrderId
+      ? ref(db, `${path}/${input.pregeneratedOrderId}`)
+      : push(ref(db, path));
     await set(newOrderRef, orderData);
 
     // Increment Coupon usage if applied (Atomic Transaction)
@@ -94,8 +97,8 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
         
         await logMarketplaceAudit('COUPON_REDEEM', {
           couponCode: input.couponCode.toUpperCase(),
-          orderId: orderId,
-          userId: input.userId
+          orderId: newOrderRef.key || "unknown",
+          userId: auth.currentUser?.uid || "anonymous"
         });
 
         console.log(`[OrderService] Coupon ${input.couponCode} incremented and audited.`);
@@ -106,7 +109,7 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
 
     const finalOrder: Order = {
       id: newOrderRef.key || "unknown",
-      userId: "user_me",
+      userId: auth.currentUser?.uid || "anonymous",
       outletId: input.outletId,
       outletName: input.outletName || "Restaurant",
       businessId: bid,
@@ -134,6 +137,9 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
 
     // 🚀 AUDIT LOG
     await logMarketplaceAudit('ORDER_PLACED', {
+      orderId: newOrderRef.key || "unknown",
+      userId: auth.currentUser?.uid || "anonymous",
+      total: input.total
     });
     
     // 🚀 INVENTORY SYNC: Atomic Stock Decrement
@@ -240,6 +246,7 @@ export function persistOrders(orders: Order[]): void {
 }
 
 export type PlaceOrderInput = {
+  pregeneratedOrderId?: string;
   businessId?: string;
   outletId: string;
   outletName?: string;
@@ -261,4 +268,81 @@ export type PlaceOrderInput = {
 export function nextStatus(current: string): string | null {
   const idx = STATUS_PIPELINE.indexOf(current);
   return idx !== -1 && idx < STATUS_PIPELINE.length - 1 ? STATUS_PIPELINE[idx + 1] : null;
+}
+
+/** Fetch orders from Firebase for a user */
+export async function fetchOrdersFromFirebase(userId: string): Promise<Order[]> {
+  try {
+    const businessesSnap = await get(ref(db, 'businesses'));
+    if (!businessesSnap.exists()) return [];
+    
+    const businesses = businessesSnap.val();
+    const userOrders: Order[] = [];
+    
+    for (const bid in businesses) {
+      const bData = businesses[bid];
+      if (bData.outlets) {
+        for (const oid in bData.outlets) {
+          const outletData = bData.outlets[oid];
+          if (outletData.orders) {
+            for (const orderId in outletData.orders) {
+              const o = outletData.orders[orderId];
+              if (o.userId === userId) {
+                const statusHistory = o.statusHistory
+                  ? Object.entries(o.statusHistory).map(([key, val]: [string, any]) => ({
+                      status: val.status,
+                      timestamp: val.timestamp
+                    })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                  : [{ status: o.status || "Placed", timestamp: o.createdAt }];
+
+                userOrders.push({
+                  id: orderId,
+                  userId: o.userId,
+                  outletId: oid,
+                  outletName: outletData.settings?.Store?.storeName || outletData.meta?.name || "Restaurant",
+                  businessId: bid,
+                  items: o.cart ? o.cart.map((c: any) => ({
+                    menuItemId: c.id,
+                    name: c.name,
+                    quantity: c.qty,
+                    price: c.price,
+                    image: c.image
+                  })) : [],
+                  subtotal: o.subtotal,
+                  deliveryFee: o.deliveryFee,
+                  taxes: o.taxes,
+                  total: o.total,
+                  status: o.status,
+                  statusHistory,
+                  paymentMethod: o.paymentMethod,
+                  deliveryAddress: {
+                    name: o.customerName,
+                    phone: o.phone,
+                    email: o.email,
+                    address: o.address,
+                    lat: o.lat,
+                    lng: o.lng
+                  },
+                  couponCode: o.couponCode,
+                  couponDiscount: o.couponDiscount,
+                  globalDiscount: o.globalDiscount,
+                  platformFee: o.platformFee,
+                  cashbackBonus: o.cashbackBonus,
+                  createdAt: o.createdAt,
+                  updatedAt: o.updatedAt,
+                  estimatedMinutes: 35
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    userOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return userOrders;
+  } catch (err) {
+    console.error("fetchOrdersFromFirebase error:", err);
+    return [];
+  }
 }

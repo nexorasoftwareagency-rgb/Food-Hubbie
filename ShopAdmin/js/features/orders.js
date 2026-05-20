@@ -83,24 +83,21 @@ let _liveOrdersValueCb = null;
  * Syncs orders across outlets and triggers alerts for new ones.
  */
 export function initRealtimeListeners() {
-    // Detach any previous listeners (using the current outlet as a safety, but we'll try both for good measure)
-    ['pizza', 'cake'].forEach(o => {
-        const r = db.ref(`${o}/orders`);
-        if (_ordersChildCb) r.off("child_added", _ordersChildCb);
-        if (_ordersChangedCb) r.off("child_changed", _ordersChangedCb);
-    });
-
-    if (_ordersValueCb && _ordersRef) {
-        _ordersRef.off("value", _ordersValueCb);
+    // Detach from the previously tracked SaaS reference only
+    if (_ordersRef) {
+        if (_ordersChildCb) _ordersRef.off("child_added", _ordersChildCb);
+        if (_ordersChangedCb) _ordersRef.off("child_changed", _ordersChangedCb);
+        if (_ordersValueCb) _ordersRef.off("value", _ordersValueCb);
         _ordersRef = null;
         _ordersValueCb = null;
     }
-
-    if (_liveOrdersValueCb && _liveOrdersRef) {
+    if (_liveOrdersRef && _liveOrdersValueCb) {
         _liveOrdersRef.off("value", _liveOrdersValueCb);
         _liveOrdersRef = null;
         _liveOrdersValueCb = null;
     }
+    _ordersChildCb = null;
+    _ordersChangedCb = null;
 
     let firstLoad = true;
     const loadTime = Date.now();

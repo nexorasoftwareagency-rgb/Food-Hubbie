@@ -18,4 +18,4 @@ window.firebaseConfig = {
   measurementId: "G-SQK852HT4W"
 };
 
-window.reCaptchaSiteKey = "YOUR_RECAPTCHA_SITE_KEY"; // TODO: Configure App Check for new project
+window.reCaptchaSiteKey = "REPLACE_WITH_YOUR_RECAPTCHA_V3_SITE_KEY";

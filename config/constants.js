@@ -63,8 +63,10 @@ const FOODHUBBIE = {
     "Placed",
     "Confirmed",
     "Preparing",
-    "Packed",
+    "Cooked",
+    "Ready",
     "Out for Delivery",
+    "Reached Drop Location",
     "Delivered",
     "Cancelled"
   ],

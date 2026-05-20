@@ -2562,10 +2562,10 @@ function updateReconKPIs(data) {
 window.settleTransaction = async function(bizId, outId, settleId, amount) {
     const confirm = await Swal.fire({
         title: 'Manual Payout Confirmation',
-        text: `Confirm that Γé╣${amount} has been manually transferred to the shop owner's account. This action is irreversible.`,
+        text: `Confirm that Γé╣${amount} has been manually transferred to the shop owner's account. This action will create a formal Ledger Entry and update the Partner Wallet.`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Mark as Settled',
+        confirmButtonText: 'Yes, Execute Settlement',
         background: '#1e293b',
         color: '#fff',
         confirmButtonColor: '#10B981'
@@ -2573,17 +2573,48 @@ window.settleTransaction = async function(bizId, outId, settleId, amount) {
 
     if (confirm.isConfirmed) {
         try {
+            const txId = `TX_${Date.now()}_${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
             const path = `businesses/${bizId}/outlets/${outId}/settlements/${settleId}`;
-            await atomicAdminAction({
-                [`${path}/settledStatus`]: 'SETTLED',
-                [`${path}/settledAt`]: firebase.database.ServerValue.TIMESTAMP,
-                [`${path}/settledBy`]: auth.currentUser.email
-            }, 'PARTNER_SETTLEMENT_MANUAL', { bizId, outId, settleId, amount });
+            const walletRef = db.ref(`businesses/${bizId}/outlets/${outId}/wallet`);
+            
+            // 1. Fetch current balance for Ledger Integrity
+            const walletSnap = await walletRef.once('value');
+            const currentWallet = walletSnap.val() || { balance: 0, lastTx: null };
+            const prevBalance = currentWallet.balance || 0;
+            const newBalance = prevBalance - amount;
 
-            showToast("Settlement Successful", "success");
+            const updates = {};
+            // Update Settlement Status
+            updates[path + '/settledStatus'] = 'SETTLED';
+            updates[path + '/settledAt'] = firebase.database.ServerValue.TIMESTAMP;
+            updates[path + '/settledBy'] = auth.currentUser.email;
+            updates[path + '/transactionId'] = txId;
+
+            // Update Wallet Balance
+            updates[`businesses/${bizId}/outlets/${outId}/wallet/balance`] = newBalance;
+            updates[`businesses/${bizId}/outlets/${outId}/wallet/lastSettlementAt`] = firebase.database.ServerValue.TIMESTAMP;
+
+            // Create Ledger Entry
+            updates[`businesses/${bizId}/outlets/${outId}/ledger/${txId}`] = {
+                id: txId,
+                type: 'PAYOUT_SETTLEMENT',
+                amount: amount,
+                prevBalance: prevBalance,
+                newBalance: newBalance,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                refId: settleId,
+                method: 'MANUAL_TRANSFER',
+                operator: auth.currentUser.email
+            };
+
+            await atomicAdminAction(updates, 'PARTNER_FINANCIAL_SETTLEMENT', { 
+                bizId, outId, settleId, txId, amount, newBalance 
+            });
+
+            showToast("Settlement Processed & Ledgered", "success");
             loadReconciliations();
         } catch (err) {
-            showToast("Settlement Failed: " + err.message, "error");
+            showToast("Financial Error: " + err.message, "error");
         }
     }
 };

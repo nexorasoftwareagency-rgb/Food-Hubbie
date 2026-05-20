@@ -22,7 +22,7 @@ export const FOODHUBBIE_FIREBASE_CONFIG = {
 export const FIREBASE_DATABASE_URL = "https://food-hubbie-default-rtdb.firebaseio.com";
 
 // App Check (reCAPTCHA v3 for browser clients)
-export const RECAPTCHA_SITE_KEY = "YOUR_RECAPTCHA_SITE_KEY";
+export const RECAPTCHA_SITE_KEY = "REPLACE_WITH_YOUR_RECAPTCHA_V3_SITE_KEY";
 
 // Standard ESM Default Export
 export default {

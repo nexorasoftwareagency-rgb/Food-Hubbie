@@ -4,8 +4,10 @@ import {
   CheckCircle2,
   Clock,
   ChefHat,
+  Flame,
   PackageCheck,
   Bike,
+  MapPinCheck,
   Home,
   Phone,
   ArrowLeft,
@@ -21,8 +23,10 @@ const stageIcons: Record<OrderStatus, typeof CheckCircle2> = {
   Placed: CheckCircle2,
   Confirmed: Clock,
   Preparing: ChefHat,
-  Packed: PackageCheck,
+  Cooked: Flame,
+  Ready: PackageCheck,
   "Out for Delivery": Bike,
+  "Reached Drop Location": MapPinCheck,
   Delivered: Home,
   Cancelled: CheckCircle2,
 };
@@ -31,8 +35,10 @@ const stageMessages: Partial<Record<OrderStatus, string>> = {
   Placed: "Your order has been received.",
   Confirmed: "The restaurant confirmed your order.",
   Preparing: "The chef is working their magic.",
-  Packed: "Your order is packed and ready.",
+  Cooked: "Your food is freshly cooked!",
+  Ready: "Your order is packed and ready for pickup.",
   "Out for Delivery": "Your rider is on the way!",
+  "Reached Drop Location": "Rider has arrived at your location!",
   Delivered: "Enjoy your meal!",
 };
 
@@ -236,7 +242,7 @@ export default function Tracking() {
 
         {/* Rider card */}
         <AnimatePresence>
-          {currentIdx >= 4 && !isDelivered && order.riderName && (
+          {currentIdx >= 5 && !isDelivered && order.riderName && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

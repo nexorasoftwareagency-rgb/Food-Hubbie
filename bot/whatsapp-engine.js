@@ -9,8 +9,31 @@ const { getData, saveUserProfile, getUserProfile, setData, updateData, pushData,
 const { formatJid, isShopOpen, calculateDistance, calculateDeliveryFee, generateOTP } = require('../shared/utils');
 const { logBotAudit } = require('./audit');
 
-// Session Cache (In-memory layer for performance)
-const sessionCache = {};
+// Session Cache (In-memory layer for performance with TTL eviction to prevent memory leaks)
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const sessionCache = new Map();
+
+function getCachedSession(jid) {
+  const entry = sessionCache.get(jid);
+  if (!entry) return null;
+  if (Date.now() > entry.expiry) {
+    sessionCache.delete(jid);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedSession(jid, data) {
+  sessionCache.set(jid, { data, expiry: Date.now() + SESSION_TTL_MS });
+}
+
+// Periodic cleanup every 10 minutes to evict expired sessions
+setInterval(() => {
+  const now = Date.now();
+  for (const [jid, entry] of sessionCache) {
+    if (now > entry.expiry) sessionCache.delete(jid);
+  }
+}, 10 * 60 * 1000);
 
 /**
  * Persists user session to Firebase
@@ -22,7 +45,7 @@ async function persistSession(jid, session) {
     const safeJid = jid.replace(/\./g, ',');
     const path = `system/botSessions/${BUSINESS_ID}/${OUTLET_ID}/${safeJid}`;
     await setData(path, session);
-    sessionCache[jid] = session;
+    setCachedSession(jid, session);
   } catch (err) {
     console.error(`[Session] Failed to persist for ${jid}:`, err.message);
   }
@@ -32,14 +55,15 @@ async function persistSession(jid, session) {
  * Loads user session from Firebase or Cache
  */
 async function getSession(jid) {
-  if (sessionCache[jid]) return sessionCache[jid];
+  const cached = getCachedSession(jid);
+  if (cached) return cached;
   
   try {
     const safeJid = jid.replace(/\./g, ',');
     const path = `system/botSessions/${BUSINESS_ID}/${OUTLET_ID}/${safeJid}`;
     const session = await getData(path);
     if (session) {
-      sessionCache[jid] = session;
+      setCachedSession(jid, session);
       return session;
     }
   } catch (err) {
@@ -78,7 +102,7 @@ async function handleIncomingMessage(sock, m) {
       address: profile?.address || null,
       location: profile?.location || null
     };
-    sessionCache[senderJid] = user;
+    setCachedSession(senderJid, user);
   }
   
   user.lastActivity = Date.now();

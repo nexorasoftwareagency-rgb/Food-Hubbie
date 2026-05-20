@@ -9,68 +9,69 @@ import { showToast, getISTDateString } from '../utils.js';
 
 /**
  * Calculates and logs a settlement for a delivered order
+ * Refactored for Strong Backend Logic (Zomato/Swiggy Style)
  */
 export async function calculateAndLogSettlement(orderId, order) {
-    console.log(`[Settlement] Calculating for Order #${orderId}...`);
+    console.log(`[FinancialEngine] Processing Order #${orderId}...`);
     
     try {
-        // 1. Fetch current Revenue Settings
         const revSnap = await Outlet.ref("settings/Revenue").once("value");
-        const rev = revSnap.val() || {
-            commissionType: "PERCENTAGE",
-            commissionValue: 20,
-            riderFeeBase: 30,
-            riderKmIncentive: 5
-        };
+        const rev = revSnap.val() || { commissionType: "PERCENTAGE", commissionValue: 20 };
 
         const total = parseFloat(order.total || 0);
         const deliveryFee = parseFloat(order.deliveryFee || 0);
         const itemTotal = total - deliveryFee;
 
-        // 2. Calculate Platform Commission
-        let commission = 0;
-        if (rev.commissionType === "PERCENTAGE") {
-            commission = (itemTotal * (parseFloat(rev.commissionValue) / 100));
-        } else {
-            commission = parseFloat(rev.commissionValue);
-        }
+        let commission = (rev.commissionType === "PERCENTAGE") 
+            ? (itemTotal * (parseFloat(rev.commissionValue) / 100)) 
+            : parseFloat(rev.commissionValue);
 
-        // 3. Calculate Rider Payout
-        // In our system, Rider Payout = Delivery Fee + potentially some incentive
-        // But for transparency, we'll use the delivery fee collected as the base.
         const riderPayout = deliveryFee; 
+        const shopNet = Math.round((total - commission - riderPayout) * 100) / 100;
+        const txId = `XACT_${orderId}_${Date.now()}`;
 
-        // 4. Calculate Shop Net
-        const shopNet = total - commission - riderPayout;
-
-        // 5. Build Settlement Record
+        // 1. Prepare Settlement Object
         const settlement = {
             orderId,
-            customerName: order.customerName || "Walk-in Customer",
+            txId,
+            customerName: order.customerName || "Walk-in",
             orderTotal: total,
             itemTotal: itemTotal,
             deliveryFee: deliveryFee,
             platformCommission: Math.round(commission * 100) / 100,
             riderPayout: riderPayout,
-            shopNet: Math.round(shopNet * 100) / 100,
-            commissionRate: `${rev.commissionValue}${rev.commissionType === 'PERCENTAGE' ? '%' : '₹'}`,
+            shopNet: shopNet,
             settledStatus: "PENDING",
             timestamp: ServerValue.TIMESTAMP,
-            date: getISTDateString(new Date()) // YYYY-MM-DD
+            date: getISTDateString(new Date())
         };
 
-        // 6. Write to Ledger
+        // 2. ATOMIC WALLET UPDATE & LEDGER POSTING
+        const walletRef = Outlet.ref("wallet/balance");
         const updates = {};
-        updates[`settlements/${orderId}`] = settlement;
         
-        // Update daily summary (Atomic increment if possible, but for simplicity here we'll overwrite)
-        // Note: Real production would use transaction()
+        updates[`settlements/${orderId}`] = settlement;
+        updates[`ledger/${txId}`] = {
+            id: txId,
+            type: 'ORDER_CREDIT',
+            amount: shopNet,
+            refId: orderId,
+            timestamp: ServerValue.TIMESTAMP,
+            description: `Revenue from Order #${orderId.slice(-5)}`
+        };
+
+        // 3. Increment Balance Atomically
+        await walletRef.transaction((currentBalance) => {
+            return (currentBalance || 0) + shopNet;
+        });
+
+        // 4. Batch write other records
         await Outlet.ref().update(updates);
         
-        console.log(`[Settlement] Successfully logged Order #${orderId}`);
+        console.log(`[FinancialEngine] Ledger Entry Created: ${txId} | Net: ₹${shopNet}`);
         return true;
     } catch (err) {
-        console.error("[Settlement] Failed to process:", err);
+        console.error("[FinancialEngine] CRITICAL: Failed to credit wallet:", err);
         return false;
     }
 }

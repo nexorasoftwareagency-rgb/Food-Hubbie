@@ -13,7 +13,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Tailwind CSS (for layout efficiency as requested in complex UI) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- SweetAlert2 -->
@@ -42,7 +42,6 @@
             overflow-x: hidden;
         }
 
-        /* Sidebar Navigation */
         .sidebar {
             width: 320px;
             height: 100vh;
@@ -86,10 +85,6 @@
             color: var(--zomato-red);
         }
 
-        .step-item.completed {
-            color: #10b981;
-        }
-
         .step-icon {
             width: 32px;
             height: 32px;
@@ -106,12 +101,6 @@
             color: white;
         }
 
-        .step-item.completed .step-icon {
-            background: #dcfce7;
-            color: #10b981;
-        }
-
-        /* Main Content */
         .main-content {
             margin-left: 320px;
             padding: 60px 80px;
@@ -127,7 +116,6 @@
             padding: 48px;
         }
 
-        /* Excel-Style Grid Entry */
         .excel-grid {
             width: 100%;
             border-collapse: collapse;
@@ -153,20 +141,19 @@
             border: 1px solid var(--zomato-border);
         }
 
-        .excel-grid input {
+        .excel-grid input, .excel-grid select {
             width: 100%;
             padding: 14px 16px;
             border: none;
             outline: none;
             font-size: 14px;
-            transition: background 0.2s;
+            background: transparent;
         }
 
         .excel-grid input:focus {
             background: #fff1f2;
         }
 
-        /* Input Styling */
         .form-label {
             display: block;
             font-size: 13px;
@@ -190,7 +177,6 @@
             box-shadow: 0 0 0 4px rgba(239, 79, 95, 0.1);
         }
 
-        /* Buttons */
         .btn-zomato {
             background-color: var(--zomato-red);
             color: white;
@@ -203,6 +189,7 @@
             transition: transform 0.2s, background 0.2s;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 12px;
         }
 
@@ -221,7 +208,6 @@
             cursor: pointer;
         }
 
-        /* Animations */
         .fade-in {
             animation: fadeIn 0.4s ease-out;
         }
@@ -233,7 +219,6 @@
 
         .hidden { display: none; }
 
-        /* KYC Card */
         .kyc-upload-box {
             border: 2px dashed var(--zomato-border);
             border-radius: 16px;
@@ -249,7 +234,6 @@
             background: #fff1f2;
         }
 
-        /* Floating Contact */
         .help-center {
             position: fixed;
             bottom: 40px;
@@ -297,6 +281,10 @@
                 <div class="step-icon"><i data-lucide="send" size="18"></i></div>
                 <span>Review & Submit</span>
             </div>
+            <div class="step-item border-t border-slate-100 mt-10 pt-10" onclick="showStatusPane()" id="step-status-nav">
+                <div class="step-icon"><i data-lucide="search" size="18"></i></div>
+                <span>Check Application</span>
+            </div>
         </div>
 
         <div class="mt-auto pt-40 border-t border-slate-100">
@@ -326,6 +314,28 @@
                     <div>
                         <label class="form-label">Registered Owner Name</label>
                         <input type="text" class="form-input" id="ownerName" placeholder="Full legal name">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-24 mb-24">
+                    <div>
+                        <label class="form-label">Restaurant Category</label>
+                        <select class="form-input" id="restCategory">
+                            <option value="premium">Premium Dining</option>
+                            <option value="standard">Standard Restaurant</option>
+                            <option value="bakery">Bakery / Cafe</option>
+                            <option value="cloud">Cloud Kitchen</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Primary Cuisine</label>
+                        <select class="form-input" id="restCuisine">
+                            <option value="multi">Multi-Cuisine</option>
+                            <option value="pizza">Pizza & Italian</option>
+                            <option value="cake">Cakes & Desserts</option>
+                            <option value="north_indian">North Indian</option>
+                            <option value="chinese">Chinese</option>
+                        </select>
                     </div>
                 </div>
 
@@ -361,7 +371,7 @@
                     <textarea class="form-input h-100" id="address" placeholder="Street, Locality, City, Landmark..."></textarea>
                 </div>
 
-                <div class="grid grid-cols-2 gap-24 mb-40">
+                <div class="grid grid-cols-2 gap-24 mb-24">
                     <div>
                         <label class="form-label">Pincode</label>
                         <input type="text" class="form-input" id="pincode" placeholder="400001">
@@ -374,6 +384,23 @@
                             <option value="10">10 km (Extended)</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-24 mb-40">
+                    <div>
+                        <label class="form-label">Latitude</label>
+                        <input type="text" class="form-input" id="lat" placeholder="e.g. 19.0760">
+                    </div>
+                    <div>
+                        <label class="form-label">Longitude</label>
+                        <input type="text" class="form-input" id="lng" placeholder="e.g. 72.8777">
+                    </div>
+                </div>
+                
+                <div class="mb-40">
+                    <button class="btn-outline w-full flex justify-center gap-10" onclick="getCurrentLocation()">
+                        <i data-lucide="map-pin"></i> Auto-detect Current Location
+                    </button>
                 </div>
 
                 <div class="flex justify-between">
@@ -424,11 +451,11 @@
             </div>
         </div>
 
-        <!-- STEP 4: OPERATIONS (EXCEL STYLE) -->
+        <!-- STEP 4: OPERATIONS -->
         <div class="content-pane fade-in hidden" id="pane4">
             <div class="content-card">
                 <h2 class="text-3xl font-black mb-8">Operating Hours</h2>
-                <p class="text-slate-500 mb-24">Enter your daily opening and closing times (Excel Entry Mode).</p>
+                <p class="text-slate-500 mb-24">Enter your daily opening and closing times.</p>
                 
                 <table class="excel-grid mb-40">
                     <thead>
@@ -439,19 +466,13 @@
                             <th>Status</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr><td class="font-bold bg-slate-50 px-16 text-sm">MONDAY</td><td><input type="time" value="09:00"></td><td><input type="time" value="23:00"></td><td><input type="text" value="OPEN" class="text-green-500 font-bold"></td></tr>
-                        <tr><td class="font-bold bg-slate-50 px-16 text-sm">TUESDAY</td><td><input type="time" value="09:00"></td><td><input type="time" value="23:00"></td><td><input type="text" value="OPEN" class="text-green-500 font-bold"></td></tr>
-                        <tr><td class="font-bold bg-slate-50 px-16 text-sm">WEDNESDAY</td><td><input type="time" value="09:00"></td><td><input type="time" value="23:00"></td><td><input type="text" value="OPEN" class="text-green-500 font-bold"></td></tr>
-                        <tr><td class="font-bold bg-slate-50 px-16 text-sm">THURSDAY</td><td><input type="time" value="09:00"></td><td><input type="time" value="23:00"></td><td><input type="text" value="OPEN" class="text-green-500 font-bold"></td></tr>
-                        <tr><td class="font-bold bg-slate-50 px-16 text-sm">FRIDAY</td><td><input type="time" value="09:00"></td><td><input type="time" value="23:00"></td><td><input type="text" value="OPEN" class="text-green-500 font-bold"></td></tr>
-                        <tr><td class="font-bold bg-slate-50 px-16 text-sm">SATURDAY</td><td><input type="time" value="09:00"></td><td><input type="time" value="23:30"></td><td><input type="text" value="OPEN" class="text-green-500 font-bold"></td></tr>
-                        <tr><td class="font-bold bg-slate-50 px-16 text-sm text-red-500">SUNDAY</td><td><input type="time" value="10:00"></td><td><input type="time" value="23:00"></td><td><input type="text" value="OPEN" class="text-green-500 font-bold"></td></tr>
+                    <tbody id="operatingHoursBody">
+                        <!-- Populated via JS for efficiency -->
                     </tbody>
                 </table>
 
                 <h2 class="text-2xl font-black mb-8">Starter Menu Preview</h2>
-                <p class="text-slate-500 mb-24">Add up to 5 top-selling items to kickstart your dashboard.</p>
+                <p class="text-slate-500 mb-24">Add top-selling items to kickstart your dashboard.</p>
                 <table class="excel-grid">
                     <thead>
                         <tr>
@@ -461,9 +482,10 @@
                             <th>Veg/Non-Veg</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr><td><input type="text" placeholder="e.g. Butter Chicken"></td><td><input type="text" placeholder="Main Course"></td><td><input type="number" placeholder="450"></td><td><input type="text" placeholder="Non-Veg"></td></tr>
-                        <tr><td><input type="text" placeholder="e.g. Paneer Tikka"></td><td><input type="text" placeholder="Starters"></td><td><input type="number" placeholder="280"></td><td><input type="text" placeholder="Veg"></td></tr>
+                    <tbody id="starterMenuBody">
+                        <tr><td><input type="text" class="menu-item-name" placeholder="e.g. Butter Chicken"></td><td><input type="text" class="menu-item-cat" placeholder="Main Course"></td><td><input type="number" class="menu-item-price" placeholder="450"></td><td><select class="menu-item-type"><option>Non-Veg</option><option>Veg</option></select></td></tr>
+                        <tr><td><input type="text" class="menu-item-name" placeholder="e.g. Paneer Tikka"></td><td><input type="text" class="menu-item-cat" placeholder="Starters"></td><td><input type="number" class="menu-item-price" placeholder="280"></td><td><select class="menu-item-type"><option>Veg</option><option>Non-Veg</option></select></td></tr>
+                        <tr><td><input type="text" class="menu-item-name"></td><td><input type="text" class="menu-item-cat"></td><td><input type="number" class="menu-item-price"></td><td><select class="menu-item-type"><option>Veg</option><option>Non-Veg</option></select></td></tr>
                     </tbody>
                 </table>
 
@@ -492,12 +514,16 @@
                         <span id="revContact">--</span>
                     </div>
                     <div class="flex justify-between mb-12">
+                        <span class="text-slate-500">> CATEGORY_NODE:</span>
+                        <span id="revCategory">--</span>
+                    </div>
+                    <div class="flex justify-between mb-12">
                         <span class="text-slate-500">> LOGISTICS_ZONE:</span>
                         <span id="revRadius">--</span>
                     </div>
                     <div class="flex justify-between mb-12">
                         <span class="text-slate-500">> COMPLIANCE_STATUS:</span>
-                        <span class="text-green-500">PENDING_AUDIT</span>
+                        <span class="text-green-500">AWAITING_VERIFICATION</span>
                     </div>
                     <div class="mt-20 border-t border-slate-800 pt-20 animate-pulse text-red-500">
                         _ Ready for Deployment...
@@ -506,9 +532,65 @@
 
                 <div class="flex justify-between">
                     <button class="btn-outline" onclick="showPane(4)">Previous</button>
-                    <button class="btn-zomato" onclick="submitOnboarding()">
+                    <button class="btn-zomato" id="submitBtn" onclick="submitOnboarding()">
                         Submit Application <i data-lucide="rocket" size="20"></i>
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATUS PANE -->
+        <div class="content-pane fade-in hidden" id="pane-status">
+            <div class="content-card">
+                <h2 class="text-3xl font-black mb-8">Application Status</h2>
+                <p class="text-slate-500 mb-40">Track your restaurant's onboarding and verification progress.</p>
+                
+                <div class="mb-40">
+                    <label class="form-label">Reference ID (e.g. REQ_12345678)</label>
+                    <div class="flex gap-12">
+                        <input type="text" class="form-input" id="searchRefId" placeholder="Enter your ID">
+                        <button class="btn-zomato px-24" onclick="checkStatus()">
+                            <i data-lucide="search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="statusResult" class="hidden">
+                    <div class="p-32 rounded-2xl border-2 border-slate-100 bg-white shadow-xl">
+                        <div class="flex justify-between items-center mb-24 pb-24 border-b border-slate-50">
+                            <div>
+                                <h3 id="statusBizName" class="text-xl font-black">--</h3>
+                                <p id="statusRefId" class="text-xs text-slate-400 font-mono mt-4">--</p>
+                            </div>
+                            <div id="statusBadge" class="px-16 py-8 rounded-full text-xs font-bold bg-amber-100 text-amber-600">
+                                PENDING_APPROVAL
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-24">
+                            <div class="flex gap-16">
+                                <div class="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center text-white"><i data-lucide="check" size="14"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-sm">Application Received</h4>
+                                    <p class="text-xs text-slate-400">Data successfully stored in global node.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-16" id="statusStepKYC">
+                                <div class="w-24 h-24 rounded-full bg-amber-500 flex items-center justify-center text-white animate-pulse"><i data-lucide="clock" size="14"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-sm">KYC \u0026 Documentation Audit</h4>
+                                    <p class="text-xs text-slate-400">SuperAdmin is currently verifying licenses.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-16 opacity-30" id="statusStepBot">
+                                <div class="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center text-slate-400"><i data-lucide="bot" size="14"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-sm">Bot Node Provisioning</h4>
+                                    <p class="text-xs text-slate-400">Setting up WhatsApp automated responder.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -528,6 +610,20 @@
             kyc: {}
         };
 
+        // Initialize Operating Hours Table
+        const days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+        const body = document.getElementById('operatingHoursBody');
+        days.forEach(day => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="font-bold bg-slate-50 px-16 text-sm">${day}</td>
+                <td><input type="time" class="open-time" value="09:00"></td>
+                <td><input type="time" class="close-time" value="23:00"></td>
+                <td><select class="day-status"><option>OPEN</option><option>CLOSED</option></select></td>
+            `;
+            body.appendChild(tr);
+        });
+
         window.showPane = function(n) {
             document.querySelectorAll('.content-pane').forEach(p => p.classList.add('hidden'));
             document.querySelectorAll('.step-item').forEach(s => s.classList.remove('active'));
@@ -538,12 +634,47 @@
             if(n === 5) populateReview();
         }
 
+        window.showStatusPane = function() {
+            document.querySelectorAll('.content-pane').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.step-item').forEach(s => s.classList.remove('active'));
+            document.getElementById(`pane-status`).classList.remove('hidden');
+            document.getElementById(`step-status-nav`).classList.add('active');
+        }
+
         window.nextPane = function(n) {
-            // Add basic validation here
             if (n === 2) {
-                if(!document.getElementById('restName').value) return alert("Restaurant Name required");
+                if(!document.getElementById('restName').value) return Swal.fire("Input Required", "Restaurant Name is mandatory", "warning");
+                if(!document.getElementById('ownerName').value) return Swal.fire("Input Required", "Owner Name is mandatory", "warning");
+                if(!document.getElementById('phone').value) return Swal.fire("Input Required", "Phone Number is mandatory", "warning");
+            }
+            if (n === 3) {
+                if(!document.getElementById('address').value) return Swal.fire("Input Required", "Physical Address is mandatory", "warning");
+            }
+            if (n === 4) {
+                if(!document.getElementById('terms').checked) return Swal.fire("Action Required", "You must agree to Terms \u0026 Conditions", "warning");
             }
             showPane(n);
+        }
+
+        window.getCurrentLocation = function() {
+            if (navigator.geolocation) {
+                Swal.fire({
+                    title: 'Detecting Location...',
+                    text: 'Please allow browser permission if prompted',
+                    allowOutsideClick: false,
+                    didOpen: () => { Swal.showLoading(); }
+                });
+
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
+                    document.getElementById('lng').value = pos.coords.longitude.toFixed(6);
+                    Swal.fire("Success!", "Location coordinates captured.", "success");
+                }, (err) => {
+                    Swal.fire("Detection Failed", "Please enter coordinates manually.", "error");
+                });
+            } else {
+                Swal.fire("Not Supported", "Geolocation is not supported by your browser.", "error");
+            }
         }
 
         window.triggerUpload = function(type) {
@@ -565,43 +696,141 @@
                     onboardingData.kyc[type] = url;
                     preview.innerText = "Verified Γ£ï";
                     preview.classList.add('text-green-500');
+                    Swal.fire("Success", `${type.toUpperCase()} uploaded successfully`, "success");
                 } catch(e) {
                     preview.innerText = "Upload Failed";
                     preview.classList.add('text-red-500');
+                    Swal.fire("Error", "Document upload failed. Try again.", "error");
                 }
             }
+         body.appendChild(tr);
         }
 
         function populateReview() {
             document.getElementById('revName').innerText = document.getElementById('restName').value;
-            document.getElementById('revContact').innerText = document.getElementById('phone').value;
-            document.getElementById('revRadius').innerText = document.getElementById('radius').value + " KM Radius";
+            document.getElementById('revContact').innerText = "+91 " + document.getElementById('phone').value;
+            document.getElementById('revCategory').innerText = document.getElementById('restCategory').value.toUpperCase();
+            document.getElementById('revRadius').innerText = document.getElementById('radius').value + " KM Zone";
         }
 
         window.submitOnboarding = async function() {
-            const btn = event.currentTarget;
+            const btn = document.getElementById('submitBtn');
             btn.disabled = true;
-            btn.innerText = "Initializing Infrastructure...";
+            btn.innerHTML = `<span class="animate-pulse">Provisioning Cloud Nodes...</span>`;
 
             try {
-                // Since this is a separate tab, we need to handle auth if not logged in
-                // Or expect them to have completed a mini-auth step
-                // For now, let's assume they provide email/pass in step 1 (I'll add it)
-                
+                // Collect Operating Hours
+                const hours = {};
+                const rows = document.querySelectorAll('#operatingHoursBody tr');
+                rows.forEach(row => {
+                    const day = row.cells[0].innerText;
+                    hours[day] = {
+                        open: row.querySelector('.open-time').value,
+                        close: row.querySelector('.close-time').value,
+                        status: row.querySelector('.day-status').value
+                    };
+                });
+
+                // Collect Menu Items
+                const menu = [];
+                document.querySelectorAll('#starterMenuBody tr').forEach(row => {
+                    const name = row.querySelector('.menu-item-name').value;
+                    if(name) {
+                        menu.push({
+                            name,
+                            category: row.querySelector('.menu-item-cat').value,
+                            price: row.querySelector('.menu-item-price').value,
+                            type: row.querySelector('.menu-item-type').value
+                        });
+                    }
+                });
+
+                const requestId = "REQ_" + Date.now().toString().slice(-8);
+                const finalData = {
+                    requestId,
+                    restaurantName: document.getElementById('restName').value,
+                    ownerName: document.getElementById('ownerName').value,
+                    phone: document.getElementById('phone').value,
+                    email: document.getElementById('email').value,
+                    category: document.getElementById('restCategory').value,
+                    cuisine: document.getElementById('restCuisine').value,
+                    address: document.getElementById('address').value,
+                    pincode: document.getElementById('pincode').value,
+                    latitude: document.getElementById('lat').value || "0.0",
+                    longitude: document.getElementById('lng').value || "0.0",
+                    radius: document.getElementById('radius').value,
+                    hours,
+                    starterMenu: menu,
+                    kyc: onboardingData.kyc,
+                    status: 'PENDING',
+                    submittedAt: ServerValue.TIMESTAMP
+                };
+
+                // Use COMPAT ref/set
+                await db.ref(`onboarding_requests/${requestId}`).set(finalData);
+
                 Swal.fire({
-                    title: 'Submission Received!',
-                    text: 'Your application is being processed by the ecosystem audit team.',
+                    title: 'Application Submitted!',
+                    html: `
+                        <div class="text-left text-sm">
+                            <p class="mb-10">Reference ID: <b class="text-red-500">${requestId}</b></p>
+                            <p class="mb-20">Your request has been queued for SuperAdmin verification. We will provision your WhatsApp Bot node shortly.</p>
+                            <div class="bg-slate-50 p-16 rounded-xl border border-slate-100 text-xs text-slate-500">
+                                Tip: Take a screenshot of your Reference ID to track status.
+                            </div>
+                        </div>
+                    `,
                     icon: 'success',
-                    confirmButtonText: 'Great!',
+                    confirmButtonText: 'Track Status',
                     confirmButtonColor: '#EF4F5F'
                 }).then(() => {
-                    window.close(); // Close the tab
+                    document.getElementById('searchRefId').value = requestId;
+                    showStatusPane();
+                    checkStatus();
                 });
 
             } catch (e) {
+                console.error(e);
                 btn.disabled = false;
-                btn.innerText = "Submit Application";
-                alert(e.message);
+                btn.innerHTML = `Submit Application <i data-lucide="rocket" size="20"></i>`;
+                Swal.fire("Deployment Failed", e.message, "error");
+            }
+        }
+
+        window.checkStatus = async function() {
+            const rid = document.getElementById('searchRefId').value.trim();
+            if(!rid) return;
+
+            try {
+                const snap = await db.ref(`onboarding_requests/${rid}`).once('value');
+                const data = snap.val();
+
+                if(!data) {
+                    Swal.fire("Not Found", "Reference ID not recognized in our database.", "info");
+                    return;
+                }
+
+                document.getElementById('statusResult').classList.remove('hidden');
+                document.getElementById('statusBizName').innerText = data.restaurantName;
+                document.getElementById('statusRefId').innerText = data.requestId;
+                document.getElementById('statusBadge').innerText = data.status;
+
+                // Update visual steps based on status
+                if(data.status === 'VERIFIED') {
+                    document.getElementById('statusStepKYC').innerHTML = `
+                        <div class="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center text-white"><i data-lucide="check" size="14"></i></div>
+                        <div>
+                            <h4 class="font-bold text-sm">KYC \u0026 Documentation Verified</h4>
+                            <p class="text-xs text-slate-400">SuperAdmin has approved your business entity.</p>
+                        </div>
+                    `;
+                    document.getElementById('statusStepBot').classList.remove('opacity-30');
+                    document.getElementById('statusStepBot').querySelector('.bg-slate-200').classList.replace('bg-slate-200', 'bg-amber-500');
+                    document.getElementById('statusStepBot').querySelector('.text-slate-400').classList.replace('text-slate-400', 'text-white');
+                }
+                lucide.createIcons();
+            } catch(e) {
+                Swal.fire("Error", "Failed to retrieve status.", "error");
             }
         }
 
@@ -610,15 +839,21 @@
                 title: 'Help Center',
                 html: `
                     <div class="text-left text-sm">
-                        <p class="mb-10">Need assistance? Contact our partner support team.</p>
-                        <div class="flex items-center gap-10 mb-8">
-                            <i data-lucide="phone" size="14"></i> <b>+91 1800-FOOD-HUB</b>
+                        <p class="mb-16">Contact our partner support team for immediate assistance.</p>
+                        <div class="space-y-10">
+                            <div class="flex items-center gap-10">
+                                <div class="w-24 h-24 rounded bg-red-50 text-red-500 flex items-center justify-center"><i data-lucide="phone" size="12"></i></div>
+                                <b>+91 1800-FOOD-HUB</b>
+                            </div>
+                            <div class="flex items-center gap-10">
+                                <div class="w-24 h-24 rounded bg-red-50 text-red-500 flex items-center justify-center"><i data-lucide="mail" size="12"></i></div>
+                                <b>partners@foodhubbie.com</b>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-10 mb-16">
-                            <i data-lucide="mail" size="14"></i> <b>partners@foodhubbie.com</b>
+                        <div class="mt-24">
+                            <label class="form-label">Support Ticket Details</label>
+                            <textarea class="form-input text-xs" placeholder="Describe your issue..."></textarea>
                         </div>
-                        <label class="form-label">Describe your issue</label>
-                        <textarea class="form-input text-xs" placeholder="Describe what's wrong..."></textarea>
                     </div>
                 `,
                 showCancelButton: true,
@@ -630,39 +865,50 @@
 
         window.viewInstructions = function() {
             Swal.fire({
-                title: 'Onboarding Instructions',
+                title: 'Onboarding Guide',
+                width: 600,
                 html: `
-                    <div class="text-left text-sm max-h-[400px] overflow-y-auto pr-10">
-                        <h4 class="font-bold mb-8">1. Identity Verification</h4>
-                        <p class="mb-12 text-slate-500">Ensure the restaurant name matches your bank account and FSSAI license exactly.</p>
-                        
-                        <h4 class="font-bold mb-8">2. KYC Documents</h4>
-                        <p class="mb-12 text-slate-500">Upload clear, high-resolution scans. Blurry documents will be rejected by the audit team.</p>
-                        
-                        <h4 class="font-bold mb-8">3. Operating Hours</h4>
-                        <p class="mb-12 text-slate-500">Specify precise times. These will be used for automated bot toggles.</p>
-                        
-                        <h4 class="font-bold mb-8">4. Approval Timeline</h4>
-                        <p class="mb-12 text-slate-500">Manual verification takes 24-48 business hours. You will receive a WhatsApp notification upon activation.</p>
+                    <div class="text-left text-sm space-y-16">
+                        <div class="flex gap-16">
+                            <div class="font-black text-red-500">01</div>
+                            <div>
+                                <h4 class="font-bold">Identity Verification</h4>
+                                <p class="text-slate-500 text-xs mt-2">Ensure Restaurant Name exactly matches your FSSAI/GST certificate to avoid rejection.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-16">
+                            <div class="font-black text-red-500">02</div>
+                            <div>
+                                <h4 class="font-bold">Logistics Mapping</h4>
+                                <p class="text-slate-500 text-xs mt-2">Use the 'Auto-detect' feature for precise bot dispatch routing.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-16">
+                            <div class="font-black text-red-500">03</div>
+                            <div>
+                                <h4 class="font-bold">Document Standards</h4>
+                                <p class="text-slate-500 text-xs mt-2">PDF, JPG, or PNG under 5MB. Blurry images will fail our automated OCR check.</p>
+                            </div>
+                        </div>
                     </div>
                 `,
-                confirmButtonText: 'I Understand',
+                confirmButtonText: 'Got it!',
                 confirmButtonColor: '#1C1C1C'
             });
         }
 
         window.viewTerms = function() {
             Swal.fire({
-                title: 'Terms & Conditions',
+                title: 'Partner Charter',
                 width: 800,
                 html: `
-                    <div class="text-left text-xs leading-relaxed text-slate-500 h-[500px] overflow-y-auto border p-20 rounded-xl">
-                        <h3 class="text-black font-bold mb-10">1. PARTNERSHIP AGREEMENT</h3>
-                        <p class="mb-16">This agreement is between Foodhubbie and the participating Restaurant Partner...</p>
-                        <h3 class="text-black font-bold mb-10">2. COMMISSION STRUCTURE</h3>
-                        <p class="mb-16">The standard platform commission is 10% per successful order, plus applicable GST...</p>
-                        <h3 class="text-black font-bold mb-10">3. DATA PRIVACY</h3>
-                        <p class="mb-16">All partner data is encrypted and stored in compliance with local regulations...</p>
+                    <div class="text-left text-xs leading-relaxed text-slate-500 h-[400px] overflow-y-auto border p-24 rounded-2xl bg-slate-50">
+                        <h3 class="text-black font-bold mb-10">1. OPERATIONAL COMPLIANCE</h3>
+                        <p class="mb-16">Partners must maintain Foodhubbie's quality standards for packaging and preparation...</p>
+                        <h3 class="text-black font-bold mb-10">2. FINANCIAL SETTLEMENT</h3>
+                        <p class="mb-16">Payouts are processed every Monday for the preceding week's sales minus 10% commission...</p>
+                        <h3 class="text-black font-bold mb-10">3. BOT INFRASTRUCTURE</h3>
+                        <p class="mb-16">Partners agree to keep the WhatsApp Bot online during specified operating hours...</p>
                     </div>
                 `,
                 confirmButtonText: 'Accept Terms',
@@ -670,7 +916,6 @@
             });
         }
 
-        // Initialize Icons
         lucide.createIcons();
     </script>
 </body>

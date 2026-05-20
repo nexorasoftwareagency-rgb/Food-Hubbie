@@ -12,6 +12,7 @@ import { toggleNotificationSheet, updateNotificationUI, updateNotificationSettin
 import { renderOrders } from './features/orders.js';
 import { loadInventory, cleanupInventory } from './features/inventory.js';
 import { renderSettlements } from './features/settlements.js';
+import { initPartners, cleanupPartners, renderPartners } from './features/partners.js';
 
 
 
@@ -169,6 +170,7 @@ export const switchTab = async (tabId, skipHistory = false) => {
         if (tabId !== 'feedback') cleanupFeedbacks();
         if (tabId !== 'liveTracker') cleanupLiveRiderTracker();
         if (tabId !== 'inventory') cleanupInventory();
+        if (tabId !== 'partners') cleanupPartners();
 
         // --- PHASE 3.25: DATA REFRESH ---
         // Refresh appropriate data based on the tab
@@ -221,6 +223,9 @@ export const switchTab = async (tabId, skipHistory = false) => {
                 break;
             case 'settlements':
                 renderSettlements();
+                break;
+            case 'partners':
+                initPartners();
                 break;
         }
 

@@ -16,7 +16,7 @@ function statusBadgeClass(status: Order["status"]): string {
     case "Out for Delivery":
       return "bg-blue-100 text-blue-700 border-blue-200";
     case "Preparing":
-    case "Packed":
+    case "Ready":
       return "bg-secondary/15 text-secondary border-secondary/30";
     default:
       return "bg-muted text-muted-foreground border-border";

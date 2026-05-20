@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getDatabase, ref, onValue, get, set, update, runTransaction, query, orderByChild, equalTo, off, serverTimestamp, remove, limitToLast, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, onValue, get, set, update, runTransaction, query, orderByChild, equalTo, off, serverTimestamp, remove, limitToLast, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
@@ -426,6 +426,8 @@ window.showSection = (sectionId) => {
         setTimeout(() => window.initActiveMap(window.activeOrderData), 200);
     } else if (sectionId === 'active') {
         setTimeout(() => window.initDefaultMap(), 200);
+    } else if (sectionId === 'ledger') {
+        window.initLedgerListener();
     }
 };
 
@@ -721,18 +723,33 @@ function initLocationTracking() {
     if (!navigator.geolocation) return;
     if (_locationWatchId) return;
 
+    // HIGH FREQUENCY TRACKING (Zomato Style)
     _locationWatchId = navigator.geolocation.watchPosition(
         pos => {
-            window.riderLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() };
-        }, err => { }, { enableHighAccuracy: true }
+            window.riderLocation = { 
+                lat: pos.coords.latitude, 
+                lng: pos.coords.longitude, 
+                accuracy: pos.coords.accuracy,
+                ts: Date.now() 
+            };
+        }, err => { }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
 
     if (_locationInterval) clearInterval(_locationInterval);
     _locationInterval = setInterval(() => {
         if (window.riderLocation && currentUser && currentUser.profile.status === "Online") {
-            set(ref(db, resolvePath(`riders/${currentUser.profile.id}/location`)), window.riderLocation).catch(() => { });
+            const locPath = resolvePath(`riders/${currentUser.profile.id}/location`);
+            update(ref(db, locPath), {
+                ...window.riderLocation,
+                lastUpdate: serverTimestamp()
+            }).catch(() => { });
+            
+            // Heartbeat update on the rider object itself
+            update(ref(db, `riders/${currentUser.profile.id}`), {
+                lastSeen: serverTimestamp()
+            }).catch(() => { });
         }
-    }, 30000);
+    }, 10000); // 10s intervals for real-time tracking
 }
 
 function stopLocationTracking() {
@@ -898,13 +915,36 @@ window.finalizeDeliverySequence = async (orderPath, matchesFallback, order, paym
     const riderId = window.currentUser.profile.id;
     const commission = Number(order.deliveryFee || 0);
     const pathParts = orderPath.split('/');
-    // SaaS Path: businesses/{bid}/outlets/{oid}/orders/{id} -> oid is at index 3
-    // Legacy Path: {oid}/orders/{id} -> oid is at index 0
     const outletId = pathParts.includes('outlets') ? pathParts[3] : (pathParts[0] || 'outlet_pizza');
-    
+    const txId = `RDX_${Date.now()}_${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
+    // 1. Update Legacy Stats
     await runTransaction(ref(db, resolvePath(`riderStats/${riderId}`, outletId)), (current) => {
         if (!current) return { totalOrders: 1, totalEarnings: commission };
         return { ...current, totalOrders: (current.totalOrders || 0) + 1, totalEarnings: (current.totalEarnings || 0) + commission };
+    });
+
+    // 2. CREATE FORMAL RIDER LEDGER ENTRY (New Ledger Architecture)
+    const ledgerEntry = {
+        txId: txId,
+        orderId: order.orderId || order.id,
+        amount: commission,
+        type: 'EARNING',
+        description: `Delivery Fee for Order #${order.orderId || order.id.slice(-5)}`,
+        timestamp: serverTimestamp(),
+        outlet: outletId
+    };
+    await set(ref(db, `riders/${riderId}/ledger/${txId}`), ledgerEntry);
+
+    // 3. Update Rider Wallet
+    await runTransaction(ref(db, `riders/${riderId}/wallet`), (current) => {
+        const data = current || { balance: 0, totalEarned: 0 };
+        return {
+            balance: (data.balance || 0) + commission,
+            totalEarned: (data.totalEarned || 0) + commission,
+            lastTx: txId,
+            lastTxAt: serverTimestamp()
+        };
     });
     
     // Populate Success UI
@@ -1456,10 +1496,8 @@ window._doRenderAllOrders = () => {
         window.activeOrderId = null;
         window.activeOrderOutlet = null;
         window.activeOrderData = null;
-    }
+    }    // 1. First Pass: Collect all relevant orders and find the BEST candidate for "Active Order"
 
-
-    // 1. First Pass: Collect all relevant orders and find the BEST candidate for "Active Order"
     const allRelevantOrders = [];
     Object.keys(window.orderCache).forEach(outletId => {
         const orders = window.orderCache[outletId];
@@ -1478,14 +1516,18 @@ window._doRenderAllOrders = () => {
                 if (!isNaN(parsed)) orderTime = parsed;
             }
 
-            const isFresh = orderTime > (Date.now() - (24 * 60 * 60 * 1000));
+            const isFresh = orderTime > (Date.now() - (12 * 60 * 60 * 1000)); // 12h
             const isActive = status !== "delivered" && status !== "cancelled";
 
-            // HARD FILTER: Ignore orders older than 48 hours for the Active view, even if status is wrong
+            // HARD FILTER: Ignore orders older than 12 hours for the Active view, even if status is wrong
             // Also flag as ghost if no timestamp exists for a very long time (fallback check)
-            const isGhost = (orderTime > 0 && orderTime < (Date.now() - (48 * 60 * 60 * 1000))) || (!orderTime && isActive);
+            const isGhost = (orderTime > 0 && orderTime < (Date.now() - (12 * 60 * 60 * 1000))) || (!orderTime && isActive);
             
-            if (isGhost && isActive) {
+            // Except if it's assigned to me and active
+            const isActiveForMe = isMine && isActive;
+            const finalGhost = isGhost && !isActiveForMe;
+            
+            if (finalGhost && isActive) {
                 console.warn(`[Sync] Detected Ghost Order #${id} (${outletId}) - Stale for ${Math.round((Date.now() - orderTime) / 3600000)}h. Skipping.`);
             }
 
@@ -2220,6 +2262,23 @@ onAuthStateChanged(auth, async user => {
 
         await loadOutletCoords();
         window.clearAllListeners();
+        
+        // GHOSTING PROTECTION: Auto-Offline on Disconnect
+        const riderRef = ref(db, `riders/${user.uid}`);
+        const riderLocationRef = ref(db, `riders/${user.uid}/location`);
+        
+        onDisconnect(riderRef).update({ 
+            status: "Offline", 
+            lastSeen: serverTimestamp(),
+            connectionLostAt: serverTimestamp() 
+        });
+        
+        // Also update location node to indicate loss of signal
+        onDisconnect(riderLocationRef).update({
+            signalLost: true,
+            lastSeen: serverTimestamp()
+        });
+
         initLocationTracking();
         initRealtimeListeners();
         setupPushNotifications(user.uid);
@@ -2386,3 +2445,72 @@ window.closeSettlementHistory = () => {
 window.initPingCheck = window.initPingCheck || (() => console.log("[System] initPingCheck shim executed"));
 window.initSlideToActions = window.initSlideToActions || (() => console.log("[System] initSlideToActions shim executed"));
 
+
+let _ledgerUnsub = null;
+window.initLedgerListener = () => {
+    if (!window.currentUser) return;
+    if (_ledgerUnsub) return;
+
+    const riderId = window.currentUser.uid;
+    const ledgerRef = query(ref(db, `riders/${riderId}/ledger`), limitToLast(50));
+    
+    _ledgerUnsub = onValue(ledgerRef, (snap) => {
+        const list = document.getElementById('ledgerList');
+        const totalBal = document.getElementById('l-total-balance');
+        const todayEarn = document.getElementById('l-today-earning');
+        if (!list) return;
+
+        const data = snap.val();
+        if (!data) {
+            list.innerHTML = `<div class="p-40 text-center text-muted">No transactions found yet.</div>`;
+            return;
+        }
+
+        let html = '';
+        let total = 0;
+        let today = 0;
+        const startOfToday = new Date().setHours(0,0,0,0);
+
+        // Convert to array and sort by timestamp desc
+        const entries = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
+        
+        entries.forEach(entry => {
+            const date = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const fullDate = new Date(entry.timestamp).toLocaleDateString();
+            const isToday = entry.timestamp > startOfToday;
+            
+            if (entry.type === 'EARNING') {
+                total += Number(entry.amount || 0);
+                if (isToday) today += Number(entry.amount || 0);
+            }
+
+            html += `
+                <div class="ledger-item animate-slide-up">
+                    <div class="ledger-icon ${entry.type.toLowerCase()}">
+                        <i data-lucide="${entry.type === 'EARNING' ? 'arrow-up-right' : 'arrow-down-left'}"></i>
+                    </div>
+                    <div class="ledger-info">
+                        <div class="ledger-title">${entry.description || 'Transaction'}</div>
+                        <div class="ledger-meta">${fullDate} • ${date}</div>
+                    </div>
+                    <div class="ledger-amount ${entry.type === 'EARNING' ? 'positive' : 'negative'}">
+                        ${entry.type === 'EARNING' ? '+' : '-'}₹${entry.amount}
+                    </div>
+                </div>
+            `;
+        });
+
+        list.innerHTML = html;
+        if (totalBal) totalBal.innerText = `₹${total}`;
+        if (todayEarn) todayEarn.innerText = `₹${today}`;
+        
+        if (window.lucide) window.lucide.createIcons({ root: list });
+    });
+};
+
+// Cleanup on logout
+const originalLogout = window.logout;
+window.logout = async () => {
+    if (_ledgerUnsub) { off(ref(db, `riders/${window.currentUser.uid}/ledger`)); _ledgerUnsub = null; }
+    if (originalLogout) await originalLogout();
+};

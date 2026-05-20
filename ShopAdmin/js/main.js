@@ -23,7 +23,8 @@ import {
 import { printReceiptById, reprintLastPosReceipt } from './features/printing.js';
 import { 
     editRider, resetRiderPassword, deleteRider, 
-    showRiderModal, saveRiderAccount, renderRiders, settleRiderWallet 
+    showRiderModal, saveRiderAccount, renderRiders, settleRiderWallet,
+    viewRiderLedger
 } from './features/riders.js';
 import { 
     editDish, deleteDish, editCategory, deleteCategory, 
@@ -38,6 +39,7 @@ import { saveStoreSettings, quickUpdateOutletStatus, addFeeSlab } from './featur
 import { initRiderAnalytics } from './features/rider-analytics.js';
 import { initInventory } from './features/inventory.js';
 import { renderSettlements, exportSettlementLedger } from './features/settlements.js';
+import { initPartners, renderPartners } from './features/partners.js';
 
 // Side-effect imports
 import './firebase.js';
@@ -94,6 +96,24 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initRiderAnalytics();
     initInventory();
+    initPartners();
+
+    // Financial Heartbeat: Sync Wallet Balance in Real-time
+    const syncWallet = () => {
+        const walletRef = Outlet.ref("wallet/balance");
+        walletRef.on('value', (snap) => {
+            const balance = snap.val() || 0;
+            const balanceEl = document.getElementById('walletBalance');
+            if (balanceEl) {
+                balanceEl.innerText = `₹${parseFloat(balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+                
+                // Add a subtle animation on change
+                balanceEl.parentElement.classList.add('pulse-financial');
+                setTimeout(() => balanceEl.parentElement.classList.remove('pulse-financial'), 500);
+            }
+        });
+    };
+    syncWallet();
 
     // Final check for icons on static content
     // Scoped initialization for performance across both states
@@ -328,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'resetRiderPassword': resetRiderPassword(el.getAttribute('data-email')); break;
                 case 'deleteRider': deleteRider(id); break;
                 case 'settleRider': settleRiderWallet(id, name); break;
+                case 'viewRiderLedger': viewRiderLedger(id, name); break;
                 case 'saveSettings': saveStoreSettings(); break;
                 case 'saveDeliveredOrder': saveDeliveredOrder(id, val); break;
                 case 'openPOSSelectionModal': openPOSSelectionModal(id); break;
@@ -441,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('menuSearch')?.addEventListener('input', (e) => filterMenu(e.target.value));
     document.getElementById('menuSearchMobile')?.addEventListener('input', (e) => filterMenu(e.target.value));
     document.getElementById('categorySearch')?.addEventListener('input', (e) => filterCategories(e.target.value));
+    document.getElementById('partnerSearch')?.addEventListener('input', (e) => renderPartners(e.target.value));
     
     // Order Filters
     const triggerOrderRender = () => {

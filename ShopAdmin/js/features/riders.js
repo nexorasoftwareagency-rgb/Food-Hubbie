@@ -108,12 +108,25 @@ export function renderRiders(searchTerm = "") {
             const tr = document.createElement('tr');
             tr.className = "premium-row-v4";
             
-            // Mask phone for privacy in general list
+            // MASKING & CALCULATIONS
             const maskedPhone = r.phone ? '******' + escapeHtml(r.phone.slice(-4)) : 'N/A';
             const safeEmail = escapeHtml(r.email || "");
             const safeName = escapeHtml(r.name || "Unnamed Rider");
             const safePhoto = (r.profilePhoto || profileImg).replace(/"/g, '&quot;');
             const safeId = escapeHtml(r.id);
+
+            // LAST SEEN LOGIC (Zomato Style)
+            const lastUpdate = r.lastSeen || (r.location && r.location.lastUpdate) || 0;
+            const isStale = lastUpdate > 0 && (Date.now() - lastUpdate) > 300000; // 5 mins
+            const isStalled = displayStatus === "On Delivery" && lastUpdate > 0 && (Date.now() - lastUpdate) > 7200000; // 2 hours
+            
+            let lastSeenText = "Never";
+            if (lastUpdate > 0) {
+                const diff = Math.floor((Date.now() - lastUpdate) / 60000);
+                lastSeenText = diff < 1 ? "Just now" : (diff < 60 ? `${diff}m ago` : `${Math.floor(diff/60)}h ago`);
+            }
+            const lastSeenClass = isStale ? 'text-danger' : (lastUpdate > 0 ? 'text-success' : 'text-muted-small');
+            const stallBadge = isStalled ? `<span class="badge-v4 danger pulse" style="font-size:9px; margin-left:5px;">STALLED</span>` : "";
 
             tr.innerHTML = `
                 <td data-label="Rider">
@@ -136,6 +149,9 @@ export function renderRiders(searchTerm = "") {
                         <span class="rider-dot-v4"></span>
                         <span>${escapeHtml(displayStatus)}</span>
                     </div>
+                    <div class="mt-4 ${lastSeenClass}" style="font-size: 10px; font-weight: 600;">
+                        Seen: ${lastSeenText} ${stallBadge}
+                    </div>
                 </td>
                 <td data-label="Performance">
                     <div class="quick-stats-grid">
@@ -144,8 +160,8 @@ export function renderRiders(searchTerm = "") {
                             <span class="sub">Orders</span>
                         </div>
                         <div class="identity-info-v4">
-                            <span class="name text-success">₹${(stats.totalEarnings || 0).toLocaleString()}</span>
-                            <span class="sub">Wallet</span>
+                            <span class="name text-success">₹${(r.wallet?.balance || stats.totalEarnings || 0).toLocaleString()}</span>
+                            <span class="sub">Ledger Balance</span>
                         </div>
                     </div>
                 </td>
@@ -162,14 +178,14 @@ export function renderRiders(searchTerm = "") {
                 </td>
                 <td data-label="Actions">
                     <div class="action-group-v4">
+                        <button data-action="viewRiderLedger" data-id="${safeId}" data-name="${safeName}" class="btn-action-v4" title="View Ledger" style="color: var(--accent);">
+                            <i data-lucide="file-text" style="width:14px;"></i>
+                        </button>
                         <button data-action="settleRider" data-id="${safeId}" data-name="${safeName}" class="btn-action-v4" title="Settle Wallet" style="color: var(--primary);">
                             <i data-lucide="wallet" style="width:14px;"></i>
                         </button>
                         <button data-action="editRider" data-id="${safeId}" class="btn-action-v4" title="Edit Rider">
                             <i data-lucide="edit-2" style="width:14px;"></i>
-                        </button>
-                        <button data-action="resetRiderPassword" data-email="${safeEmail}" class="btn-action-v4" title="Reset Password">
-                            <i data-lucide="key" style="width:14px;"></i>
                         </button>
                         <button data-action="deleteRider" data-id="${safeId}" class="btn-action-v4 danger" title="Delete Rider">
                             <i data-lucide="trash-2" style="width:14px;"></i>
@@ -562,3 +578,73 @@ export async function settleRiderWallet(riderId, riderName, customTimeLimit = nu
         showToast("Failed to settle wallet. Check console for details.", "error");
     }
 }
+
+/**
+ * VIEW RIDER LEDGER
+ * Fetches and displays the formal transaction history for a rider.
+ */
+export async function viewRiderLedger(riderId, riderName) {
+    const modal = document.getElementById('riderLedgerModal');
+    const list = document.getElementById('riderLedgerList');
+    const title = document.getElementById('riderLedgerTitle');
+    
+    if (!modal || !list) return;
+
+    title.innerText = `${riderName}'s Transaction Ledger`;
+    list.innerHTML = '<div class="text-center p-40"><div class="loading-spinner m-auto"></div><p class="mt-10">Fetching ledger records...</p></div>';
+    modal.classList.add('active');
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+
+    try {
+        const ledgerRef = db.ref(`riders/${riderId}/ledger`);
+        const snap = await ledgerRef.orderByChild('timestamp').limitToLast(50).once('value');
+        
+        if (!snap.exists()) {
+            list.innerHTML = '<div class="text-center p-40 text-muted">No transactions found in this rider\'s ledger.</div>';
+            return;
+        }
+
+        const txs = [];
+        snap.forEach(child => {
+            txs.push({ id: child.key, ...child.val() });
+        });
+        txs.sort((a, b) => b.timestamp - a.timestamp);
+
+        list.innerHTML = txs.map(tx => {
+            const date = new Date(tx.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+            const isEarning = tx.type === 'EARNING';
+            const typeColor = isEarning ? 'var(--success)' : 'var(--danger)';
+            const typeIcon = isEarning ? 'trending-up' : 'trending-down';
+            
+            return `
+                <div class="ledger-item-v4 premium-row-v4 p-15 mb-10 rounded-12 glass-panel" style="border-left: 4px solid ${typeColor}">
+                    <div class="flex-row justify-between flex-center">
+                        <div class="flex-row flex-center flex-gap-12">
+                            <div class="status-icon" style="background: ${typeColor}15; color: ${typeColor}; padding: 8px;">
+                                <i data-lucide="${typeIcon}" style="width:16px;"></i>
+                            </div>
+                            <div class="identity-info-v4">
+                                <span class="name">${escapeHtml(tx.description || 'Transaction')}</span>
+                                <span class="sub">${date} • ID: ${escapeHtml(tx.txId || tx.id)}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="name" style="color: ${typeColor}; font-weight: 700;">
+                                ${isEarning ? '+' : '-'} ₹${(tx.amount || 0).toLocaleString()}
+                            </div>
+                            <span class="sub">${escapeHtml(tx.outlet || 'Global')}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (window.lucide) window.lucide.createIcons({ root: list });
+
+    } catch (error) {
+        console.error("[Ledger] Error:", error);
+        list.innerHTML = '<div class="text-center p-40 text-danger">Failed to load ledger records. Check connection.</div>';
+    }
+}
+
