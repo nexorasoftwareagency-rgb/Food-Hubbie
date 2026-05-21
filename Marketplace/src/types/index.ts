@@ -126,6 +126,8 @@ export type OrderStatus =
 
 export type PaymentMethod = "upi" | "card" | "wallet" | "cod";
 
+export type FulfillmentMethod = "delivery" | "dinein" | "takeaway";
+
 export type OrderItem = {
   menuItemId: string;
   name: string;
@@ -144,6 +146,9 @@ export type DeliveryAddress = {
   lat: number;
   lng: number;
   coords?: Coordinates;
+  tableNumber?: string;
+  dineinGuests?: number;
+  pickupTime?: string;
 };
 
 export type Order = {
@@ -152,6 +157,7 @@ export type Order = {
   outletId: string;
   outletName: string;
   businessId: string;
+  type: FulfillmentMethod;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;

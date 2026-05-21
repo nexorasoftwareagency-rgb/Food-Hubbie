@@ -4,7 +4,7 @@
 
 import { db, ref, get, push, set, auth } from "@/lib/firebase";
 import { update } from "firebase/database";
-import type { Order, CartItem, DeliveryAddress, PaymentMethod, OrderStatus } from "@/types";
+import type { Order, CartItem, DeliveryAddress, PaymentMethod, OrderStatus, FulfillmentMethod } from "@/types";
 import { logMarketplaceAudit } from "./auditService";
 
 const STORAGE_KEY = "foodhubbie_orders";
@@ -58,7 +58,10 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
     cashbackBonus: input.cashbackBonus || 0,
     paymentMethod: input.paymentMethod,
     status: "Placed",
-    type: "Online",
+    type: input.type || "delivery",
+    tableNumber: input.deliveryAddress.tableNumber || null,
+    dineinGuests: input.deliveryAddress.dineinGuests || null,
+    pickupTime: input.deliveryAddress.pickupTime || null,
     createdAt: now,
     updatedAt: now,
     cart: input.items.map((i) => ({
@@ -256,6 +259,7 @@ export type PlaceOrderInput = {
   taxes: number;
   total: number;
   paymentMethod: PaymentMethod;
+  type: FulfillmentMethod;
   deliveryAddress: DeliveryAddress;
   couponCode?: string;
   discount?: number;

@@ -2,7 +2,7 @@
 // Business logic for cart operations — delivery fee calculation, cart validation,
 // and outlet-lock enforcement. Decoupled from React state.
 
-import type { CartItem, Outlet } from "@/types";
+import type { CartItem, Outlet, FulfillmentMethod } from "@/types";
 import { calcDeliveryFee } from "@/lib/deliveryFee";
 
 export const GST_RATE = 0.05; // 5% GST
@@ -26,7 +26,8 @@ export function calcCartSummary(
     globalDiscount?: { type: 'percent' | 'fixed', value: number };
     platformFee?: number;
     isFreeDelivery?: boolean;
-  } = {}
+  } = {},
+  fulfillmentMethod: FulfillmentMethod = "delivery"
 ): CartSummary {
   let subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const { couponDiscount = 0, surgeMultiplier = 1, globalDiscount, platformFee = 0 } = promotions;
@@ -44,9 +45,9 @@ export function calcCartSummary(
   const baseSubtotal = Math.max(0, subtotal - globalSavings);
   const afterCouponSubtotal = Math.max(0, baseSubtotal - couponDiscount);
 
-  // 2. Delivery Fee calculation
+  // 2. Delivery Fee calculation (only for delivery orders)
   let deliveryFee = 0;
-  if (outlet) {
+  if (outlet && fulfillmentMethod === "delivery") {
     deliveryFee = calcDeliveryFee(
       outlet.distanceKm,
       outlet.deliveryFeeStructure
@@ -54,11 +55,11 @@ export function calcCartSummary(
   }
 
   // 3. Apply Surge Pricing to delivery (Standard Industry Practice)
-  let finalDeliveryFee = Math.round(deliveryFee * surgeMultiplier);
+  let finalDeliveryFee = fulfillmentMethod === "delivery" ? Math.round(deliveryFee * surgeMultiplier) : 0;
   
   // Handle Free Delivery Coupon
   const isFreeDelivery = promotions.isFreeDelivery || false;
-  const deliverySavings = isFreeDelivery ? finalDeliveryFee : 0;
+  const deliverySavings = isFreeDelivery && fulfillmentMethod === "delivery" ? finalDeliveryFee : 0;
   finalDeliveryFee = Math.max(0, finalDeliveryFee - deliverySavings);
 
   // 4. Tax Calculation

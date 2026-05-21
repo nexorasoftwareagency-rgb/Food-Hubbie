@@ -3,11 +3,11 @@ import { useLocation } from "wouter";
 import { useCart } from "@/context/CartContext";
 import { useOrderContext } from "@/context/OrderContext";
 import { useAuth } from "@/context/AuthContext";
-import { CreditCard, Wallet, Banknote, ShieldCheck, MapPin, ChevronLeft } from "lucide-react";
+import { CreditCard, Wallet, Banknote, ShieldCheck, MapPin, ChevronLeft, Bike, Store, Package } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { calcCartSummary } from "@/services/cartService";
 import { deliveryFeeLabel } from "@/lib/deliveryFee";
-import type { PaymentMethod, DeliveryAddress } from "@/types";
+import type { PaymentMethod, DeliveryAddress, FulfillmentMethod } from "@/types";
 import { Link } from "wouter";
 import { useLocationContext } from "@/context/LocationContext";
 import { FcGoogle } from "react-icons/fc";
@@ -25,6 +25,12 @@ const paymentMethods: { id: PaymentMethod; name: string; icon: typeof ShieldChec
   { id: "cod", name: "Cash on Delivery", icon: Banknote },
 ];
 
+const fulfillmentMethods: { id: FulfillmentMethod; name: string; shortName: string; icon: typeof Bike; description: string }[] = [
+  { id: "delivery", name: "Home Delivery", shortName: "Delivery", icon: Bike, description: "Get it delivered to your door" },
+  { id: "dinein", name: "Dine In", shortName: "Dine-in", icon: Store, description: "Eat at the restaurant" },
+  { id: "takeaway", name: "Takeaway", shortName: "Takeaway", icon: Package, description: "Pick up your order" },
+];
+
 import { walletService } from "@/services/walletService";
 
 export default function Checkout() {
@@ -34,7 +40,8 @@ export default function Checkout() {
   const { state: locationState } = useLocationContext();
   const [, setLocation] = useLocation();
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>("delivery");
   const [isProcessing, setIsProcessing] = useState(false);
   const [upiId, setUpiId] = useState("");
   const [isFreeDelivery, setIsFreeDelivery] = useState(false);
@@ -78,7 +85,7 @@ export default function Checkout() {
     couponDiscount: cartState.appliedCoupon ? (cartState.appliedCoupon.type === 'percent' ? Math.round(cartState.items.reduce((s, i) => s + i.price * i.quantity, 0) * (cartState.appliedCoupon.value / 100)) : cartState.appliedCoupon.value) : 0,
     platformFee,
     isFreeDelivery
-  });
+  }, fulfillmentMethod);
   
   // Projected Cashback (2% of net food value)
   const projectedBonus = Math.round((summary.subtotal - (cartState.appliedCoupon?.type === 'percent' ? Math.round(summary.subtotal * (cartState.appliedCoupon.value / 100)) : (cartState.appliedCoupon?.value || 0))) * 0.02);
@@ -125,8 +132,12 @@ export default function Checkout() {
       alert("Please enter a valid 10-digit Indian phone number.");
       return;
     }
-    if (!form.address.trim()) {
+    if (fulfillmentMethod === "delivery" && !form.address.trim()) {
       alert("Please enter your delivery address.");
+      return;
+    }
+    if (fulfillmentMethod === "dinein" && !form.tableNumber?.trim()) {
+      alert("Please enter your table number.");
       return;
     }
 
@@ -188,6 +199,7 @@ export default function Checkout() {
           couponDiscount,
           globalDiscountAmount,
           paymentMethod,
+          type: fulfillmentMethod,
           deliveryAddress: form,
           platformFee: summary.platformFee,
           cashbackBonus: bonusAmount,
@@ -296,17 +308,55 @@ export default function Checkout() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">
+            {/* Fulfillment Method Selector */}
+            <div className="bg-card rounded-2xl border border-border shadow-soft overflow-hidden">
+              <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
+                <h2 className="font-bold text-lg flex items-center gap-2 text-primary">
+                  <Bike className="h-5 w-5" />
+                  How would you like to order?
+                </h2>
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-3 gap-3">
+                  {fulfillmentMethods.map((method) => {
+                    const Icon = method.icon;
+                    const isSelected = fulfillmentMethod === method.id;
+                    return (
+                      <button
+                        key={method.id}
+                        onClick={() => setFulfillmentMethod(method.id)}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
+                            : "border-border bg-muted/30 hover:bg-muted/50"
+                        }`}
+                      >
+                        <Icon className={`h-6 w-6 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                        <span className={`text-xs font-bold ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+                          {method.shortName}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  {fulfillmentMethods.find(m => m.id === fulfillmentMethod)?.description}
+                </p>
+              </div>
+            </div>
+
             {/* Delivery address */}
             <div className="bg-card rounded-2xl border border-border shadow-soft overflow-hidden">
               <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
                 <h2 className="font-bold text-lg flex items-center gap-2 text-primary">
                   <MapPin className="h-5 w-5" />
-                  Delivery Address
+                  {fulfillmentMethod === "delivery" ? "Delivery Address" : fulfillmentMethod === "dinein" ? "Table Details" : "Pickup Details"}
                 </h2>
               </div>
 
               <div className="p-6">
-                {user.savedAddresses && user.savedAddresses.length > 0 && (
+                {fulfillmentMethod === "delivery" && user.savedAddresses && user.savedAddresses.length > 0 && (
                   <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
                     {user.savedAddresses.map((addr) => (
                       <button
@@ -333,12 +383,25 @@ export default function Checkout() {
 
                 <div className="space-y-4">
                     {(
-                      [
-                        { key: "name", label: "Full Name", type: "text", placeholder: "e.g. John Doe" },
-                        { key: "phone", label: "Phone Number", type: "tel", placeholder: "e.g. 98765 43210" },
-                        { key: "address", label: "Complete Address", type: "textarea", placeholder: "House No, Street, Locality..." },
-                        { key: "landmark", label: "Landmark (optional)", type: "text", placeholder: "e.g. Near Big Bazaar" },
-                      ] as const
+                      fulfillmentMethod === "delivery"
+                        ? [
+                            { key: "name", label: "Full Name", type: "text", placeholder: "e.g. John Doe" },
+                            { key: "phone", label: "Phone Number", type: "tel", placeholder: "e.g. 98765 43210" },
+                            { key: "address", label: "Complete Address", type: "textarea", placeholder: "House No, Street, Locality..." },
+                            { key: "landmark", label: "Landmark (optional)", type: "text", placeholder: "e.g. Near Big Bazaar" },
+                          ]
+                        : fulfillmentMethod === "dinein"
+                        ? [
+                            { key: "name", label: "Full Name", type: "text", placeholder: "e.g. John Doe" },
+                            { key: "phone", label: "Phone Number", type: "tel", placeholder: "e.g. 98765 43210" },
+                            { key: "tableNumber", label: "Table Number", type: "text", placeholder: "e.g. T-5" },
+                            { key: "dineinGuests", label: "Number of Guests", type: "number", placeholder: "e.g. 2" },
+                          ]
+                        : [
+                            { key: "name", label: "Full Name", type: "text", placeholder: "e.g. John Doe" },
+                            { key: "phone", label: "Phone Number", type: "tel", placeholder: "e.g. 98765 43210" },
+                            { key: "pickupTime", label: "Preferred Pickup Time", type: "time", placeholder: "" },
+                          ]
                     ).map(({ key, label, type, placeholder }) => (
                       <div key={key}>
                         <label className="block text-[10px] font-black text-muted-foreground mb-1.5 uppercase tracking-widest opacity-70">
@@ -346,7 +409,7 @@ export default function Checkout() {
                         </label>
                         {type === "textarea" ? (
                           <textarea
-                            value={form[key] ?? ""}
+                            value={(form as any)[key] ?? ""}
                             onChange={(e) =>
                               setForm((prev) => ({ ...prev, [key]: e.target.value }))
                             }
@@ -356,9 +419,9 @@ export default function Checkout() {
                         ) : (
                           <input
                             type={type}
-                            value={form[key] ?? ""}
+                            value={(form as any)[key] ?? ""}
                             onChange={(e) =>
-                              setForm((prev) => ({ ...prev, [key]: e.target.value }))
+                              setForm((prev) => ({ ...prev, [key]: type === "number" ? parseInt(e.target.value) || 0 : e.target.value }))
                             }
                             placeholder={placeholder}
                             className="w-full bg-muted/30 border border-border/50 rounded-xl p-3.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
@@ -515,12 +578,26 @@ export default function Checkout() {
                   <span className="text-muted-foreground">Item Total</span>
                   <span className="font-medium">₹{summary.subtotal}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Delivery</span>
-                  <span className="font-medium">
-                    {deliveryFeeLabel(summary.deliveryFee)}
-                  </span>
-                </div>
+                {fulfillmentMethod === "delivery" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Delivery</span>
+                    <span className="font-medium">
+                      {deliveryFeeLabel(summary.deliveryFee)}
+                    </span>
+                  </div>
+                )}
+                {fulfillmentMethod === "dinein" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Dine-in</span>
+                    <span className="font-medium text-green-600">Included</span>
+                  </div>
+                )}
+                {fulfillmentMethod === "takeaway" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Takeaway</span>
+                    <span className="font-medium text-green-600">Free</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">GST (5%)</span>
                   <span className="font-medium">₹{summary.taxes}</span>
@@ -589,7 +666,7 @@ export default function Checkout() {
                     Placing Order...
                   </>
                 ) : (
-                  `Pay ₹${summary.total}`
+                  fulfillmentMethod === "delivery" ? `Pay ₹${summary.total}` : `Place Order • ₹${summary.total}`
                 )}
               </motion.button>
 
