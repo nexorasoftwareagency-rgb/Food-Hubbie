@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingBag, User } from "lucide-react";
+import { Search, ShoppingBag, User, Home } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLocationContext } from "@/context/LocationContext";
@@ -22,7 +22,7 @@ export function TopNav() {
   };
 
   const navItems = [
-    { label: "Home", icon: Search, href: "/", active: location === "/" },
+    { label: "Home", icon: Home, href: "/", active: location === "/" },
     { label: "Search", icon: Search, href: "/search", active: location === "/search" },
     { label: "Orders", icon: ShoppingBag, href: "/orders", active: location === "/orders" },
     { label: "Profile", icon: User, href: "/profile", active: location === "/profile" },

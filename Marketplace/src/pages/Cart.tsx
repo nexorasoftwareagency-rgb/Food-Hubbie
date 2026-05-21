@@ -13,16 +13,22 @@ import { validateCoupon } from "@/services/promotionService";
 export default function Cart() {
   const { state, dispatch, total, itemCount, platformFee } = useCart();
   const [outlet, setOutlet] = useState<Outlet | null>(null);
-  const [coupon, setCoupon] = useState("");
-  const [couponApplied, setCouponApplied] = useState(false);
-  const [couponDiscount, setCouponDiscount] = useState(0);
-  const [isFreeDelivery, setIsFreeDelivery] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
 
   useEffect(() => {
     if (state.outletId) {
       fetchOutletById(state.outletId).then(setOutlet);
     }
   }, [state.outletId]);
+
+  // Sync with CartContext appliedCoupon
+  const appliedCoupon = state.appliedCoupon;
+  const isFreeDelivery = appliedCoupon?.code === "FREESHIP" || (appliedCoupon as any)?.type === 'freeship';
+  const couponDiscount = appliedCoupon
+    ? appliedCoupon.type === 'percent'
+      ? Math.round(state.items.reduce((s, i) => s + i.price * i.quantity, 0) * (appliedCoupon.value / 100))
+      : appliedCoupon.value
+    : 0;
 
   const summary = calcCartSummary(
     state.items,
@@ -41,32 +47,20 @@ export default function Cart() {
   const outletName = outlet?.name || "Restaurant";
 
   const applyCoupon = async () => {
-    const code = coupon.trim().toUpperCase();
+    const code = couponInput.trim().toUpperCase();
     if (!code) return;
 
     try {
       const couponData = await validateCoupon(code);
       if (couponData) {
-        if (couponData.minOrder && summary.subtotal < couponData.minOrder) {
+        const subtotal = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
+        if (couponData.minOrder && subtotal < couponData.minOrder) {
           alert(`Minimum order of ₹${couponData.minOrder} required for this coupon.`);
           return;
         }
-
-        let discount = 0;
-        let freeShip = false;
-
-        if (code === "FREESHIP" || (couponData.type as any) === 'freeship') {
-          freeShip = true;
-          discount = 0;
-        } else if (couponData.type === 'percent') {
-          discount = Math.round(summary.subtotal * (couponData.value / 100));
-        } else {
-          discount = Math.round(couponData.value);
-        }
-
-        setCouponDiscount(discount);
-        setIsFreeDelivery(freeShip);
-        setCouponApplied(true);
+        // Dispatch to CartContext so Checkout page sees it
+        dispatch({ type: "APPLY_COUPON", payload: couponData });
+        setCouponInput("");
       } else {
         alert("Invalid or expired coupon code.");
       }
@@ -257,23 +251,18 @@ export default function Cart() {
               <Tag className="h-4 w-4 text-secondary" />
               Apply Coupon
             </h3>
-            {couponApplied ? (
+            {appliedCoupon ? (
               <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
                 <div>
                   <p className="text-green-700 font-bold text-sm">
-                    {coupon.toUpperCase()} applied!
+                    {appliedCoupon.code} applied!
                   </p>
                   <p className="text-green-600 text-xs">
                     {isFreeDelivery ? "Free Delivery Applied" : `You saved ₹${couponDiscount}`}
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setCouponApplied(false);
-                    setCouponDiscount(0);
-                    setIsFreeDelivery(false);
-                    setCoupon("");
-                  }}
+                  onClick={() => dispatch({ type: "REMOVE_COUPON" })}
                   className="text-xs text-destructive font-semibold"
                 >
                   Remove
@@ -283,8 +272,8 @@ export default function Cart() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={coupon}
-                  onChange={(e) => setCoupon(e.target.value)}
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value)}
                   placeholder="Enter coupon code (try FIRST50)"
                   data-testid="input-coupon"
                   className="flex-1 bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -314,7 +303,7 @@ export default function Cart() {
           </div>
 
           {/* 🎯 ZOMATO FEATURE: Savings Celebration */}
-          {(summary.savings > 0 || couponApplied) && (
+          {(summary.savings > 0 || appliedCoupon) && (
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

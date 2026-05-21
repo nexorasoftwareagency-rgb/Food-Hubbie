@@ -79,6 +79,18 @@ export default function Checkout() {
     lng: locationState.coords?.lng ?? 0,
   });
 
+  // Sync form coordinates when location is detected
+  useEffect(() => {
+    if (locationState.coords?.lat && locationState.coords?.lng) {
+      setForm(prev => ({
+        ...prev,
+        lat: prev.lat === 0 ? locationState.coords!.lat : prev.lat,
+        lng: prev.lng === 0 ? locationState.coords!.lng : prev.lng,
+        address: prev.address || locationState.address || "",
+      }));
+    }
+  }, [locationState.coords?.lat, locationState.coords?.lng, locationState.address]);
+
   const summary = calcCartSummary(cartState.items, outlet, {
     surgeMultiplier: surge?.multiplier || 1,
     globalDiscount: globalDiscount ? { type: globalDiscount.type, value: globalDiscount.value } : undefined,

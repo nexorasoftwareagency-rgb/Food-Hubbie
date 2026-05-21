@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Leaf } from "lucide-react";
 
 export default function Search() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryParams = new URLSearchParams(window.location.search);
   const urlQuery = queryParams.get("q") || "";
 
@@ -79,9 +79,8 @@ export default function Search() {
     setRecentSearches(newRecents);
     localStorage.setItem("recentSearches", JSON.stringify(newRecents));
 
-    // Update URL without reload
-    const newUrl = `${window.location.pathname}?q=${encodeURIComponent(query)}`;
-    window.history.replaceState({}, '', newUrl);
+    // Update URL via wouter router
+    setLocation(`/search?q=${encodeURIComponent(query)}`);
   };
 
   return (

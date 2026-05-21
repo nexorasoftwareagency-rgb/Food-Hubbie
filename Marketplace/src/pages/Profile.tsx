@@ -21,6 +21,7 @@ import {
   Home,
   Briefcase,
   Smartphone,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useOrderContext } from "@/context/OrderContext";
@@ -36,6 +37,8 @@ export default function Profile() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
   const [isSaving, setIsSaving] = useState(false);
+  const [showAddAddress, setShowAddAddress] = useState(false);
+  const [newAddress, setNewAddress] = useState({ label: "Home" as "Home" | "Work" | "Other", address: "", landmark: "" });
 
   // Redirect if not logged in
   if (authState === "unauthenticated") {
@@ -62,6 +65,34 @@ export default function Profile() {
       console.error("Update failed:", err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveAddress = async () => {
+    if (!newAddress.address.trim()) return;
+    const updatedAddresses = [...(user?.savedAddresses || []), {
+      id: `addr_${Date.now()}`,
+      label: newAddress.label,
+      address: newAddress.address,
+      landmark: newAddress.landmark,
+      coords: { lat: 0, lng: 0 },
+      isDefault: user?.savedAddresses.length === 0,
+    }];
+    try {
+      await updateUser({ savedAddresses: updatedAddresses } as any);
+      setShowAddAddress(false);
+      setNewAddress({ label: "Home", address: "", landmark: "" });
+    } catch (err) {
+      console.error("Save address failed:", err);
+    }
+  };
+
+  const handleDeleteAddress = async (id: string) => {
+    const updatedAddresses = user?.savedAddresses.filter(a => a.id !== id) || [];
+    try {
+      await updateUser({ savedAddresses: updatedAddresses } as any);
+    } catch (err) {
+      console.error("Delete address failed:", err);
     }
   };
 
@@ -146,32 +177,74 @@ export default function Profile() {
         <h2 className="text-xl font-black font-heading">Saved Addresses</h2>
       </div>
 
-      <div className="space-y-3">
-        {(Array.isArray(user?.savedAddresses) && user.savedAddresses.length > 0) ? (
-          user.savedAddresses.map((addr, i) => (
-            <div key={i} className="bg-card border border-border rounded-3xl p-5 flex gap-4 hover:shadow-md transition-all group cursor-pointer">
-              <div className={`p-3 rounded-2xl text-primary bg-primary/10 h-fit`}>
-                <MapPin className="h-5 w-5" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-foreground">Address {i + 1}</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{addr?.address ?? '—'}</p>
-              </div>
-              <Edit3 className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
-            </div>
-          ))
-        ) : (
-          <div className="bg-muted/30 rounded-[2rem] p-10 text-center border-2 border-dashed border-border">
-            <MapPin className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-bold text-muted-foreground">No saved addresses yet</p>
+      {showAddAddress ? (
+        <div className="bg-card border border-border rounded-3xl p-5 space-y-4">
+          <h3 className="font-bold text-foreground">Add New Address</h3>
+          <div className="flex gap-2">
+            {(["Home", "Work", "Other"] as const).map(label => (
+              <button
+                key={label}
+                onClick={() => setNewAddress(prev => ({ ...prev, label }))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold ${newAddress.label === label ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        )}
-        
-        <button className="w-full py-5 border-2 border-dashed border-border rounded-3xl text-muted-foreground font-bold text-sm flex items-center justify-center gap-2 hover:border-primary/30 hover:text-primary hover:bg-primary/5 transition-all">
+          <textarea
+            value={newAddress.address}
+            onChange={(e) => setNewAddress(prev => ({ ...prev, address: e.target.value }))}
+            placeholder="Enter full address..."
+            className="w-full bg-muted/30 border border-border/50 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
+          />
+          <input
+            value={newAddress.landmark}
+            onChange={(e) => setNewAddress(prev => ({ ...prev, landmark: e.target.value }))}
+            placeholder="Landmark (optional)"
+            className="w-full bg-muted/30 border border-border/50 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <div className="flex gap-2">
+            <button onClick={() => { setShowAddAddress(false); setNewAddress({ label: "Home", address: "", landmark: "" }); }} className="flex-1 py-3 border border-border rounded-xl font-semibold text-foreground hover:bg-muted transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleSaveAddress} className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors">
+              Save
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {(Array.isArray(user?.savedAddresses) && user.savedAddresses.length > 0) ? (
+            user.savedAddresses.map((addr, i) => (
+              <div key={addr.id || i} className="bg-card border border-border rounded-3xl p-5 flex gap-4 hover:shadow-md transition-all group">
+                <div className={`p-3 rounded-2xl text-primary bg-primary/10 h-fit`}>
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-foreground">{addr.label}</h3>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{addr?.address ?? '—'}</p>
+                  {addr.landmark && <p className="text-[10px] text-muted-foreground/60 mt-0.5">Near: {addr.landmark}</p>}
+                </div>
+                <button onClick={() => handleDeleteAddress(addr.id)} className="p-2 text-muted-foreground/30 hover:text-destructive transition-colors" title="Delete">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))
+          ) : (
+            <div className="bg-muted/30 rounded-[2rem] p-10 text-center border-2 border-dashed border-border">
+              <MapPin className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm font-bold text-muted-foreground">No saved addresses yet</p>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {!showAddAddress && (
+        <button onClick={() => setShowAddAddress(true)} className="w-full py-5 border-2 border-dashed border-border rounded-3xl text-muted-foreground font-bold text-sm flex items-center justify-center gap-2 hover:border-primary/30 hover:text-primary hover:bg-primary/5 transition-all">
           <Plus className="h-5 w-5" />
           Add New Address
         </button>
-      </div>
+      )}
     </motion.div>
   );
 

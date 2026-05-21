@@ -57,17 +57,19 @@ export default function Tracking() {
 
     if (order.status === "Delivered" || order.status === "Cancelled") return;
 
-    // Simulate order advancing every 6 seconds for demo
+    // Simulate order advancing every 6 seconds for demo (DISABLED IN PRODUCTION)
     const advance = setInterval(() => {
-      setCurrentIdx((prev) => {
-        if (prev >= STATUS_PIPELINE.length - 1) {
-          clearInterval(advance);
-          return prev;
-        }
-        const nextStatus = STATUS_PIPELINE[prev + 1] as any;
-        updateOrderStatus(order.id, nextStatus);
-        return prev + 1;
-      });
+      if (import.meta.env.DEV) {
+        setCurrentIdx((prev) => {
+          if (prev >= STATUS_PIPELINE.length - 1) {
+            clearInterval(advance);
+            return prev;
+          }
+          const nextStatus = STATUS_PIPELINE[prev + 1] as any;
+          updateOrderStatus(order.id, nextStatus);
+          return prev + 1;
+        });
+      }
     }, 6000);
 
     // Countdown ETA
