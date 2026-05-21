@@ -200,10 +200,6 @@ export function initRealtimeListeners() {
 
 export function cleanupOrders() {
     console.log("[Orders] Detaching listeners...");
-    ['pizza', 'cake'].forEach(o => {
-        const r = db.ref(`${o}/orders`);
-        r.off();
-    });
     if (_ordersRef) _ordersRef.off();
     if (_liveOrdersRef) _liveOrdersRef.off();
     _ordersRef = null;
@@ -991,22 +987,13 @@ export async function updateStatus(id, status) {
     }
 
     try {
-        const updates = {
+        // Merge statusHistory and timestamp into the existing updates object
+        updates.updatedAt = ServerValue.TIMESTAMP;
+        updates.statusHistory = [...(Array.isArray(order.statusHistory) ? order.statusHistory : []), {
             status,
-            paymentMethod,
-            paymentStatus,
-            updatedAt: ServerValue.TIMESTAMP,
-            statusHistory: [...(Array.isArray(order.statusHistory) ? order.statusHistory : []), {
-                status,
-                timestamp: ServerValue.TIMESTAMP,
-                updatedBy: auth.currentUser?.email || 'admin'
-            }]
-        };
-
-        if (isResurrecting) {
-            // Include resurrection logic if applicable (already calculated in updates variable earlier if we followed the logic)
-            // But let's be explicit and re-calculate if needed or just use the variables from above
-        }
+            timestamp: ServerValue.TIMESTAMP,
+            updatedBy: auth.currentUser?.email || 'admin'
+        }];
 
         if (status === "Confirmed" && !order.stockDeducted) {
             const items = order.normalizedItems || order.cart || [];
