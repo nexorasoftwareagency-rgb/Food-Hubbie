@@ -73,31 +73,50 @@ function checkAuth() {
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             try {
-                // Verify SuperAdmin status in DB first
-                const snap = await db.ref(`admins/${user.uid}`).once('value');
+                // Verify admin status in DB first
+                const snap = await db.ref(`system/admins/${user.uid}`).once('value');
                 const adminData = snap.val();
                 
-                if (adminData && adminData.isSuper === true) {
-                    document.getElementById('loginOverlay').classList.add('hidden');
-                    document.getElementById('mainContainer').classList.remove('hidden');
-                    initStats();
-                    initOnboardingManager();
-                    logAdminAction('SESSION_INIT', { method: 'Firebase Auth' });
-                } else {
+                const isSuper = adminData && adminData.isSuper === true;
+                const role = adminData?.role || (isSuper ? 'superadmin' : 'admin');
+                
+                if (!isSuper) {
                     // Fallback: check custom claims if DB record is missing
                     const token = await user.getIdTokenResult(true);
                     if (token.claims && token.claims.superadmin === true) {
                         console.log("[SuperAdmin] Emergency access granted via custom claims");
-                        document.getElementById('loginOverlay').classList.add('hidden');
-                        document.getElementById('mainContainer').classList.remove('hidden');
-                        initStats();
-                        initOnboardingManager();
-                        logAdminAction('SESSION_INIT', { method: 'Custom Claims Fallback' });
+                    } else if (adminData) {
+                        console.log(`[RBAC] Access granted with role: ${role}`);
                     } else {
-                        console.error("Access Denied: Not a Super Admin");
-                        showToast("Unauthorized: Super Admin privileges required", "error");
+                        console.error("Access Denied: Not an Admin");
+                        showToast("Unauthorized: Admin privileges required", "error");
                         auth.signOut();
+                        return;
                     }
+                }
+                
+                // Store current admin role for RBAC checks
+                window.currentAdminRole = role;
+                window.currentAdminData = adminData || {};
+                
+                // Check if 2FA is enabled
+                const tfaSnap = await db.ref(`system/admins/${user.uid}/tfa`).once('value');
+                const tfaData = tfaSnap.val();
+                
+                if (tfaData && tfaData.enabled && tfaData.secret) {
+                    // Show 2FA modal
+                    document.getElementById('loginOverlay').classList.add('hidden');
+                    document.getElementById('tfaModal').classList.remove('hidden');
+                    document.getElementById('mainContainer').classList.add('hidden');
+                    document.getElementById('tfaCode').focus();
+                } else {
+                    // No 2FA, proceed to main app
+                    document.getElementById('loginOverlay').classList.add('hidden');
+                    document.getElementById('mainContainer').classList.remove('hidden');
+                    applyRBACRestrictions(role);
+                    initStats();
+                    initOnboardingManager();
+                    logAdminAction('SESSION_INIT', { method: 'Firebase Auth', role });
                 }
             } catch (err) {
                 console.error("Auth Verification Error:", err);
@@ -105,10 +124,140 @@ function checkAuth() {
             }
         } else {
             document.getElementById('loginOverlay').classList.remove('hidden');
+            document.getElementById('tfaModal').classList.add('hidden');
             document.getElementById('mainContainer').classList.add('hidden');
         }
     });
 }
+
+// =====================================================
+// MODULE: ROLE-BASED ACCESS CONTROL (R5-2)
+// =====================================================
+
+/**
+ * RBAC Role Definitions:
+ * - superadmin: Full access to all tabs and operations
+ * - business: Access to business management, orders, riders, promotions
+ * - outlet: Access to orders, live orders, reviews only
+ * - support: Access to users, reviews, broadcast (read-only)
+ */
+const RBAC_PERMISSIONS = {
+    superadmin: {
+        tabs: ['dashboard', 'liveorders', 'riders', 'reconciliation', 'users', 'businesses', 'audit', 'settings', 'promotions', 'inventory', 'delivery', 'reviews', 'broadcast', 'reports', 'analytics', 'onboarding'],
+        operations: ['all']
+    },
+    business: {
+        tabs: ['dashboard', 'liveorders', 'riders', 'users', 'businesses', 'promotions', 'inventory', 'delivery', 'reviews', 'reports'],
+        operations: ['manage_businesses', 'manage_riders', 'manage_promotions', 'view_orders', 'view_users']
+    },
+    outlet: {
+        tabs: ['dashboard', 'liveorders', 'reviews'],
+        operations: ['view_orders', 'view_reviews']
+    },
+    support: {
+        tabs: ['dashboard', 'users', 'reviews', 'broadcast'],
+        operations: ['view_users', 'view_reviews', 'send_broadcast']
+    }
+};
+
+/**
+ * Apply RBAC restrictions based on admin role
+ */
+function applyRBACRestrictions(role) {
+    const permissions = RBAC_PERMISSIONS[role] || RBAC_PERMISSIONS.outlet;
+    
+    // Hide unauthorized tabs
+    const allTabs = document.querySelectorAll('.nav-link[data-tab]');
+    allTabs.forEach(tab => {
+        const tabName = tab.getAttribute('data-tab');
+        if (permissions.tabs.includes(tabName)) {
+            tab.style.display = '';
+        } else {
+            tab.style.display = 'none';
+        }
+    });
+    
+    // Restrict specific operations based on role
+    if (role !== 'superadmin') {
+        // Hide sensitive controls for non-superadmin roles
+        const sensitiveControls = [
+            'btnDeleteBusiness',
+            'btnSystemReset',
+            'btnDatabaseBackup',
+            'btnInfrastructureControls'
+        ];
+        sensitiveControls.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+    }
+    
+    // Show role badge in UI
+    const roleBadge = document.getElementById('adminRoleBadge');
+    if (roleBadge) {
+        roleBadge.textContent = role.toUpperCase();
+        roleBadge.style.display = '';
+    }
+    
+    console.log(`[RBAC] Applied restrictions for role: ${role}`);
+}
+
+/**
+ * Check if current admin has permission for an operation
+ */
+function hasPermission(operation) {
+    const role = window.currentAdminRole || 'outlet';
+    const permissions = RBAC_PERMISSIONS[role] || RBAC_PERMISSIONS.outlet;
+    
+    if (permissions.operations.includes('all')) return true;
+    return permissions.operations.includes(operation);
+}
+
+/**
+ * Check if current admin has access to a tab
+ */
+function hasTabAccess(tabName) {
+    const role = window.currentAdminRole || 'outlet';
+    const permissions = RBAC_PERMISSIONS[role] || RBAC_PERMISSIONS.outlet;
+    return permissions.tabs.includes(tabName);
+}
+
+/**
+ * Submit 2FA code for verification
+ */
+window.submitTFACode = async function() {
+    const code = document.getElementById('tfaCode').value.trim();
+    const errorEl = document.getElementById('tfaError');
+    const btn = document.getElementById('btnTFA');
+    
+    if (!code || code.length !== 6) {
+        errorEl.innerText = "Enter a valid 6-digit code";
+        errorEl.classList.remove('hidden');
+        return;
+    }
+    
+    btn.innerText = "Verifying...";
+    btn.disabled = true;
+    errorEl.classList.add('hidden');
+    
+    const isValid = await verifyTFACode(code);
+    
+    if (isValid) {
+        document.getElementById('tfaModal').classList.add('hidden');
+        document.getElementById('mainContainer').classList.remove('hidden');
+        applyRBACRestrictions(window.currentAdminRole || 'superadmin');
+        initStats();
+        initOnboardingManager();
+        logAdminAction('SESSION_INIT', { method: '2FA Verified' });
+    } else {
+        errorEl.innerText = "Invalid code. Please try again.";
+        errorEl.classList.remove('hidden');
+        btn.innerText = "VERIFY CODE";
+        btn.disabled = false;
+        document.getElementById('tfaCode').value = '';
+        document.getElementById('tfaCode').focus();
+    }
+};
 
 async function logAdminAction(action, details = {}) {
     const user = auth.currentUser;
@@ -148,6 +297,42 @@ async function atomicAdminAction(updates, action, details = {}) {
     return db.ref().update(atomicUpdates);
 }
 
+/**
+ * RATE LIMITER (R5-7)
+ * Prevents abuse of broadcast and coupon creation.
+ * Tracks action timestamps per admin and blocks if threshold exceeded.
+ */
+const _rateLimitStore = {};
+const RATE_LIMITS = {
+    'SEND_BROADCAST': { max: 5, windowMs: 60000 },      // 5 broadcasts per minute
+    'CREATE_COUPON': { max: 10, windowMs: 60000 },       // 10 coupons per minute
+    'BULK_OPERATION': { max: 2, windowMs: 120000 },      // 2 bulk ops per 2 minutes
+    'ECOSYSTEM_INITIALIZE': { max: 3, windowMs: 300000 } // 3 provisions per 5 minutes
+};
+
+function checkRateLimit(action) {
+    const limit = RATE_LIMITS[action];
+    if (!limit) return true; // No limit for this action
+
+    const adminEmail = auth.currentUser?.email || 'unknown';
+    const key = `${action}:${adminEmail}`;
+    
+    if (!_rateLimitStore[key]) _rateLimitStore[key] = [];
+    
+    const now = Date.now();
+    // Remove expired timestamps
+    _rateLimitStore[key] = _rateLimitStore[key].filter(ts => now - ts < limit.windowMs);
+    
+    if (_rateLimitStore[key].length >= limit.max) {
+        const oldest = _rateLimitStore[key][0];
+        const waitSec = Math.ceil((limit.windowMs - (now - oldest)) / 1000);
+        return { allowed: false, waitSeconds: waitSec, max: limit.max, windowMs: limit.windowMs };
+    }
+    
+    _rateLimitStore[key].push(now);
+    return { allowed: true };
+}
+
 // --- UI Navigation ---
 const tabs = document.querySelectorAll('.nav-link');
 const panes = document.querySelectorAll('.tab-pane');
@@ -168,7 +353,8 @@ const tabMap = {
     'liveorders': 'Real-time order pipeline across all outlets',
     'reviews': 'Ratings, feedback & outlet quality scoring',
     'broadcast': 'Push notification engine & audience targeting',
-    'reconciliation': 'Manual partner payout & financial reconciliation'
+    'reconciliation': 'Manual partner payout & financial reconciliation',
+    'analytics': 'Platform-wide business intelligence & metrics'
 };
 
 tabs.forEach(tab => {
@@ -191,6 +377,13 @@ tabs.forEach(tab => {
         
         // Refresh Icons & Load Data
         if (typeof lucide !== 'undefined') lucide.createIcons();
+        
+        // Detach live orders listener when leaving tab
+        if (target !== 'liveorders' && _liveOrdersUnsub) {
+            _liveOrdersUnsub();
+            _liveOrdersUnsub = null;
+        }
+        
         if (target === 'inventory') loadInventory();
         if (target === 'delivery') loadGlobalDelivery();
         if (target === 'riders') loadRiders();
@@ -203,6 +396,7 @@ tabs.forEach(tab => {
         if (target === 'reviews') loadReviews();
         if (target === 'broadcast') loadBroadcastHistory();
         if (target === 'reconciliation') loadReconciliations();
+        if (target === 'analytics') showToast('Click "Refresh Data" to load analytics', 'info');
     });
 });
 
@@ -234,7 +428,334 @@ window.loadInfrastructure = function() {
         `;
     }
     logAdminAction('VIEW_INFRASTRUCTURE', { status: connectionStatus });
+    loadTFAStatus();
 };
+
+// =====================================================
+// MODULE: TWO-FACTOR AUTHENTICATION (R5-6)
+// =====================================================
+let _tfaSecret = null;
+let _tfaTempSecret = null;
+
+/**
+ * Load 2FA status for current admin
+ */
+async function loadTFAStatus() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+        const snap = await db.ref(`system/admins/${user.uid}/tfa`).once('value');
+        const tfaData = snap.val();
+        
+        const enableBtn = document.getElementById('tfaEnableBtn');
+        const disableBtn = document.getElementById('tfaDisableBtn');
+        const qrContainer = document.getElementById('tfaQRContainer');
+        
+        if (tfaData && tfaData.enabled) {
+            enableBtn?.classList.add('hidden');
+            disableBtn?.classList.remove('hidden');
+            qrContainer?.classList.add('hidden');
+        } else {
+            enableBtn?.classList.remove('hidden');
+            disableBtn?.classList.add('hidden');
+            qrContainer?.classList.add('hidden');
+        }
+    } catch (err) {
+        console.error("Failed to load TFA status:", err);
+    }
+}
+
+/**
+ * Show 2FA setup UI with QR code
+ */
+window.showTFASetup = function() {
+    const user = auth.currentUser;
+    if (!user) return showToast("You must be logged in", "error");
+    
+    // Generate a random secret
+    const secret = new OTPAuth.Secret({ size: 20 });
+    _tfaTempSecret = secret.base32;
+    
+    // Create TOTP instance
+    const totp = new OTPAuth.TOTP({
+        issuer: 'FoodHubbie',
+        label: user.email,
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        secret: secret
+    });
+    
+    // Generate QR code
+    const otpauthURL = totp.toString();
+    const qrContainer = document.getElementById('tfaQRContainer');
+    const qrCodeEl = document.getElementById('tfaQRCode');
+    const secretDisplay = document.getElementById('tfaSecretDisplay');
+    
+    qrContainer.classList.remove('hidden');
+    secretDisplay.textContent = _tfaTempSecret;
+    
+    // Generate QR code using qrcode library
+    QRCode.toCanvas(otpauthURL, { width: 200, margin: 2 }, function (error, canvas) {
+        if (error) {
+            console.error("QR Code generation failed:", error);
+            showToast("Failed to generate QR code", "error");
+            return;
+        }
+        qrCodeEl.innerHTML = '';
+        qrCodeEl.appendChild(canvas);
+    });
+    
+    document.getElementById('tfaVerifyInput').value = '';
+};
+
+/**
+ * Verify TFA setup code and enable 2FA
+ */
+window.verifyTFASetup = async function() {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
+    const user = auth.currentUser;
+    if (!user) return showToast("You must be logged in", "error");
+    
+    const code = document.getElementById('tfaVerifyInput').value.trim();
+    if (!code || code.length !== 6) {
+        return showToast("Enter a valid 6-digit code", "error");
+    }
+    
+    try {
+        const totp = new OTPAuth.TOTP({
+            issuer: 'FoodHubbie',
+            label: user.email,
+            algorithm: 'SHA1',
+            digits: 6,
+            period: 30,
+            secret: new OTPAuth.Secret({ base32: _tfaTempSecret })
+        });
+        
+        const isValid = totp.validate({ token: code, window: 1 }) !== null;
+        
+        if (!isValid) {
+            return showToast("Invalid code. Please try again.", "error");
+        }
+        
+        // Save 2FA status to database
+        await db.ref(`system/admins/${user.uid}/tfa`).set({
+            enabled: true,
+            secret: _tfaTempSecret,
+            setupAt: Date.now(),
+            setupBy: user.email
+        });
+        
+        _tfaSecret = _tfaTempSecret;
+        _tfaTempSecret = null;
+        
+        showToast("Two-factor authentication enabled!", "success");
+        await logAdminAction('TFA_ENABLED', { adminEmail: user.email });
+        
+        loadTFAStatus();
+    } catch (err) {
+        console.error("TFA setup failed:", err);
+        showToast("Failed to enable 2FA: " + err.message, "error");
+    }
+};
+
+/**
+ * Disable 2FA
+ */
+window.disableTFA = async function() {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
+    const user = auth.currentUser;
+    if (!user) return showToast("You must be logged in", "error");
+    
+    if (!confirm("Disable two-factor authentication? This reduces account security.")) return;
+    
+    try {
+        await db.ref(`system/admins/${user.uid}/tfa`).remove();
+        _tfaSecret = null;
+        
+        showToast("Two-factor authentication disabled", "success");
+        await logAdminAction('TFA_DISABLED', { adminEmail: user.email });
+        
+        loadTFAStatus();
+    } catch (err) {
+        console.error("TFA disable failed:", err);
+        showToast("Failed to disable 2FA: " + err.message, "error");
+    }
+};
+
+/**
+ * Verify 2FA code during login (called after successful auth)
+ */
+window.verifyTFACode = async function(code) {
+    const user = auth.currentUser;
+    if (!user) return false;
+    
+    try {
+        const snap = await db.ref(`system/admins/${user.uid}/tfa`).once('value');
+        const tfaData = snap.val();
+        
+        if (!tfaData || !tfaData.enabled || !tfaData.secret) {
+            return true; // 2FA not enabled, skip verification
+        }
+        
+        const totp = new OTPAuth.TOTP({
+            issuer: 'FoodHubbie',
+            label: user.email,
+            algorithm: 'SHA1',
+            digits: 6,
+            period: 30,
+            secret: new OTPAuth.Secret({ base32: tfaData.secret })
+        });
+        
+        return totp.validate({ token: code, window: 1 }) !== null;
+    } catch (err) {
+        console.error("TFA verification failed:", err);
+        return false;
+    }
+};
+
+// =====================================================
+// MODULE: DATA RETENTION POLICIES (R5-5)
+// =====================================================
+
+/**
+ * Apply data retention policy to specified data type
+ * @param {string} type - 'orders', 'audit', or 'settlements'
+ */
+window.applyDataRetention = async function(type) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
+    const daysEl = document.getElementById(`retention${type.charAt(0).toUpperCase() + type.slice(1)}`);
+    const actionEl = document.getElementById(`retention${type.charAt(0).toUpperCase() + type.slice(1)}Action`);
+    const statusEl = document.getElementById('retentionStatus');
+    const statusTextEl = document.getElementById('retentionStatusText');
+    
+    if (!daysEl || !actionEl) return showToast("Retention configuration not found", "error");
+    
+    const days = parseInt(daysEl.value);
+    const action = actionEl.value;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const cutoffTimestamp = cutoffDate.getTime();
+    
+    if (!confirm(`This will ${action} all ${type} older than ${days} days (before ${cutoffDate.toLocaleDateString()}). Continue?`)) return;
+    
+    statusEl.classList.remove('hidden');
+    statusTextEl.textContent = `Scanning ${type} for records older than ${days} days...`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    try {
+        let affectedCount = 0;
+        const updates = {};
+        
+        switch (type) {
+            case 'orders':
+                affectedCount = await processRetentionOrders(cutoffTimestamp, action, updates);
+                break;
+            case 'audit':
+                affectedCount = await processRetentionAudit(cutoffTimestamp, action, updates);
+                break;
+            case 'settlements':
+                affectedCount = await processRetentionSettlements(cutoffTimestamp, action, updates);
+                break;
+        }
+        
+        if (Object.keys(updates).length > 0) {
+            statusTextEl.textContent = `Applying ${action} to ${affectedCount} records...`;
+            await db.ref().update(updates);
+        }
+        
+        statusTextEl.textContent = `Successfully ${action}d ${affectedCount} ${type} records older than ${days} days.`;
+        showToast(`Data retention applied: ${affectedCount} ${type} ${action}d`, "success");
+        await logAdminAction('DATA_RETENTION_APPLIED', { type, days, action, affectedCount });
+        
+        setTimeout(() => statusEl.classList.add('hidden'), 5000);
+    } catch (err) {
+        console.error("Data retention failed:", err);
+        statusTextEl.textContent = `Failed: ${err.message}`;
+        showToast("Data retention failed: " + err.message, "error");
+    }
+};
+
+async function processRetentionOrders(cutoffTimestamp, action, updates) {
+    let count = 0;
+    const snap = await db.ref('businesses').once('value');
+    const businesses = snap.val() || {};
+    
+    for (const [bizId, biz] of Object.entries(businesses)) {
+        const outlets = biz.outlets || {};
+        for (const [outletId, outlet] of Object.entries(outlets)) {
+            const orders = outlet.orders || {};
+            for (const [orderId, order] of Object.entries(orders)) {
+                const orderTimestamp = order.timestamp || order.createdAt || 0;
+                if (orderTimestamp < cutoffTimestamp) {
+                    if (action === 'archive') {
+                        updates[`archives/orders/${bizId}/${outletId}/${orderId}`] = { ...order, archivedAt: Date.now(), archivedBy: auth.currentUser.email };
+                    }
+                    updates[`businesses/${bizId}/outlets/${outletId}/orders/${orderId}`] = null;
+                    count++;
+                }
+            }
+        }
+    }
+    
+    return count;
+}
+
+async function processRetentionAudit(cutoffTimestamp, action, updates) {
+    let count = 0;
+    
+    // System audit logs
+    const adminSnap = await db.ref('system/auditLogs').orderByChild('timestamp').endAt(cutoffTimestamp).once('value');
+    adminSnap.forEach(child => {
+        if (action === 'archive') {
+            updates[`archives/auditLogs/${child.key}`] = { ...child.val(), archivedAt: Date.now() };
+        }
+        updates[`system/auditLogs/${child.key}`] = null;
+        count++;
+    });
+    
+    // Marketplace audit logs
+    const marketSnap = await db.ref('logs/marketplaceAudit').orderByChild('timestamp').endAt(cutoffTimestamp).once('value');
+    marketSnap.forEach(child => {
+        if (action === 'archive') {
+            updates[`archives/marketplaceAudit/${child.key}`] = { ...child.val(), archivedAt: Date.now() };
+        }
+        updates[`logs/marketplaceAudit/${child.key}`] = null;
+        count++;
+    });
+    
+    // Bot audit logs
+    const botSnap = await db.ref('logs/botAudit').orderByChild('timestamp').endAt(cutoffTimestamp).once('value');
+    botSnap.forEach(child => {
+        if (action === 'archive') {
+            updates[`archives/botAudit/${child.key}`] = { ...child.val(), archivedAt: Date.now() };
+        }
+        updates[`logs/botAudit/${child.key}`] = null;
+        count++;
+    });
+    
+    return count;
+}
+
+async function processRetentionSettlements(cutoffTimestamp, action, updates) {
+    let count = 0;
+    const snap = await db.ref('system/settlements').once('value');
+    const settlements = snap.val() || {};
+    
+    for (const [setId, settlement] of Object.entries(settlements)) {
+        const settlementTimestamp = settlement.timestamp || settlement.createdAt || 0;
+        if (settlementTimestamp < cutoffTimestamp) {
+            if (action === 'archive') {
+                updates[`archives/settlements/${setId}`] = { ...settlement, archivedAt: Date.now() };
+            }
+            updates[`system/settlements/${setId}`] = null;
+            count++;
+        }
+    }
+    
+    return count;
+}
 
 window.showOnboarding = function() {
     document.querySelector('[data-tab="onboarding"]').click();
@@ -247,6 +768,7 @@ function initStats() {
     // Load secondary data modules
     loadPromotions();
     loadReports();
+    loadBusinessesTab();
 
     db.ref('businesses').on('value', (snap) => {
         const businesses = snap.val() || {};
@@ -358,6 +880,9 @@ function renderOrderHeatmap() {
     el.innerHTML = html + '</table>';
 }
 
+// --- Business Registry ---
+let allBusinessesList = [];
+
 function renderBusinessList(list) {
     const tbody = document.getElementById('businessList');
     if (!tbody) return;
@@ -402,8 +927,89 @@ function renderBusinessList(list) {
         </tr>
     `).join('');
     // Mirror to dedicated businesses tab
+    allBusinessesList = list;
+    PAGINATION.businesses.total = list.length;
+    renderBusinessesAlt(list);
+    lucide.createIcons();
+}
+
+async function loadBusinessesTab() {
+    try {
+        const snap = await db.ref('businesses').once('value');
+        const businesses = snap.val() || {};
+        const list = [];
+        
+        Object.entries(businesses).forEach(([id, biz]) => {
+            const outlets = biz.outlets || {};
+            list.push({
+                id,
+                name: biz.name || id,
+                owner: biz.owner || 'N/A',
+                outlets: Object.keys(outlets).length,
+                status: biz.status || 'Active',
+                commission: biz.commission || { percentage: 0, fixed: 0 },
+                firstOutlet: Object.keys(outlets)[0] || null
+            });
+        });
+        
+        allBusinessesList = list;
+        PAGINATION.businesses.total = list.length;
+        PAGINATION.businesses.page = 1;
+        renderBusinessesAlt(list);
+    } catch (err) {
+        console.error("Failed to load businesses tab:", err);
+    }
+}
+
+window.goToBusinessesPage = function(page) {
+    PAGINATION.businesses.page = page;
+    renderBusinessesAlt(allBusinessesList);
+};
+
+function renderBusinessesAlt(list) {
     const altTbody = document.getElementById('businessListAlt');
-    if (altTbody) altTbody.innerHTML = tbody.innerHTML;
+    if (!altTbody) return;
+    
+    if (list.length === 0) {
+        altTbody.innerHTML = '<tr><td colspan="5" class="text-center p-12 text-muted">No operational nodes detected in the ecosystem registry.</td></tr>';
+        renderPagination('businessesPagination', 1, 15, 0, 'goToBusinessesPage');
+        return;
+    }
+
+    const paginated = paginateArray(list, PAGINATION.businesses.page, PAGINATION.businesses.pageSize);
+
+    altTbody.innerHTML = paginated.map(b => `
+        <tr>
+            <td>
+                <div class="font-black" style="color:var(--pro-text)">${safeText(b.name)}</div>
+                <div class="text-xs text-muted font-mono opacity-60">${safeText(b.id)}</div>
+            </td>
+            <td>
+                <div class="font-semibold" style="color:var(--pro-text)">${safeText(b.owner)}</div>
+                <div class="text-xs text-muted uppercase" style="letter-spacing:0.5px">Authority</div>
+            </td>
+            <td>
+                <div class="font-black" style="color:#F97316">${b.outlets} Clusters</div>
+            </td>
+            <td>
+                <span class="pro-badge badge-success">
+                    <i data-lucide="shield-check" size="10"></i> ${safeText(b.status)}
+                </span>
+            </td>
+            <td>
+                <div class="flex gap-2">
+                    <button class="btn-pro-icon" title="Edit Commission" onclick="showCommissionModal('${safeText(b.id)}', ${b.commission.percentage}, ${b.commission.fixed})">
+                        <i data-lucide="percent" size="16" color="#F97316"></i>
+                    </button>
+                    <button class="btn-pro-icon" title="Node Configuration" onclick="showOutletModal('${safeText(b.id)}', '${b.firstOutlet || ''}')">
+                        <i data-lucide="settings" size="16"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+    
+    renderPagination('businessesPagination', PAGINATION.businesses.page, PAGINATION.businesses.pageSize, PAGINATION.businesses.total, 'goToBusinessesPage');
     lucide.createIcons();
 }
 
@@ -412,7 +1018,7 @@ const onboardingForm = document.getElementById('onboardingForm');
 if (onboardingForm) {
     onboardingForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+        if (!hasPermission('all')) return showToast("Access denied", "error");
         const bizName = document.getElementById('bizName').value;
         const bizId = document.getElementById('bizId').value;
         const outletName = document.getElementById('outletName').value;
@@ -478,7 +1084,7 @@ if (onboardingForm) {
             };
 
             // Admin Node
-            updates[`admins/${uid}`] = {
+            updates[`system/admins/${uid}`] = {
                 name: `${bizName} Admin`,
                 email: adminEmail,
                 phone: adminPhone,
@@ -571,6 +1177,7 @@ window.removeSlab = function(idx) {
 };
 
 window.saveGlobalDelivery = async function() {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     try {
         await db.ref('system/settings/delivery/slabs').set(globalDeliverySlabs);
         alert("✅ Global Delivery Flow updated successfully!");
@@ -616,6 +1223,7 @@ window.hideOutletModal = function() {
 };
 
 window.updateOutlet = async function() {
+    if (!hasPermission('manage_businesses')) return showToast("Access denied", "error");
     if (!editingBizId || !editingOutletId) return;
     
     const name = document.getElementById('editOutletName').value;
@@ -683,6 +1291,7 @@ window.hideCommissionModal = function() {
 };
 
 window.saveCommission = async function() {
+    if (!hasPermission('manage_businesses')) return showToast("Access denied", "error");
     const bid = document.getElementById('comm_business_id').value;
     const perc = parseFloat(document.getElementById('comm_percentage').value) || 0;
     const fixed = parseFloat(document.getElementById('comm_fixed').value) || 0;
@@ -790,9 +1399,16 @@ async function loadRiders() {
     db.ref('riders').on('value', (snap) => {
         const data = snap.val() || {};
         allRiders = Object.keys(data).map(id => ({ id, ...data[id] }));
+        PAGINATION.riders.total = allRiders.length;
+        PAGINATION.riders.page = 1;
         renderRidersList(allRiders);
     });
 }
+
+window.goToRidersPage = function(page) {
+    PAGINATION.riders.page = page;
+    renderRidersList(allRiders);
+};
 
 function renderRidersList(list) {
     const tbody = document.getElementById('ridersListTable');
@@ -800,10 +1416,13 @@ function renderRidersList(list) {
 
     if (list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center p-12 text-muted">No logistics partners registered in the fleet node.</td></tr>';
+        renderPagination('ridersPagination', 1, 20, 0, 'goToRidersPage');
         return;
     }
 
-    tbody.innerHTML = list.map(r => `
+    const paginated = paginateArray(list, PAGINATION.riders.page, PAGINATION.riders.pageSize);
+
+    tbody.innerHTML = paginated.map(r => `
         <tr>
             <td>
                 <div class="flex items-center gap-3">
@@ -831,6 +1450,8 @@ function renderRidersList(list) {
             </td>
         </tr>
     `).join('');
+    
+    renderPagination('ridersPagination', PAGINATION.riders.page, PAGINATION.riders.pageSize, PAGINATION.riders.total, 'goToRidersPage');
     lucide.createIcons();
 }
 
@@ -877,6 +1498,7 @@ window.editRider = function(id) {
 };
 
 window.saveRider = async function() {
+    if (!hasPermission('manage_riders')) return showToast("Access denied", "error");
     const name = document.getElementById('riderName').value;
     const email = document.getElementById('riderEmail').value;
     const phone = document.getElementById('riderPhone').value;
@@ -895,8 +1517,17 @@ window.saveRider = async function() {
     try {
         if (editingRiderId) {
             if (pass && pass.length >= 6) {
-                console.log("[SuperAdmin] Rider Password change requested.");
-                data.password = pass; 
+                console.log("[SuperAdmin] Rider Password change requested. Use Firebase Auth password reset email.");
+                showToast("Password reset email sent to rider.", "info");
+                try {
+                    const riderSnap = await db.ref(`riders/${editingRiderId}`).once('value');
+                    const riderEmail = riderSnap.val()?.email;
+                    if (riderEmail) {
+                        await secondaryAuth.sendPasswordResetEmail(riderEmail);
+                    }
+                } catch (resetErr) {
+                    console.error("Password reset failed:", resetErr);
+                }
             }
 
             const updates = {};
@@ -926,7 +1557,6 @@ window.saveRider = async function() {
             data.uid = uid;
             data.createdAt = firebase.database.ServerValue.TIMESTAMP;
             data.status = 'Offline';
-            data.password = pass; 
             
             const profileFile = document.getElementById('fileProfile').files[0];
             const aadharFile = document.getElementById('fileAadhar').files[0];
@@ -952,6 +1582,7 @@ window.saveRider = async function() {
 };
 
 window.resetRiderPassword = async function(id, email) {
+    if (!hasPermission('manage_riders')) return showToast("Access denied", "error");
     if (!confirm(`Trigger secure password reset email for ${email}?`)) return;
     try {
         await auth.sendPasswordResetEmail(email);
@@ -962,6 +1593,7 @@ window.resetRiderPassword = async function(id, email) {
 };
 
 window.deleteRider = async function(id) {
+    if (!hasPermission('manage_riders')) return showToast("Access denied", "error");
     if (!confirm("Are you sure you want to revoke access and delete this partner node? This cannot be undone.")) return;
     try {
         const updates = {};
@@ -1018,8 +1650,9 @@ function renderCoupons() {
 }
 
 window.saveSurge = async function() {
+    if (!hasPermission('manage_promotions')) return showToast("Access denied", "error");
     const multiplier = parseFloat(document.getElementById('surgeMultiplier').value) || 1.0;
-    const reason = document.getElementById('surgeReason').value;
+    const reason = safeText(document.getElementById('surgeReason').value);
     const isActive = multiplier > 1.0;
 
     try {
@@ -1039,6 +1672,7 @@ window.saveSurge = async function() {
 };
 
 window.saveGlobalDiscount = async function() {
+    if (!hasPermission('manage_promotions')) return showToast("Access denied", "error");
     const value = parseFloat(document.getElementById('globalDiscountValue').value) || 0;
     const type = document.getElementById('globalDiscountType').value;
     const isActive = value > 0;
@@ -1060,6 +1694,7 @@ window.saveGlobalDiscount = async function() {
 };
 
 window.savePlatformFee = async function() {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     const amount = parseFloat(document.getElementById('platformFee').value) || 0;
     
     try {
@@ -1082,6 +1717,7 @@ window.showCouponModal = () => document.getElementById('couponModal').classList.
 window.hideCouponModal = () => document.getElementById('couponModal').classList.add('hidden');
 
 window.saveCoupon = async function() {
+    if (!hasPermission('manage_promotions')) return showToast("Access denied", "error");
     const code = document.getElementById('couponCode').value.toUpperCase();
     const type = document.getElementById('couponType').value;
     const value = parseFloat(document.getElementById('couponValue').value);
@@ -1090,6 +1726,11 @@ window.saveCoupon = async function() {
     const isActive = document.getElementById('couponActive').checked;
 
     if (!code) return showToast("Enter Promo Code", "error");
+
+    const rateCheck = checkRateLimit('CREATE_COUPON');
+    if (!rateCheck.allowed) {
+        return showToast(`Rate limited. Wait ${rateCheck.waitSeconds}s before creating another coupon.`, "warning");
+    }
 
     try {
         const couponData = {
@@ -1150,6 +1791,7 @@ async function loadPromotions() {
 }
 
 window.toggleCoupon = async (code, current) => {
+    if (!hasPermission('manage_promotions')) return showToast("Access denied", "error");
     await db.ref(`system/promotions/coupons/${code}/isActive`).set(!current);
     await logAdminAction('TOGGLE_COUPON', { code, isActive: !current });
     showToast("Coupon Status Updated", "success");
@@ -1157,6 +1799,7 @@ window.toggleCoupon = async (code, current) => {
 };
 
 window.deleteCoupon = async (code) => {
+    if (!hasPermission('manage_promotions')) return showToast("Access denied", "error");
     if (confirm(`Decommission coupon ${code}?`)) {
         await db.ref(`system/promotions/coupons/${code}`).remove();
         await logAdminAction('DELETE_COUPON', { code });
@@ -1196,6 +1839,7 @@ window.exportCoupons = function() {
 };
 
 window.bulkOperation = async function(op) {
+    if (!hasPermission('manage_promotions')) return showToast("Access denied", "error");
     if (Object.keys(allCoupons).length === 0) return showToast("No targets for operation", "error");
     
     if (!confirm(`Are you sure you want to execute bulk ${op} on all registry nodes?`)) return;
@@ -1239,11 +1883,81 @@ function showToast(message, type = 'info') {
 let allUsers = {};
 let filteredUsersList = [];
 
+// R5-4: Pagination state
+const PAGINATION = {
+    users: { page: 1, pageSize: 20, total: 0 },
+    audit: { page: 1, pageSize: 50, total: 0 },
+    businesses: { page: 1, pageSize: 15, total: 0 },
+    riders: { page: 1, pageSize: 20, total: 0 }
+};
+
+function paginateArray(arr, page, pageSize) {
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    return arr.slice(start, end);
+}
+
+function renderPagination(containerId, currentPage, pageSize, total, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const totalPages = Math.ceil(total / pageSize);
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, total);
+    
+    let html = `<div class="pagination-controls">
+        <span class="pagination-info">Showing ${startItem}-${endItem} of ${total}</span>
+        <div class="pagination-buttons">
+            <button class="btn-pro btn-sm ${currentPage === 1 ? 'disabled' : ''}" 
+                ${currentPage === 1 ? 'disabled' : `onclick="${onPageChange}(${currentPage - 1})"`}>
+                <i data-lucide="chevron-left" size="16"></i>
+            </button>`;
+    
+    // Smart page number display
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<button class="btn-pro btn-sm" onclick="${onPageChange}(1)">1</button>`;
+        if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="btn-pro btn-sm ${i === currentPage ? 'active' : ''}" onclick="${onPageChange}(${i})">${i}</button>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+        html += `<button class="btn-pro btn-sm" onclick="${onPageChange}(${totalPages})">${totalPages}</button>`;
+    }
+    
+    html += `<button class="btn-pro btn-sm ${currentPage === totalPages ? 'disabled' : ''}" 
+                ${currentPage === totalPages ? 'disabled' : `onclick="${onPageChange}(${currentPage + 1})"`}>
+                <i data-lucide="chevron-right" size="16"></i>
+            </button>
+        </div>
+    </div>`;
+    
+    container.innerHTML = html;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
 async function loadUsers() {
     console.log("Loading User Registry...");
     try {
         const snap = await db.ref('users').once('value');
         allUsers = snap.val() || {};
+        PAGINATION.users.total = Object.keys(allUsers).length;
+        PAGINATION.users.page = 1;
         filterUsers(); // Initial render
     } catch (err) {
         showToast("Failed to sync users: " + err.message, "error");
@@ -1263,6 +1977,13 @@ window.filterUsers = function() {
         return name.includes(query) || email.includes(query) || phone.includes(query);
     });
 
+    PAGINATION.users.total = filteredUsersList.length;
+    PAGINATION.users.page = 1;
+    renderUsers();
+};
+
+window.goToUsersPage = function(page) {
+    PAGINATION.users.page = page;
     renderUsers();
 };
 
@@ -1272,10 +1993,13 @@ function renderUsers() {
 
     if (filteredUsersList.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 48px; color: #64748B;">No user nodes matching the current filters.</td></tr>';
+        renderPagination('usersPagination', 1, 20, 0, 'goToUsersPage');
         return;
     }
 
-    tbody.innerHTML = filteredUsersList.map(u => `
+    const paginated = paginateArray(filteredUsersList, PAGINATION.users.page, PAGINATION.users.pageSize);
+
+    tbody.innerHTML = paginated.map(u => `
         <tr>
             <td>
                 <div style="font-weight: 700; color: #0F172A;">${safeText(u.name || 'Anonymous')}</div>
@@ -1301,11 +2025,15 @@ function renderUsers() {
                     <button class="btn-pro-icon" style="background: rgba(148, 163, 184, 0.1); color: #64748B;" onclick="viewUserHistory('${safeText(u.id)}')" title="Transaction History">
                         <i data-lucide="history" size="18"></i>
                     </button>
+                    ${u.email ? `<button class="btn-pro-icon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;" onclick="triggerPasswordReset('${safeText(u.email)}')" title="Reset Password">
+                        <i data-lucide="key" size="18"></i>
+                    </button>` : ''}
                 </div>
             </td>
         </tr>
     `).join("");
 
+    renderPagination('usersPagination', PAGINATION.users.page, PAGINATION.users.pageSize, PAGINATION.users.total, 'goToUsersPage');
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -1323,6 +2051,7 @@ window.hideWalletModal = function() {
 };
 
 window.processWalletCredit = async function() {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     const uid = document.getElementById('walletUserId').value;
     const amount = parseFloat(document.getElementById('walletAmount').value);
     const reason = document.getElementById('walletReason').value;
@@ -1381,6 +2110,40 @@ window.exportUsers = function() {
     
     logAdminAction('EXPORT_USERS', { count: rows.length });
     showToast("Registry Exported Successfully", "success");
+};
+
+/**
+ * R5-1: Trigger Password Reset (Client-Side Fallback)
+ * Uses Firebase Auth client-side method since Cloud Functions require Blaze plan.
+ * Only SuperAdmins can call this (enforced by UI access control).
+ */
+window.triggerPasswordReset = async function(email) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
+    if (!email) return showToast("User has no email on file", "error");
+    
+    if (!confirm(`Send password reset email to ${email}?`)) return;
+    
+    try {
+        showToast("Sending password reset...", "info");
+        
+        // Use Firebase Auth client-side password reset
+        await auth.sendPasswordResetEmail(email);
+        
+        showToast(`Password reset email sent to ${email}`, "success");
+        await logAdminAction('PASSWORD_RESET_TRIGGERED', { targetEmail: email });
+    } catch (err) {
+        console.error("Password reset error:", err);
+        
+        if (err.code === 'auth/user-not-found') {
+            showToast(`No user found with email: ${email}`, "error");
+        } else if (err.code === 'auth/invalid-email') {
+            showToast("Invalid email address format", "error");
+        } else if (err.code === 'auth/too-many-requests') {
+            showToast("Too many reset attempts. Try again later.", "warning");
+        } else {
+            showToast("Password reset failed: " + err.message, "error");
+        }
+    }
 };
 
 window.viewUserHistory = function(uid) {
@@ -1624,6 +2387,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- Unified Audit Intelligence ---
+let allAuditLogs = [];
+
 window.loadAuditLogs = async function() {
     const tbody = document.getElementById('unifiedAuditBody');
     const filter = document.getElementById('auditLogFilter')?.value || 'all';
@@ -1637,32 +2402,40 @@ window.loadAuditLogs = async function() {
         const botLogs = [];
         const riderLogs = [];
 
-        const adminSnap = await db.ref('system/auditLogs').limitToLast(100).once('value');
+        const adminSnap = await db.ref('system/auditLogs').limitToLast(200).once('value');
         adminSnap.forEach(snap => adminLogs.push({ ...snap.val(), timestamp: snap.val().timestamp || Date.now() }));
 
-        const marketSnap = await db.ref('logs/marketplaceAudit').limitToLast(50).once('value');
+        const marketSnap = await db.ref('logs/marketplaceAudit').limitToLast(100).once('value');
         marketSnap.forEach(snap => marketplaceLogs.push({ ...snap.val(), timestamp: snap.val().timestamp || Date.now() }));
 
-        const botSnap = await db.ref('logs/botAudit').limitToLast(50).once('value');
+        const botSnap = await db.ref('logs/botAudit').limitToLast(100).once('value');
         botSnap.forEach(snap => botLogs.push({ ...snap.val(), timestamp: snap.val().timestamp || Date.now() }));
 
-        const riderSnap = await db.ref('logs/riderErrors').limitToLast(50).once('value');
+        const riderSnap = await db.ref('logs/riderErrors').limitToLast(100).once('value');
         riderSnap.forEach(riderGroup => {
             riderGroup.forEach(snap => riderLogs.push({ ...snap.val(), timestamp: snap.val().timestamp || Date.now() }));
         });
 
-        const allLogs = [
+        allAuditLogs = [
             ...adminLogs.map(l => ({ ...l, source: 'ADMIN', badge: 'badge-info' })),
             ...marketplaceLogs.map(l => ({ ...l, source: 'MARKETPLACE', badge: 'badge-success' })),
             ...botLogs.map(l => ({ ...l, source: 'WHATSAPP', badge: 'badge-warning' })),
             ...riderLogs.map(l => ({ ...l, source: 'RIDER_APP', badge: 'badge-danger' }))
         ].sort((a, b) => b.timestamp - a.timestamp);
 
-        renderUnifiedLogs(allLogs, filter);
+        PAGINATION.audit.total = allAuditLogs.length;
+        PAGINATION.audit.page = 1;
+        renderUnifiedLogs(allAuditLogs, filter);
     } catch (err) {
         console.error("Audit Fetch Failed:", err);
         tbody.innerHTML = `<tr><td colspan="5" class="text-center p-12 text-danger">Telemetric failure: ${err.message}</td></tr>`;
     }
+};
+
+window.goToAuditPage = function(page) {
+    PAGINATION.audit.page = page;
+    const filter = document.getElementById('auditLogFilter')?.value || 'all';
+    renderUnifiedLogs(allAuditLogs, filter);
 };
 
 function renderUnifiedLogs(logs, filter) {
@@ -1670,13 +2443,17 @@ function renderUnifiedLogs(logs, filter) {
     if (!tbody) return;
 
     const filtered = filter === 'all' ? logs : logs.filter(l => l.source.toLowerCase().includes(filter.toLowerCase()));
+    PAGINATION.audit.total = filtered.length;
 
     if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center p-12 text-muted">No telemetric events detected in the current audit window.</td></tr>';
+        renderPagination('auditPagination', 1, 50, 0, 'goToAuditPage');
         return;
     }
 
-    tbody.innerHTML = filtered.map(log => `
+    const paginated = paginateArray(filtered, PAGINATION.audit.page, PAGINATION.audit.pageSize);
+
+    tbody.innerHTML = paginated.map(log => `
         <tr>
             <td>
                 <span class="pro-badge ${log.badge}">${log.source}</span>
@@ -1698,6 +2475,8 @@ function renderUnifiedLogs(logs, filter) {
             </td>
         </tr>
     `).join('');
+    
+    renderPagination('auditPagination', PAGINATION.audit.page, PAGINATION.audit.pageSize, PAGINATION.audit.total, 'goToAuditPage');
     lucide.createIcons();
 }
 
@@ -1706,58 +2485,76 @@ function renderUnifiedLogs(logs, filter) {
 // =====================================================
 let allLiveOrders = [];
 let currentOrderFilter = 'all';
+let _liveOrdersUnsub = null;
+let _liveOrdersRefreshTimer = null;
+
+function _processAndRenderOrders(businesses) {
+    allLiveOrders = [];
+    const outletFilter = document.getElementById('orderOutletFilter');
+    let filterHTML = '<option value="all">All Outlets</option>';
+
+    for (const [bizId, biz] of Object.entries(businesses)) {
+        const outlets = biz.outlets || {};
+        for (const [outId, outlet] of Object.entries(outlets)) {
+            const outletName = outlet.name || outId;
+            filterHTML += `<option value="${bizId}/${outId}">${safeText(outletName)}</option>`;
+            
+            const orders = outlet.orders || {};
+            Object.entries(orders).forEach(([orderId, order]) => {
+                allLiveOrders.push({
+                    id: orderId,
+                    bizId,
+                    outletId: outId,
+                    outletName,
+                    customerName: order.customerName || order.name || 'Guest',
+                    phone: order.phone || '',
+                    items: order.items || [],
+                    total: parseFloat(order.total || order.grandTotal || 0),
+                    status: (order.status || 'new').toLowerCase(),
+                    riderId: order.riderId || null,
+                    riderName: order.riderName || null,
+                    timestamp: order.timestamp || order.createdAt || Date.now(),
+                    date: order.date || ''
+                });
+            });
+        }
+    }
+
+    if (outletFilter && outletFilter.options.length <= 1) outletFilter.innerHTML = filterHTML;
+
+    allLiveOrders.sort((a, b) => b.timestamp - a.timestamp);
+
+    const cutoff = Date.now() - (48 * 60 * 60 * 1000);
+    allLiveOrders = allLiveOrders.filter(o => o.timestamp > cutoff || ['new', 'confirmed', 'preparing', 'ready', 'picked', 'out', 'out for delivery', 'cooked', 'placed', 'reached drop location', 'delivered'].includes(o.status));
+
+    renderOrderPipeline();
+}
 
 window.loadLiveOrders = async function() {
     const tbody = document.getElementById('liveOrdersBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="9" class="text-center p-12 text-muted"><div class="animate-pulse">Aggregating orders from all outlets...</div></td></tr>';
 
+    if (_liveOrdersUnsub) {
+        _liveOrdersUnsub();
+        _liveOrdersUnsub = null;
+    }
+
     try {
         const bizSnap = await db.ref('businesses').once('value');
         const businesses = bizSnap.val() || {};
-        allLiveOrders = [];
-        const outletFilter = document.getElementById('orderOutletFilter');
-        
-        // Populate outlet filter dropdown
-        let filterHTML = '<option value="all">All Outlets</option>';
+        _processAndRenderOrders(businesses);
 
-        for (const [bizId, biz] of Object.entries(businesses)) {
-            const outlets = biz.outlets || {};
-            for (const [outId, outlet] of Object.entries(outlets)) {
-                const outletName = outlet.name || outId;
-                filterHTML += `<option value="${bizId}/${outId}">${safeText(outletName)}</option>`;
-                
-                const orders = outlet.orders || {};
-                Object.entries(orders).forEach(([orderId, order]) => {
-                    allLiveOrders.push({
-                        id: orderId,
-                        bizId,
-                        outletId: outId,
-                        outletName,
-                        customerName: order.customerName || order.name || 'Guest',
-                        phone: order.phone || '',
-                        items: order.items || [],
-                        total: parseFloat(order.total || order.grandTotal || 0),
-                        status: (order.status || 'new').toLowerCase(),
-                        riderId: order.riderId || null,
-                        riderName: order.riderName || null,
-                        timestamp: order.timestamp || order.createdAt || Date.now(),
-                        date: order.date || ''
-                    });
-                });
-            }
-        }
+        db.ref('businesses').on('value', (snap) => {
+            const data = snap.val() || {};
+            _processAndRenderOrders(data);
+        }, (err) => {
+            console.error("[LiveOrders] Realtime listener error:", err);
+        });
 
-        if (outletFilter) outletFilter.innerHTML = filterHTML;
-
-        // Sort by most recent first
-        allLiveOrders.sort((a, b) => b.timestamp - a.timestamp);
-
-        // Filter to recent orders (last 48 hours)
-        const cutoff = Date.now() - (48 * 60 * 60 * 1000);
-        allLiveOrders = allLiveOrders.filter(o => o.timestamp > cutoff || ['new', 'confirmed', 'preparing', 'ready', 'picked', 'out'].includes(o.status));
-
-        renderOrderPipeline();
+        _liveOrdersUnsub = () => {
+            db.ref('businesses').off('value');
+        };
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center p-12 text-danger">Failed to load orders: ${err.message}</td></tr>`;
     }
@@ -1818,10 +2615,10 @@ function renderOrderTable() {
     // Status counts
     const counts = { all: filtered.length, new: 0, preparing: 0, out: 0, delivered: 0 };
     filtered.forEach(o => {
-        if (['new', 'pending', 'confirmed'].includes(o.status)) counts.new++;
-        else if (['preparing', 'cooking', 'ready'].includes(o.status)) counts.preparing++;
-        else if (['picked', 'out', 'out_for_delivery', 'in_transit'].includes(o.status)) counts.out++;
-        else if (['delivered', 'completed'].includes(o.status)) counts.delivered++;
+        if (['new', 'pending', 'confirmed', 'placed'].includes(o.status)) counts.new++;
+        else if (['preparing', 'cooking', 'ready', 'cooked'].includes(o.status)) counts.preparing++;
+        else if (['picked', 'out', 'out_for_delivery', 'out for delivery', 'in_transit'].includes(o.status)) counts.out++;
+        else if (['delivered', 'completed', 'reached drop location'].includes(o.status)) counts.delivered++;
     });
 
     document.getElementById('orderCountAll').innerText = counts.all;
@@ -1833,10 +2630,10 @@ function renderOrderTable() {
     // Apply filter
     if (currentOrderFilter !== 'all') {
         const statusMap = {
-            'new': ['new', 'pending', 'confirmed'],
-            'preparing': ['preparing', 'cooking', 'ready'],
-            'out': ['picked', 'out', 'out_for_delivery', 'in_transit'],
-            'delivered': ['delivered', 'completed']
+            'new': ['new', 'pending', 'confirmed', 'placed'],
+            'preparing': ['preparing', 'cooking', 'ready', 'cooked'],
+            'out': ['picked', 'out', 'out_for_delivery', 'out for delivery', 'in_transit'],
+            'delivered': ['delivered', 'completed', 'reached drop location']
         };
         const allowed = statusMap[currentOrderFilter] || [];
         filtered = filtered.filter(o => allowed.includes(o.status));
@@ -1869,10 +2666,10 @@ function renderOrderTable() {
 
     const statusBadge = (s) => {
         const map = {
-            'new': 'badge-warning', 'pending': 'badge-warning', 'confirmed': 'badge-info',
-            'preparing': 'badge-info', 'cooking': 'badge-info', 'ready': 'badge-success',
-            'picked': 'badge-info', 'out': 'badge-info', 'out_for_delivery': 'badge-info', 'in_transit': 'badge-info',
-            'delivered': 'badge-success', 'completed': 'badge-success',
+            'new': 'badge-warning', 'pending': 'badge-warning', 'confirmed': 'badge-info', 'placed': 'badge-warning',
+            'preparing': 'badge-info', 'cooking': 'badge-info', 'ready': 'badge-success', 'cooked': 'badge-success',
+            'picked': 'badge-info', 'out': 'badge-info', 'out_for_delivery': 'badge-info', 'out for delivery': 'badge-info', 'in_transit': 'badge-info',
+            'delivered': 'badge-success', 'completed': 'badge-success', 'reached drop location': 'badge-info',
             'cancelled': 'badge-danger', 'rejected': 'badge-danger'
         };
         return map[s] || 'badge-warning';
@@ -1882,7 +2679,7 @@ function renderOrderTable() {
         const age = Date.now() - o.timestamp;
         const ageMin = Math.floor(age / 60000);
         const ageStr = ageMin < 60 ? `${ageMin}m` : `${Math.floor(ageMin / 60)}h ${ageMin % 60}m`;
-        const isOverdue = ageMin > 30 && ['new', 'pending', 'confirmed'].includes(o.status);
+        const isOverdue = ageMin > 30 && ['new', 'pending', 'confirmed', 'placed'].includes(o.status);
         const itemCount = Array.isArray(o.items) ? o.items.length : Object.keys(o.items || {}).length;
         
         return `<tr style="${isOverdue ? 'background:#FEF2F2' : ''}">
@@ -1925,19 +2722,19 @@ function renderOrderKanban() {
     }
 
     const columns = [
-        { id: 'pending', title: 'New & Pending', status: ['new', 'pending', 'confirmed'], color: '#FBBF24' },
-        { id: 'preparing', title: 'Preparing', status: ['preparing', 'cooking', 'ready'], color: '#6366F1' },
-        { id: 'on-the-way', title: 'On the Way', status: ['picked', 'out', 'out_for_delivery', 'in_transit'], color: '#10B981' },
-        { id: 'completed', title: 'Delivered', status: ['delivered', 'completed'], color: '#38BDF8' }
+        { id: 'pending', title: 'New & Pending', status: ['new', 'pending', 'confirmed', 'placed'], color: '#FBBF24' },
+        { id: 'preparing', title: 'Preparing', status: ['preparing', 'cooking', 'ready', 'cooked'], color: '#6366F1' },
+        { id: 'on-the-way', title: 'On the Way', status: ['picked', 'out', 'out_for_delivery', 'out for delivery', 'in_transit'], color: '#10B981' },
+        { id: 'completed', title: 'Delivered', status: ['delivered', 'completed', 'reached drop location'], color: '#38BDF8' }
     ];
 
     // Status counts update (keep global counts in sync)
     const counts = { all: filtered.length, new: 0, preparing: 0, out: 0, delivered: 0 };
     filtered.forEach(o => {
-        if (['new', 'pending', 'confirmed'].includes(o.status)) counts.new++;
-        else if (['preparing', 'cooking', 'ready'].includes(o.status)) counts.preparing++;
-        else if (['picked', 'out', 'out_for_delivery', 'in_transit'].includes(o.status)) counts.out++;
-        else if (['delivered', 'completed'].includes(o.status)) counts.delivered++;
+        if (['new', 'pending', 'confirmed', 'placed'].includes(o.status)) counts.new++;
+        else if (['preparing', 'cooking', 'ready', 'cooked'].includes(o.status)) counts.preparing++;
+        else if (['picked', 'out', 'out_for_delivery', 'out for delivery', 'in_transit'].includes(o.status)) counts.out++;
+        else if (['delivered', 'completed', 'reached drop location'].includes(o.status)) counts.delivered++;
     });
 
     document.getElementById('orderCountAll').innerText = counts.all;
@@ -1960,7 +2757,7 @@ function renderOrderKanban() {
                 <div class="kanban-cards">
                     ${colOrders.length === 0 ? '<div class="text-center p-8 text-muted text-xs">Empty</div>' : colOrders.map(o => {
                         const ageMin = Math.floor((Date.now() - o.timestamp) / 60000);
-                        const isOverdue = ageMin > 30 && ['new', 'pending', 'confirmed'].includes(o.status);
+                        const isOverdue = ageMin > 30 && ['new', 'pending', 'confirmed', 'placed'].includes(o.status);
                         return `
                             <div class="kanban-card ${isOverdue ? 'overdue' : ''}" draggable="true" ondragstart="handleOrderDragStart(event, '${o.bizId}', '${o.outletId}', '${o.id}')">
                                 <div class="flex justify-between items-start mb-2">
@@ -1992,6 +2789,7 @@ window.handleOrderDragStart = function(e, bizId, outletId, orderId) {
 };
 
 window.handleOrderDrop = async function(e, columnId) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     e.preventDefault();
     const el = e.currentTarget;
     el.classList.remove('kanban-drag-over');
@@ -1999,10 +2797,10 @@ window.handleOrderDrop = async function(e, columnId) {
     if (!draggedOrder) return;
 
     const statusMap = {
-        'pending': 'confirmed',
-        'preparing': 'preparing',
-        'on-the-way': 'out_for_delivery',
-        'completed': 'delivered'
+        'pending': 'Confirmed',
+        'preparing': 'Preparing',
+        'on-the-way': 'Out for Delivery',
+        'completed': 'Delivered'
     };
 
     const newStatus = statusMap[columnId];
@@ -2024,16 +2822,17 @@ window.handleOrderDrop = async function(e, columnId) {
 
 
 window.updateOrderStatus = async function(bizId, outletId, orderId) {
-    const newStatus = prompt("Enter new status:\n(confirmed, preparing, ready, picked, delivered, cancelled)");
+    if (!hasPermission('all')) return showToast("Access denied", "error");
+    const newStatus = prompt("Enter new status:\n(Placed, Confirmed, Preparing, Cooked, Ready, Out for Delivery, Reached Drop Location, Delivered, Cancelled)");
     if (!newStatus) return;
-    const valid = ['confirmed', 'preparing', 'ready', 'picked', 'out_for_delivery', 'delivered', 'cancelled'];
+    const valid = ['placed', 'confirmed', 'preparing', 'cooked', 'ready', 'out for delivery', 'reached drop location', 'delivered', 'cancelled'];
     if (!valid.includes(newStatus.toLowerCase())) return showToast("Invalid status. Use: " + valid.join(', '), "error");
 
     try {
         const updates = {};
-        updates[`businesses/${bizId}/outlets/${outletId}/orders/${orderId}/status`] = newStatus.toLowerCase();
+        updates[`businesses/${bizId}/outlets/${outletId}/orders/${orderId}/status`] = newStatus;
         await atomicAdminAction(updates, 'ORDER_STATUS_UPDATE', { bizId, outletId, orderId, newStatus });
-        showToast(`Order status updated to ${newStatus.toUpperCase()}`, "success");
+        showToast(`Order status updated to ${newStatus}`, "success");
         loadLiveOrders();
     } catch (err) {
         showToast("Failed: " + err.message, "error");
@@ -2178,6 +2977,7 @@ function renderReviewsList() {
 // =====================================================
 
 window.sendBroadcast = async function() {
+    if (!hasPermission('send_broadcast')) return showToast("Access denied", "error");
     const title = document.getElementById('broadcastTitle').value.trim();
     const body = document.getElementById('broadcastBody').value.trim();
     const audience = document.getElementById('broadcastAudience').value;
@@ -2185,6 +2985,12 @@ window.sendBroadcast = async function() {
     const imageUrl = document.getElementById('broadcastImage')?.value.trim() || '';
 
     if (!title || !body) return showToast("Title and body are required", "error");
+    
+    const rateCheck = checkRateLimit('SEND_BROADCAST');
+    if (!rateCheck.allowed) {
+        return showToast(`Rate limited. Wait ${rateCheck.waitSeconds}s before sending another broadcast.`, "warning");
+    }
+    
     if (!confirm(`Send broadcast "${title}" to ${audience.replace('_', ' ')}?`)) return;
 
     try {
@@ -2360,6 +3166,7 @@ function renderInventoryTable(items) {
 }
 
 window.quickAdjustStock = async function(bizId, outId, dishId, delta) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     const path = `businesses/${bizId}/outlets/${outId}/dishes/${dishId}`;
     try {
         const snap = await db.ref(path).once("value");
@@ -2381,6 +3188,7 @@ window.quickAdjustStock = async function(bizId, outId, dishId, delta) {
 };
 
 window.toggleAvailability = async function(bizId, outId, dishId, status) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     const path = `businesses/${bizId}/outlets/${outId}/dishes/${dishId}`;
     try {
         await atomicAdminAction({
@@ -2523,10 +3331,10 @@ function renderReconciliationTable(data) {
                     <div class="font-bold">${s.bizName}</div>
                     <div class="text-xs text-slate-500">${s.outName}</div>
                 </td>
-                <td class="font-black">Γé╣${s.orderTotal}</td>
-                <td class="text-danger font-bold">- Γé╣${s.platformCommission}</td>
-                <td class="text-info font-bold">- Γé╣${s.riderPayout}</td>
-                <td class="text-success font-black">Γé╣${s.shopNet}</td>
+                <td class="font-black">₹${s.orderTotal}</td>
+                <td class="text-danger font-bold">- ₹${s.platformCommission}</td>
+                <td class="text-info font-bold">- ₹${s.riderPayout}</td>
+                <td class="text-success font-black">₹${s.shopNet}</td>
                 <td>
                     <span class="pro-badge ${isSettled ? 'badge-success' : 'badge-warning'}">
                         ${isSettled ? 'SETTLED' : 'PENDING'}
@@ -2562,16 +3370,17 @@ function updateReconKPIs(data) {
         }
     });
 
-    document.getElementById('reconGlobalRev').innerText = `Γé╣${Math.round(stats.rev)}`;
-    document.getElementById('reconGlobalComm').innerText = `Γé╣${Math.round(stats.comm)}`;
-    document.getElementById('reconGlobalPending').innerText = `Γé╣${Math.round(stats.pending)}`;
-    document.getElementById('reconGlobalSettled').innerText = `Γé╣${Math.round(stats.settled)}`;
+    document.getElementById('reconGlobalRev').innerText = `₹${Math.round(stats.rev)}`;
+    document.getElementById('reconGlobalComm').innerText = `₹${Math.round(stats.comm)}`;
+    document.getElementById('reconGlobalPending').innerText = `₹${Math.round(stats.pending)}`;
+    document.getElementById('reconGlobalSettled').innerText = `₹${Math.round(stats.settled)}`;
 }
 
 window.settleTransaction = async function(bizId, outId, settleId, amount) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     const confirm = await Swal.fire({
         title: 'Manual Payout Confirmation',
-        text: `Confirm that Γé╣${amount} has been manually transferred to the shop owner's account. This action will create a formal Ledger Entry and update the Partner Wallet.`,
+        text: `Confirm that ₹${amount} has been manually transferred to the shop owner's account. This action will create a formal Ledger Entry and update the Partner Wallet.`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Yes, Execute Settlement',
@@ -2728,6 +3537,7 @@ window.viewKYC = function(url, type) {
 };
 
 window.approvePartner = async function(uid) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     const result = await Swal.fire({
         title: 'Initialize Infrastructure?',
         text: "This will provision a live business node, default outlet, and administrative credentials atomically.",
@@ -2746,11 +3556,17 @@ window.approvePartner = async function(uid) {
         const snap = await db.ref(`onboarding_requests/${uid}`).once('value');
         const req = snap.val();
 
-        // 1. Prepare Atomic Provisioning (Reusing the pattern from existing onboardingForm)
-        const updates = {};
         const bid = `biz_${Date.now()}`;
-        const oid = `outlet_default`; // New partners start with one default outlet
+        const oid = `outlet_default`;
         const adminEmail = req.email.toLowerCase();
+        const tempPassword = `FoodHubbie@${Math.random().toString(36).slice(-8)}`;
+
+        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(adminEmail, tempPassword);
+        const adminUid = userCredential.user.uid;
+
+        await secondaryAuth.signOut();
+
+        const updates = {};
 
         // Business Node
         updates[`businesses/${bid}`] = {
@@ -2782,7 +3598,7 @@ window.approvePartner = async function(uid) {
                 const cid = `cat_${Math.random().toString(36).substr(2, 9)}`;
                 updates[`businesses/${bid}/outlets/${oid}/menu/categories/${cid}`] = {
                     id: cid,
-                    name: cat,
+                    name: safeText(cat),
                     status: 'ACTIVE',
                     priority: 0
                 };
@@ -2790,13 +3606,13 @@ window.approvePartner = async function(uid) {
         }
 
         // Admin Profile Node
-        updates[`admins/${uid}`] = {
-            id: uid,
+        updates[`system/admins/${adminUid}`] = {
+            id: adminUid,
             email: adminEmail,
             role: 'Partner Admin',
             outletId: oid,
             businessId: bid,
-            name: req.ownerName,
+            name: safeText(req.ownerName),
             status: 'ACTIVE',
             createdAt: firebase.database.ServerValue.TIMESTAMP
         };
@@ -2808,14 +3624,15 @@ window.approvePartner = async function(uid) {
             status: 'APPROVED',
             processedAt: firebase.database.ServerValue.TIMESTAMP,
             bid: bid,
-            oid: oid
+            oid: oid,
+            adminUid: adminUid
         };
 
         await db.ref().update(updates);
 
         Swal.fire({
             title: 'Node Provisioned!',
-            text: `Infrastructure for ${req.bizName} is now live. Partner can now access the ShopAdmin dashboard.`,
+            html: `Infrastructure for <b>${safeText(req.bizName)}</b> is now live.<br><br>Admin email: <b>${safeText(adminEmail)}</b><br>Temp password: <b>${safeText(tempPassword)}</b><br><br>Partner must change password on first login to ShopAdmin.`,
             icon: 'success',
             background: '#1e293b',
             color: '#fff'
@@ -2828,6 +3645,7 @@ window.approvePartner = async function(uid) {
 };
 
 window.rejectPartner = async function(uid) {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
     const result = await Swal.fire({
         title: 'Reject Request?',
         text: "This will permanently remove this registration attempt. This action is irreversible.",

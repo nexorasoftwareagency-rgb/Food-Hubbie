@@ -1,4 +1,4 @@
-import { db, ref, get, push, set } from "@/lib/firebase";
+import { db, ref, get, push, set, update } from "@/lib/firebase";
 import type { Review } from "@/types";
 import { logMarketplaceAudit } from "./auditService";
 
@@ -29,6 +29,9 @@ export async function fetchGlobalReviews(limit = 6): Promise<Review[]> {
                   outletId: oid,
                   outletName: oData.settings?.Store?.storeName || "Restaurant",
                   rating: rData.rating || 5,
+                  riderRating: rData.riderRating,
+                  riderId: rData.riderId,
+                  riderName: rData.riderName,
                   comment: rData.comment || "",
                   date: rData.date || rData.createdAt || new Date().toISOString(),
                   likes: rData.likes || 0
@@ -51,7 +54,7 @@ export async function fetchGlobalReviews(limit = 6): Promise<Review[]> {
 }
 
 /**
- * Submit a new review for an order.
+ * Submit a new review for an order (includes optional rider rating).
  */
 export async function submitReview(
   businessId: string,
@@ -73,12 +76,33 @@ export async function submitReview(
       likes: 0
     };
 
-    await set(newReviewRef, finalReview);
+    const updates: Record<string, any> = {};
+    updates[newReviewRef.key as string] = finalReview;
+
+    // If rider rating provided, also save to rider ratings aggregation
+    if (reviewData.riderRating && reviewData.riderId) {
+      const riderRatingPath = `riders/${reviewData.riderId}/ratings`;
+      const riderRatingRef = push(ref(db, riderRatingPath));
+      updates[`riders/${reviewData.riderId}/ratings/${riderRatingRef.key}`] = {
+        rating: reviewData.riderRating,
+        orderId,
+        userId: reviewData.userId,
+        userName: reviewData.userName,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString()
+      };
+
+      // Update rider aggregate stats
+      await updateRiderRatingStats(reviewData.riderId, reviewData.riderRating);
+    }
+
+    await update(reviewsRef, updates);
 
     // Audit Log
     await logMarketplaceAudit('ORDER_REVIEW_SUBMITTED', {
       orderId,
       rating: reviewData.rating,
+      riderRating: reviewData.riderRating,
       outletId
     });
 
@@ -86,5 +110,29 @@ export async function submitReview(
   } catch (error) {
     console.error("Error submitting review:", error);
     throw new Error("Could not submit your review. Please try again.");
+  }
+}
+
+/**
+ * Update rider's aggregate rating stats
+ */
+async function updateRiderRatingStats(riderId: string, newRating: number): Promise<void> {
+  try {
+    const riderSnap = await get(ref(db, `riders/${riderId}`));
+    const riderData = riderSnap.val() || {};
+    
+    const currentAvg = riderData.averageRating || 0;
+    const currentCount = riderData.ratingCount || 0;
+    
+    const newCount = currentCount + 1;
+    const newAvg = ((currentAvg * currentCount) + newRating) / newCount;
+    
+    await update(ref(db, `riders/${riderId}`), {
+      averageRating: Math.round(newAvg * 10) / 10,
+      ratingCount: newCount,
+      lastRatingAt: Date.now()
+    });
+  } catch (error) {
+    console.error("Error updating rider rating stats:", error);
   }
 }

@@ -63,6 +63,178 @@ try {
 }
 
 // ==========================================
+// R4-2: OFFLINE ORDER QUEUE SYSTEM
+// ==========================================
+const OFFLINE_QUEUE_KEY = 'rider_offline_queue';
+let _isOnline = navigator.onLine;
+let _queueSyncInProgress = false;
+
+// Load queue from localStorage
+function loadOfflineQueue() {
+    try {
+        const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
+        return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+        console.error("Failed to load offline queue:", e);
+        return [];
+    }
+}
+
+// Save queue to localStorage
+function saveOfflineQueue(queue) {
+    try {
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+    } catch (e) {
+        console.error("Failed to save offline queue:", e);
+    }
+}
+
+// Add action to offline queue
+function queueOfflineAction(action) {
+    const queue = loadOfflineQueue();
+    queue.push({
+        ...action,
+        queuedAt: Date.now(),
+        id: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    });
+    saveOfflineQueue(queue);
+    updateOfflineIndicator();
+    console.log(`[OfflineQueue] Action queued: ${action.type}`);
+}
+
+// Sync queued actions when back online
+async function syncOfflineQueue() {
+    if (_queueSyncInProgress || !window.currentUser) return;
+    
+    const queue = loadOfflineQueue();
+    if (queue.length === 0) return;
+    
+    _queueSyncInProgress = true;
+    console.log(`[OfflineQueue] Syncing ${queue.length} queued actions...`);
+    
+    const failedActions = [];
+    
+    for (const action of queue) {
+        try {
+            switch (action.type) {
+                case 'ACCEPT_ORDER':
+                    await executeAcceptOrder(action.payload);
+                    break;
+                case 'UPDATE_STATUS':
+                    await executeStatusUpdate(action.payload);
+                    break;
+                case 'REACHED_OUTLET':
+                    await executeReachedOutlet(action.payload);
+                    break;
+                default:
+                    console.warn(`[OfflineQueue] Unknown action type: ${action.type}`);
+            }
+        } catch (e) {
+            console.error(`[OfflineQueue] Failed to sync action ${action.type}:`, e);
+            failedActions.push(action);
+        }
+    }
+    
+    // Keep only failed actions in queue
+    saveOfflineQueue(failedActions);
+    _queueSyncInProgress = false;
+    updateOfflineIndicator();
+    
+    if (failedActions.length > 0) {
+        window.showToast(`${failedActions.length} actions failed to sync. Retrying...`, "warning");
+    } else {
+        window.showToast("All offline actions synced successfully!", "success");
+    }
+}
+
+// Execute accept order action
+async function executeAcceptOrder(payload) {
+    const { id, outletId, bizId } = payload;
+    const targetBiz = bizId || window.activeOrderBusiness || resolveBusinessForOutlet(outletId);
+    const orderPath = resolvePath(`orders/${id}`, outletId, targetBiz);
+    
+    const result = await runTransaction(ref(db, orderPath), current => {
+        if (current && current.assignedRider) return;
+        const initialOTP = Math.floor(1000 + Math.random() * 9000).toString();
+        return {
+            ...current,
+            deliveryOTP: initialOTP,
+            otp: initialOTP,
+            assignedRider: window.currentUser.email.toLowerCase(),
+            riderId: window.currentUser.uid,
+            riderPhone: window.currentUser.profile?.phone || "",
+            acceptedAt: Date.now()
+        };
+    });
+    
+    if (result.committed) {
+        window.showToast("Order Accepted!", "success");
+        const o = result.snapshot.val();
+        window.triggerWhatsAppAlert(o.customerPhone || o.phone, o.orderId || id, "ACCEPTED");
+    } else {
+        throw new Error("Order already taken by another rider");
+    }
+}
+
+// Execute status update action
+async function executeStatusUpdate(payload) {
+    const { id, outletId, bizId, status } = payload;
+    const targetBiz = bizId || window.activeOrderBusiness || resolveBusinessForOutlet(outletId);
+    const orderPath = resolvePath(`orders/${id}`, outletId, targetBiz);
+    
+    await update(ref(db, orderPath), {
+        status: status,
+        statusUpdatedAt: Date.now(),
+        statusUpdatedBy: window.currentUser.uid
+    });
+}
+
+// Execute reached outlet action
+async function executeReachedOutlet(payload) {
+    const { id, outletId, bizId } = payload;
+    const targetBiz = bizId || window.activeOrderBusiness || resolveBusinessForOutlet(outletId);
+    const orderPath = resolvePath(`orders/${id}`, outletId, targetBiz);
+    
+    await update(ref(db, orderPath), {
+        reachedOutletAt: Date.now(),
+        status: 'Reached Outlet',
+        statusUpdatedAt: Date.now(),
+        statusUpdatedBy: window.currentUser.uid
+    });
+}
+
+// Update offline indicator UI
+function updateOfflineIndicator() {
+    const indicator = document.getElementById('offlineIndicator');
+    const queue = loadOfflineQueue();
+    
+    if (indicator) {
+        if (!_isOnline || queue.length > 0) {
+            indicator.classList.remove('hidden');
+            indicator.textContent = _isOnline 
+                ? `🔄 Syncing ${queue.length} action(s)...`
+                : `📡 Offline - ${queue.length} action(s) queued`;
+        } else {
+            indicator.classList.add('hidden');
+        }
+    }
+}
+
+// Online/Offline event listeners
+window.addEventListener('online', () => {
+    _isOnline = true;
+    console.log("[OfflineQueue] Back online, syncing...");
+    updateOfflineIndicator();
+    syncOfflineQueue();
+});
+
+window.addEventListener('offline', () => {
+    _isOnline = false;
+    console.log("[OfflineQueue] Went offline");
+    updateOfflineIndicator();
+});
+
+// ==========================================
 // FOODHUBBIE SAAS | RIDER PORTAL v1.0
 // ==========================================
 window.haptic = window.haptic || ((val) => {
@@ -154,7 +326,7 @@ window.completeSiteRefresh = async () => {
 window.reachedOutlet = async (id, outlet, bid = null) => {
     if (!id || !outlet) return;
     window.haptic([50, 30, 50]);
-    const targetBiz = bid || window.activeOrderBusiness || 'business_roshani';
+    const targetBiz = bid || window.activeOrderBusiness || resolveBusinessForOutlet(outlet);
 
     // Gating Check: Proximity to Restaurant (1000m)
     const outletCoords = window.outletCoords[outlet] || { lat: 0, lng: 0 };
@@ -165,10 +337,19 @@ window.reachedOutlet = async (id, outlet, bid = null) => {
         return window.showToast(`Too far from restaurant! Must be within 1km. (Distance: ${(dist*1000).toFixed(0)}m)`, "error");
     }
 
+    // R4-2: Queue action if offline
+    if (!_isOnline) {
+        queueOfflineAction({
+            type: 'REACHED_OUTLET',
+            payload: { id, outletId: outlet, bizId: targetBiz }
+        });
+        window.showToast("Status queued for sync when back online", "info");
+        return;
+    }
+
     try {
         const orderPath = resolvePath(`orders/${id}`, outlet, targetBiz);
         await update(ref(db, orderPath), {
-            status: "Arrived at Restaurant",
             arrivedAtRestaurantAt: serverTimestamp()
         });
         window.showToast("Arrived at Restaurant! Check items.", "success");
@@ -181,7 +362,18 @@ window.reachedOutlet = async (id, outlet, bid = null) => {
 window.reachedDropLocation = async (id, outlet, bid = null) => {
     if (!id || !outlet) return;
     window.haptic([50, 30, 50]);
-    const targetBiz = bid || window.activeOrderBusiness || 'business_roshani';
+    const targetBiz = bid || window.activeOrderBusiness || resolveBusinessForOutlet(outlet);
+    
+    // R4-2: Queue action if offline
+    if (!_isOnline) {
+        queueOfflineAction({
+            type: 'UPDATE_STATUS',
+            payload: { id, outletId: outlet, bizId: targetBiz, status: 'Reached Drop Location' }
+        });
+        window.showToast("Status queued for sync when back online", "info");
+        return;
+    }
+    
     try {
         const orderPath = resolvePath(`orders/${id}`, outlet, targetBiz);
         const snap = await get(ref(db, orderPath));
@@ -277,35 +469,262 @@ window.activeOrderData = null;
 window.activeOrderId = null;
 window.activeOrderOutlet = null;
 window.ignoredPings = new Set();
-window.orderCache = { outlet_pizza: {}, outlet_cake: {} };
-window.outletCoords = { outlet_pizza: { lat: 25.887944, lng: 85.026194 }, outlet_cake: { lat: 25.887472, lng: 85.026861 } };
+window.orderCache = {};
+window.outletCoords = {};
+window.allBusinessesCache = [];
 
-// Load outlet coordinates and settings from Firebase on init
-async function loadOutletCoords() {
+// R4-4: Multi-outlet support - dynamically resolve business/outlet from Firebase config
+async function initMultiOutlet() {
     try {
-        const bid = window.currentUser?.profile?.businessId || 'business_roshani';
-        const bizRef = ref(db, `businesses/${bid}/outlets`);
-        const snap = await get(bizRef);
-        const outlets = snap.val() || {};
+        // Load all businesses and their outlets
+        const bizSnap = await get(ref(db, 'businesses'));
+        const businesses = bizSnap.val() || {};
+        window.allBusinessesCache = Object.entries(businesses).map(([bid, biz]) => ({
+            id: bid,
+            name: biz.name || bid,
+            outlets: Object.keys(biz.outlets || {}),
+            ...biz
+        }));
         
+        // Initialize outlet coords from all businesses
+        window.outletCoords = {};
         window.outletSettings = {};
-        Object.entries(outlets).forEach(([id, data]) => {
-            if (data.settings && data.settings.Store) {
-                window.outletCoords[id] = {
-                    lat: parseFloat(data.settings.Store.lat) || 25.887944,
-                    lng: parseFloat(data.settings.Store.lng) || 85.026194
-                };
+        window.orderCache = {};
+        
+        for (const [bid, biz] of Object.entries(businesses)) {
+            const outlets = biz.outlets || {};
+            for (const [oid, outlet] of Object.entries(outlets)) {
+                if (outlet.settings?.Store) {
+                    window.outletCoords[oid] = {
+                        lat: parseFloat(outlet.settings.Store.lat) || 0,
+                        lng: parseFloat(outlet.settings.Store.lng) || 0
+                    };
+                }
+                if (outlet.settings?.Delivery) {
+                    window.outletSettings[oid] = {
+                        riderAcceptanceRadius: parseFloat(outlet.settings.Delivery.riderAcceptanceRadius) || 1.0
+                    };
+                }
+                window.orderCache[oid] = {};
             }
-            if (data.settings && data.settings.Delivery) {
-                window.outletSettings[id] = {
-                    riderAcceptanceRadius: parseFloat(data.settings.Delivery.riderAcceptanceRadius) || 1.0
-                };
-            }
-        });
-        console.log(`[Outlet] Coordinates loaded for ${bid}:`, window.outletCoords);
-        console.log(`[Outlet] Settings loaded for ${bid}:`, window.outletSettings);
-    } catch (e) { console.warn("[Outlet] Error loading coordinates:", e); }
+        }
+        
+        // Set active order business from rider's profile if available
+        if (window.currentUser?.profile?.businessId) {
+            window.activeOrderBusiness = window.currentUser.profile.businessId;
+        } else if (window.allBusinessesCache.length > 0) {
+            window.activeOrderBusiness = window.allBusinessesCache[0].id;
+        }
+        
+        console.log(`[MultiOutlet] Loaded ${window.allBusinessesCache.length} businesses, ${Object.keys(window.outletCoords).length} outlets`);
+    } catch (e) {
+        console.warn("[MultiOutlet] Init error:", e);
+    }
 }
+
+/**
+ * R4-4: Resolve business ID for a given outlet ID
+ */
+function resolveBusinessForOutlet(outletId) {
+    if (!outletId) return window.activeOrderBusiness || null;
+    
+    const cached = window._outletBizCache;
+    if (cached?.[outletId]) return cached[outletId];
+    
+    // Fallback: search all businesses
+    if (window.allBusinessesCache) {
+        for (const biz of window.allBusinessesCache) {
+            if (biz.outlets?.includes(outletId)) {
+                if (!window._outletBizCache) window._outletBizCache = {};
+                window._outletBizCache[outletId] = biz.id;
+                return biz.id;
+            }
+        }
+    }
+    return window.activeOrderBusiness || null;
+}
+
+/**
+ * R4-4: Get outlet name from any business
+ */
+function getOutletName(outletId) {
+    if (!outletId) return 'Outlet';
+    
+    // Check cached outlet names
+    if (window._outletNames?.[outletId]) return window._outletNames[outletId];
+    
+    // Search across all businesses
+    if (window.allBusinessesCache) {
+        for (const biz of window.allBusinessesCache) {
+            for (const oid of biz.outlets || []) {
+                if (oid === outletId) return biz.name || outletId;
+            }
+        }
+    }
+    return outletId;
+}
+
+// Initialize outlet coords on startup
+async function loadOutletCoords() {
+    // R4-4: Delegated to initMultiOutlet for broader scope
+    if (window.allBusinessesCache.length === 0) {
+        await initMultiOutlet();
+    }
+}
+
+// ==========================================
+// R4-5: ROUTE OPTIMIZATION
+// ==========================================
+
+/**
+ * Optimize delivery route using nearest-neighbor heuristic.
+ * Given a starting location and a list of stops (pickup + dropoff),
+ * returns an ordered array of stops suggesting the shortest route.
+ * 
+ * @param {Object} startCoords - { lat, lng } rider's current location
+ * @param {Array} stops - Array of { id, label, lat, lng, type: 'pickup'|'dropoff' }
+ * @returns {Array} - Ordered stops array
+ */
+window.optimizeRoute = function(startCoords, stops) {
+    if (!stops || stops.length === 0) return [];
+    if (stops.length === 1) return stops;
+
+    const unvisited = [...stops];
+    const route = [];
+    let current = { lat: startCoords.lat, lng: startCoords.lng };
+
+    // Nearest neighbor: at each step, pick the closest unvisited stop
+    while (unvisited.length > 0) {
+        let nearest = 0;
+        let nearestDist = Infinity;
+
+        for (let i = 0; i < unvisited.length; i++) {
+            const dist = window.getDistance(current.lat, current.lng, unvisited[i].lat, unvisited[i].lng);
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = i;
+            }
+        }
+
+        const chosen = unvisited.splice(nearest, 1)[0];
+        route.push(chosen);
+        current = { lat: chosen.lat, lng: chosen.lng };
+    }
+
+    return route;
+};
+
+/**
+ * Calculate total distance of a route in km.
+ */
+window.calculateRouteDistance = function(startCoords, route) {
+    let total = 0;
+    let current = { lat: startCoords.lat, lng: startCoords.lng };
+
+    for (const stop of route) {
+        total += window.getDistance(current.lat, current.lng, stop.lat, stop.lng);
+        current = { lat: stop.lat, lng: stop.lng };
+    }
+
+    return total;
+};
+
+/**
+ * Collect active orders and build optimized route for display.
+ * Called from the order list UI to show suggested delivery order.
+ */
+window.suggestOptimizedRoute = function() {
+    const activeOrders = window.currentOrders?.filter(o =>
+        o.assignedRider === window.currentUser?.email?.toLowerCase() &&
+        !['delivered', 'cancelled'].includes((o.status || '').toLowerCase())
+    ) || [];
+
+    if (activeOrders.length < 2) return null;
+
+    const startCoords = window.riderLocation || { lat: 0, lng: 0 };
+    const stops = [];
+
+    for (const order of activeOrders) {
+        const oid = order.outletId || order.outlet;
+        const outletCoord = window.outletCoords[oid];
+        
+        // Pickup stop
+        if (outletCoord) {
+            stops.push({
+                id: `pickup_${order.id}`,
+                label: `Pickup: ${order.outletName || oid}`,
+                lat: outletCoord.lat,
+                lng: outletCoord.lng,
+                type: 'pickup',
+                orderId: order.id
+            });
+        }
+
+        // Dropoff stop
+        if (order.lat && order.lng) {
+            stops.push({
+                id: `dropoff_${order.id}`,
+                label: `Drop: ${order.customerName || 'Customer'}`,
+                lat: order.lat,
+                lng: order.lng,
+                type: 'dropoff',
+                orderId: order.id
+            });
+        }
+    }
+
+    if (stops.length < 2) return null;
+
+    const optimized = window.optimizeRoute(startCoords, stops);
+    const totalDist = window.calculateRouteDistance(startCoords, optimized);
+
+    return {
+        stops: optimized,
+        totalDistance: totalDist,
+        stopCount: optimized.length
+    };
+};
+
+/**
+ * R4-5: Display optimized route in UI
+ */
+window.showOptimizedRoute = function() {
+    const route = window.suggestOptimizedRoute();
+    const routeSummary = document.getElementById('routeSummary');
+    const routeStops = document.getElementById('routeStops');
+    const optimizeBtn = document.getElementById('optimizeRouteBtn');
+    
+    if (!route) {
+        window.showToast("Need at least 2 active orders to optimize route", "info");
+        return;
+    }
+    
+    // Toggle display
+    const isVisible = routeSummary && routeSummary.style.display !== 'none';
+    
+    if (isVisible) {
+        routeSummary.style.display = 'none';
+        return;
+    }
+    
+    const stopLabels = route.stops.map((s, i) => {
+        const icon = s.type === 'pickup' ? '🏪' : '📍';
+        return `${i + 1}. ${icon} ${s.label}`;
+    });
+    
+    if (routeStops) {
+        routeStops.innerHTML = stopLabels.map(s => `<div style="padding:4px 0;">${s}</div>`).join('');
+    }
+    
+    if (routeSummary) {
+        routeSummary.style.display = 'block';
+        const totalKm = (route.totalDistance || 0).toFixed(1);
+        const existing = routeSummary.querySelector('.route-distance');
+        if (existing) existing.textContent = `Total: ~${totalKm} km | ${route.stopCount} stops`;
+    }
+    
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+};
 
 window.getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
@@ -345,8 +764,9 @@ window.triggerWhatsAppAlert = (phone, orderId, actionType, extraData = {}, isMan
         window.open(url, '_blank', 'noopener,noreferrer');
     } else {
         // Send via Bot command node
-        const outlet = window.activeOrderOutlet || 'outlet_pizza';
-        const cmdRef = ref(db, `bot/${outlet}/commands`);
+        const outlet = window.activeOrderOutlet || Object.keys(window.orderCache || {})[0];
+        const path = resolvePath('botCommands', outlet, window.activeOrderBusiness || resolveBusinessForOutlet(outlet));
+        const cmdRef = ref(db, path);
         push(cmdRef, {
             action: "SEND_GENERIC_MESSAGE",
             phone: cleanPhone,
@@ -366,8 +786,8 @@ function resolvePath(path, outlet = null, biz = null) {
     if (sharedNodes.includes(rootNode)) return path;
     
     // Global Rider Logic: Must know which business/outlet the data belongs to
-    const targetBiz = biz || window.activeOrderBusiness || 'business_roshani';
-    const targetOutlet = outlet || window.activeOrderOutlet || 'outlet_pizza';
+    const targetBiz = biz || window.activeOrderBusiness || resolveBusinessForOutlet(outlet);
+    const targetOutlet = outlet || window.activeOrderOutlet || Object.keys(window.orderCache || {})[0];
     
     // SaaS path: businesses/{bid}/outlets/{oid}/{path}
     return `businesses/${targetBiz}/outlets/${targetOutlet}/${path}`;
@@ -599,8 +1019,8 @@ window.confirmPickup = async () => {
 
     window.haptic(40);
     const id = window.activeOrderId;
-    const outletId = window.activeOrderOutlet || 'outlet_pizza';
-    const bizId = window.activeOrderBusiness || 'business_roshani';
+    const outletId = window.activeOrderOutlet || Object.keys(window.orderCache || {})[0];
+    const bizId = window.activeOrderBusiness || resolveBusinessForOutlet(outletId);
 
     // Proximity gate: Must be within 300m of outlet to pickup
     const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
@@ -612,7 +1032,7 @@ window.confirmPickup = async () => {
     const orderPath = resolvePath(`orders/${id}`, outletId, bizId);
 
     try {
-        await update(ref(db, orderPath), { status: "Picked Up", pickedUpAt: serverTimestamp() });
+        await update(ref(db, orderPath), { status: "Out for Delivery", pickedUpAt: serverTimestamp() });
         window.showToast("Order Picked Up! Drive safe. 🛵", "success");
         
         // Auto-switch to LIVE section & start navigation
@@ -787,20 +1207,45 @@ let _locationWatchId = null;
 let _locationInterval = null;
 
 function initLocationTracking() {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+        window.showToast("Geolocation is not supported by your browser.", "error");
+        return;
+    }
     if (_locationWatchId) return;
 
-    // HIGH FREQUENCY TRACKING (Zomato Style)
-    _locationWatchId = navigator.geolocation.watchPosition(
-        pos => {
-            window.riderLocation = { 
-                lat: pos.coords.latitude, 
-                lng: pos.coords.longitude, 
-                accuracy: pos.coords.accuracy,
-                ts: Date.now() 
-            };
-        }, err => { }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-    );
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+        if (result.state === 'denied') {
+            window.showToast("Location access denied. Please enable location in browser settings.", "error");
+            const btn = document.getElementById('statusToggleBtn');
+            if (btn) {
+                btn.className = 'status-pill offline';
+                btn.querySelector('span').innerText = 'OFFLINE';
+            }
+            return;
+        }
+        startTracking();
+    }).catch(() => startTracking());
+
+    function startTracking() {
+        _locationWatchId = navigator.geolocation.watchPosition(
+            pos => {
+                window.riderLocation = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy,
+                    ts: Date.now()
+                };
+            }, err => {
+                if (err.code === 1) {
+                    window.showToast("Location permission denied. Please enable location access.", "error");
+                } else if (err.code === 2) {
+                    window.showToast("Location unavailable. Check device settings.", "error");
+                } else if (err.code === 3) {
+                    console.warn("[Location] Timeout getting position");
+                }
+            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+    }
 
     if (_locationInterval) clearInterval(_locationInterval);
     _locationInterval = setInterval(() => {
@@ -827,7 +1272,7 @@ function stopLocationTracking() {
 // CORE DELIVERY LOGIC
 window.acceptOrder = async (id, outletId, bizId = null) => {
     window.haptic(40);
-    const targetBiz = bizId || window.activeOrderBusiness || 'business_roshani';
+    const targetBiz = bizId || window.activeOrderBusiness || resolveBusinessForOutlet(outletId);
     if (!window.currentUser) return window.showToast("Authentication error. Please login again.", "error");
     if (!window.riderLocation) return window.showToast("GPS Error. Ensure location is ON.", "error");
 
@@ -837,21 +1282,30 @@ window.acceptOrder = async (id, outletId, bizId = null) => {
     const distFromRest = window.getDistance(window.riderLocation.lat, window.riderLocation.lng, outletCoords.lat, outletCoords.lng);
     if (distFromRest > maxDist) return window.showToast(`Must be within 1km of outlet to accept! (You are ${(distFromRest*1000).toFixed(0)}m away)`, "error");
 
+    // R4-2: Queue action if offline
+    if (!_isOnline) {
+        queueOfflineAction({
+            type: 'ACCEPT_ORDER',
+            payload: { id, outletId, bizId: targetBiz }
+        });
+        window.showToast("Order queued for sync when back online", "info");
+        return;
+    }
+
     try {
-        const orderPath = `businesses/${targetBiz}/outlets/${outletId}/orders/${id}`;
+        const orderPath = resolvePath(`orders/${id}`, outletId, targetBiz);
         const result = await runTransaction(ref(db, orderPath), current => {
             if (current && current.assignedRider) return;
             // Changed from 4-digit to 4-digit OTP for consistency across system
             const initialOTP = Math.floor(1000 + Math.random() * 9000).toString();
-            return { 
-                ...current, 
-                status: "Arriving at Restaurant", 
-                deliveryOTP: initialOTP, 
-                otp: initialOTP, 
-                assignedRider: window.currentUser.email.toLowerCase(), 
+            return {
+                ...current,
+                deliveryOTP: initialOTP,
+                otp: initialOTP,
+                assignedRider: window.currentUser.email.toLowerCase(),
                 riderId: window.currentUser.uid,
                 riderPhone: window.currentUser.profile.phone || "",
-                acceptedAt: Date.now() 
+                acceptedAt: Date.now()
             };
         });
         if (result.committed) {
@@ -886,7 +1340,7 @@ window.verifyOTP = async () => {
     btn.innerHTML = '<span class="spinner"></span> VERIFYING...';
     btn.disabled = true;
 
-    const outletId = window._currentOrderOutlet || 'outlet_pizza';
+    const outletId = window._currentOrderOutlet || Object.keys(window.orderCache || {})[0];
     const otpAttemptsPath = resolvePath(`otpAttempts/${currentOrderId}`, outletId);
     const now = Date.now();
 
@@ -983,7 +1437,7 @@ window.finalizeDeliverySequence = async (orderPath, matchesFallback, order, paym
     const riderId = window.currentUser.profile.id;
     const commission = Number(order.deliveryFee || 0);
     const pathParts = orderPath.split('/');
-    const outletId = pathParts.includes('outlets') ? pathParts[pathParts.indexOf('outlets') + 1] : (pathParts[0] || 'outlet_pizza');
+    const outletId = pathParts.includes('outlets') ? pathParts[pathParts.indexOf('outlets') + 1] : (pathParts[0] || Object.keys(window.orderCache || {})[0]);
     const txId = `RDX_${Date.now()}_${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
     // 1. Update Legacy Stats — write directly to root riderStats/${riderId}
@@ -1048,7 +1502,7 @@ window.emergencyOverride = async () => {
     if (!currentUser || !currentUser.profile || !currentUser.profile.isAdmin) return window.showToast("Unauthorized access.", "error");
     if (confirm("FORCE COMPLETE: Bypass customer OTP?")) {
         window.haptic([50, 50, 50]);
-        const orderPath = resolvePath(`orders/${currentOrderId}`, window._currentOrderOutlet || 'outlet_pizza');
+        const orderPath = resolvePath(`orders/${currentOrderId}`, window._currentOrderOutlet || Object.keys(window.orderCache || {})[0]);
         const snap = await get(ref(db, orderPath));
         const order = snap.val();
         
@@ -1063,7 +1517,7 @@ window.emergencyOverride = async () => {
 window.regenerateOTP = async () => {
     if (!currentOrderId) return;
     const now = Date.now();
-    const outletId = window._currentOrderOutlet || 'outlet_pizza';
+    const outletId = window._currentOrderOutlet || Object.keys(window.orderCache || {})[0];
     const otpAttemptsPath = resolvePath(`otpAttempts/${currentOrderId}`, outletId);
 
     const attemptsSnap = await get(ref(db, otpAttemptsPath));
@@ -1147,7 +1601,9 @@ window.showPingModal = (id, outletId, order) => {
     const modal = document.getElementById('newOrderPingModal');
     if (!modal) return;
     
-    document.getElementById('pingOutletName').innerText = (outletId === 'pizza' ? 'Pizza' : 'Cake') + ' Outlet';
+    const outletMeta = window.outletCoords[outletId] || {};
+    const pingOutletName = outletMeta.name || outletId.replace('outlet_', '') || 'Outlet';
+    document.getElementById('pingOutletName').innerText = pingOutletName + ' Outlet';
     document.getElementById('pingCustomerAddress').innerText = order.address || 'Unknown';
     document.getElementById('pingOrderId').innerText = '#' + (order.orderId || id.slice(-6)).toUpperCase();
     document.getElementById('pingOrderTotal').innerText = '₹' + (order.deliveryFee || '0');
@@ -1542,13 +1998,8 @@ window._doRenderAllOrders = () => {
     let todayOrders = 0; 
     let todayPay = 0; 
     
-    // Outlet Specific Stats
-    let pizzaToday = 0;
-    let cakeToday = 0;
-    let pizzaTodayOrders = 0;
-    let cakeTodayOrders = 0;
-    let pizzaEarnings = 0; // Lifetime
-    let cakeEarnings = 0; // Lifetime
+    // Outlet Specific Stats (dynamic map)
+    const outletStats = {};
     let totalCashToSettle = 0;
     
     // Weekly Stats
@@ -1610,18 +2061,18 @@ window._doRenderAllOrders = () => {
     // Identify the TRUE active order (Weighted by progress status)
     if (!sliderState.isDragging) {
         // Calculate status weights for prioritization
-        const getWeight = (status) => {
+        const getWeight = (status, order) => {
             const s = (status || "").toLowerCase();
-            if (s === "reached drop location") return 4;
-            if (s === "picked up" || s === "out for delivery") return 3;
-            if (s === "arrived at restaurant" || s === "arrived at outlet") return 2;
-            if (["ready", "cooked", "packed", "waiting for pickup", "accepted"].includes(s)) return 1;
+            if (s === "reached drop location" || order?.reachedDropAt) return 4;
+            if (s === "out for delivery" || order?.pickedUpAt) return 3;
+            if (order?.arrivedAtRestaurantAt) return 2;
+            if (["ready", "cooked", "packed", "waiting for pickup", "accepted", "preparing", "confirmed"].includes(s)) return 1;
             return 0;
         };
 
         const activeCandidate = allRelevantOrders
             .filter(item => item.isMine && item.isActive && !item.isGhost)
-            .sort((a, b) => getWeight(b.status) - getWeight(a.status) || b.orderTime - a.orderTime)[0];
+            .sort((a, b) => getWeight(b.status, b.order) - getWeight(a.status, a.order) || b.orderTime - a.orderTime)[0];
 
         if (activeCandidate) {
             window.activeOrderId = activeCandidate.id;
@@ -1642,7 +2093,7 @@ window._doRenderAllOrders = () => {
         if (isGhost || (!isActive && !isFresh)) return;
 
         // 1. UNASSIGNED - STRICT FILTERING
-        const allowedUnassignedStatus = ["ready", "cooked", "packed"];
+        const allowedUnassignedStatus = ["ready", "cooked", "packed", "preparing", "confirmed"];
         if (!o.assignedRider && allowedUnassignedStatus.includes(status)) {
             // PROXIMITY CHECK (1000m - matches accept gate)
             const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
@@ -1665,11 +2116,12 @@ window._doRenderAllOrders = () => {
                 const safeTotal = escapeHtml(String(o.total || 0));
                 const safeId = o.orderId || id;
                 const safeOutlet = outletId;
-                const safeBid = o._bid || 'business_roshani';
+                const safeBid = o._bid || resolveBusinessForOutlet(outletId);
                 const statusLabel = (status === "ready" || status === "cooked" || status === "packed") ? "READY" : "PREPARING";
                 
-                const outletName = outletId === 'pizza' ? 'Pizza' : 'Cake';
-                const outletIcon = outletId === 'pizza' ? '🍕' : '🎂';
+                const outletMeta = window.outletCoords[outletId] || {};
+                const outletName = outletMeta.name || outletId;
+                const outletIcon = outletMeta.icon || '🏪';
                 
                 unassignedRows += `
                     <tr>
@@ -1746,10 +2198,10 @@ window._doRenderAllOrders = () => {
                 let currentStep = 0;
                 const statusLower = (o.status || "").toLowerCase();
                 
-                if (statusLower === "reached drop location") currentStep = 3;
-                else if (statusLower === "picked up" || statusLower === "out for delivery") currentStep = 2;
-                else if (statusLower === "arrived at restaurant" || statusLower === "arrived at outlet") currentStep = 1;
-                else if (["ready", "cooked", "packed", "waiting for pickup"].includes(statusLower)) currentStep = 0; 
+                if (statusLower === "reached drop location" || o.reachedDropAt) currentStep = 3;
+                else if (statusLower === "out for delivery" || o.pickedUpAt) currentStep = 2;
+                else if (o.arrivedAtRestaurantAt) currentStep = 1;
+                else if (["ready", "cooked", "packed", "waiting for pickup", "preparing", "confirmed"].includes(statusLower)) currentStep = 0;
                 else currentStep = 0; 
 
                 const outletCoords = window.outletCoords[outletId] || { lat: 0, lng: 0 };
@@ -1914,18 +2366,16 @@ window._doRenderAllOrders = () => {
                 if (isToday) {
                     todayOrders++;
                     todayPay += fee;
-                    if (outletId === 'pizza') {
-                        pizzaToday += fee;
-                        pizzaTodayOrders++;
-                    }
-                    else if (outletId === 'cake') {
-                        cakeToday += fee;
-                        cakeTodayOrders++;
-                    }
                 }
 
-                if (outletId === 'pizza') pizzaEarnings += fee;
-                else if (outletId === 'cake') cakeEarnings += fee;
+                if (!outletStats[outletId]) {
+                    outletStats[outletId] = { today: 0, todayOrders: 0, lifetime: 0 };
+                }
+                if (isToday) {
+                    outletStats[outletId].today += fee;
+                    outletStats[outletId].todayOrders++;
+                }
+                outletStats[outletId].lifetime += fee;
 
                 if (isCash && !o.settled) totalCashToSettle += orderTotal;
 
@@ -1943,8 +2393,9 @@ window._doRenderAllOrders = () => {
                 const dTime = o.deliveredAt ? new Date(o.deliveredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
                 const safeAddress = escapeHtml(o.address || '---');
                 
-                const outletName = outletId === 'pizza' ? 'Pizza' : 'Cake';
-                const outletIcon = outletId === 'pizza' ? '🍕' : '🎂';
+                const outletMeta = window.outletCoords[outletId] || {};
+                const outletName = outletMeta.name || outletId;
+                const outletIcon = outletMeta.icon || '🏪';
 
                 historyRows += `
                     <tr>
@@ -2075,12 +2526,15 @@ window._doRenderAllOrders = () => {
     
     if (document.getElementById('e-total')) document.getElementById('e-total').innerText = `₹${totalCashToSettle.toLocaleString()}`;
 
-    if (document.getElementById('e-pizza')) document.getElementById('e-pizza').innerText = `₹${pizzaEarnings.toLocaleString()}`;
-    if (document.getElementById('e-pizza-today')) document.getElementById('e-pizza-today').innerText = `Today: ₹${pizzaToday.toLocaleString()}`;
-    if (document.getElementById('e-pizza-orders')) document.getElementById('e-pizza-orders').innerText = `${pizzaTodayOrders} Orders`;
-
-    if (document.getElementById('e-cake-today')) document.getElementById('e-cake-today').innerText = `Today: ₹${cakeToday.toLocaleString()}`;
-    if (document.getElementById('e-cake-orders')) document.getElementById('e-cake-orders').innerText = `${cakeTodayOrders} Orders`;
+    Object.entries(outletStats).forEach(([oid, stats]) => {
+        const idSuffix = oid.startsWith('outlet_') ? oid.replace('outlet_', '') : oid;
+        const lifetimeEl = document.getElementById(`e-${idSuffix}`);
+        const todayEl = document.getElementById(`e-${idSuffix}-today`);
+        const ordersEl = document.getElementById(`e-${idSuffix}-orders`);
+        if (lifetimeEl) lifetimeEl.innerText = `₹${stats.lifetime.toLocaleString()}`;
+        if (todayEl) todayEl.innerText = `Today: ₹${stats.today.toLocaleString()}`;
+        if (ordersEl) ordersEl.innerText = `${stats.todayOrders} Orders`;
+    });
 
     // Weekly Chart Update
     const chartContainer = document.getElementById('weeklyChart');
@@ -2103,6 +2557,17 @@ window._doRenderAllOrders = () => {
         if (dashboardActiveView) window.lucide.createIcons({ root: dashboardActiveView });
         if (activeOrderView) window.lucide.createIcons({ root: activeOrderView });
     }
+
+    // R4-5: Show route optimization button if multiple active orders
+    const routeBtn = document.getElementById('optimizeRouteBtn');
+    if (routeBtn) {
+        const activeCount = window.currentOrders?.filter(o =>
+            o.assignedRider === window.currentUser?.email?.toLowerCase() &&
+            !['delivered', 'cancelled'].includes((o.status || '').toLowerCase())
+        ).length || 0;
+        routeBtn.style.display = activeCount >= 2 ? 'flex' : 'none';
+    }
+}
 
     // Global slider is already initialized via event delegation
 
@@ -2134,7 +2599,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Notifications
     document.getElementById('mobileNotifBtn')?.addEventListener('click', window.toggleNotifSheet);
     document.getElementById('btnCloseNotifSheet')?.addEventListener('click', window.toggleNotifSheet);
-    document.getElementById('btnClearAllNotifs')?.addEventListener('click', window.clearNotifications);
+    document.getElementById('btnClearAllNotifs')?.addEventListener('click', window.clearAllNotifications);
 
     // Confirmation Modal
     document.getElementById('btnConfirmNo')?.addEventListener('click', () => {
@@ -2220,37 +2685,38 @@ document.addEventListener('DOMContentLoaded', () => {
     let touchStart = 0;
     const ptr = document.getElementById('ptrIndicator');
     
-    window.addEventListener('touchstart', e => {
-        if (window.scrollY === 0) touchStart = e.touches[0].pageY;
-    }, { passive: true });
+    if (ptr) {
+        window.addEventListener('touchstart', e => {
+            if (window.scrollY === 0) touchStart = e.touches[0].pageY;
+        }, { passive: true });
 
-    window.addEventListener('touchmove', e => {
-        if (touchStart === 0) return;
-        const touch = e.touches[0].pageY;
-        const diff = touch - touchStart;
-        if (diff > 0 && window.scrollY === 0) {
-            ptr.classList.add('active');
-            const rotation = Math.min(diff * 2, 360);
-            ptr.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
-            if (diff > 200) {
-                ptr.classList.add('refreshing');
-                if (!ptr._haptic) { window.haptic(30); ptr._haptic = true; }
+        window.addEventListener('touchmove', e => {
+            if (touchStart === 0) return;
+            const diff = touch - touchStart;
+            if (diff > 0 && window.scrollY === 0) {
+                ptr.classList.add('active');
+                const rotation = Math.min(diff * 2, 360);
+                ptr.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+                if (diff > 200) {
+                    ptr.classList.add('refreshing');
+                    if (!ptr._haptic) { window.haptic(30); ptr._haptic = true; }
+                }
             }
-        }
-    }, { passive: true });
+        }, { passive: true });
 
-    window.addEventListener('touchend', e => {
-        const touchEnd = e.changedTouches[0].pageY;
-        if (touchEnd - touchStart > 200 && window.scrollY === 0) {
-            console.log("[UI] Gesture Refresh Triggered");
-            window.completeSiteRefresh();
-        } else {
-            ptr.classList.remove('active', 'refreshing');
-            ptr.style.transform = '';
-            ptr._haptic = false;
-        }
-        touchStart = 0;
-    });
+        window.addEventListener('touchend', e => {
+            const touchEnd = e.changedTouches[0].pageY;
+            if (touchEnd - touchStart > 200 && window.scrollY === 0) {
+                console.log("[UI] Gesture Refresh Triggered");
+                window.completeSiteRefresh();
+            } else {
+                ptr.classList.remove('active', 'refreshing');
+                ptr.style.transform = '';
+                ptr._haptic = false;
+            }
+            touchStart = 0;
+        });
+    }
 
     // History Search
     document.getElementById('historySearch')?.addEventListener('input', (e) => {
@@ -2432,7 +2898,7 @@ window.handleProfilePhotoUpload = async (e) => {
         
         await update(ref(db, `riders/${currentUser.profile.id}`), { profilePhoto: url });
         document.getElementById('r-profile-img').src = url;
-        document.getElementById('sidebar-avatar').src = url;
+        document.getElementById('r-profile-img').src = url;
         window.showToast("Profile photo updated!", "success");
     } catch (err) {
         console.error("Upload failed:", err);

@@ -7,7 +7,7 @@
  */
 
 // Browser-side Firebase config (for Admin, Rider, Marketplace)
-export const FOODHUBBIE_FIREBASE_CONFIG = {
+const FOODHUBBIE_FIREBASE_CONFIG = {
   apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
   authDomain: "food-hubbie.firebaseapp.com",
   databaseURL: "https://food-hubbie-default-rtdb.firebaseio.com",
@@ -19,13 +19,13 @@ export const FOODHUBBIE_FIREBASE_CONFIG = {
 };
 
 // Server-side Firebase URL (for Bot / Node.js)
-export const FIREBASE_DATABASE_URL = "https://food-hubbie-default-rtdb.firebaseio.com";
+const FIREBASE_DATABASE_URL = "https://food-hubbie-default-rtdb.firebaseio.com";
 
 // App Check (reCAPTCHA v3 for browser clients)
-export const RECAPTCHA_SITE_KEY = "REPLACE_WITH_YOUR_RECAPTCHA_V3_SITE_KEY";
+const RECAPTCHA_SITE_KEY = "6LeblvYsAAAAAPhR4Uw4kHZLsW50dxE8o2D2XIo3";
 
-// Standard ESM Default Export
-export default {
+// Standard CJS Export
+module.exports = {
   FOODHUBBIE_FIREBASE_CONFIG,
   FIREBASE_DATABASE_URL,
   RECAPTCHA_SITE_KEY

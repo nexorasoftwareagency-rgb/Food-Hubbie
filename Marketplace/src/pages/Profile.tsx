@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   User,
@@ -41,10 +41,13 @@ export default function Profile() {
   const [newAddress, setNewAddress] = useState({ label: "Home" as "Home" | "Work" | "Other", address: "", landmark: "" });
 
   // Redirect if not logged in
-  if (authState === "unauthenticated") {
-    setLocation("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (authState === "unauthenticated") {
+      setLocation("/login");
+    }
+  }, [authState, setLocation]);
+
+  if (authState === "unauthenticated") return null;
 
   if (authState === "loading") {
     return (

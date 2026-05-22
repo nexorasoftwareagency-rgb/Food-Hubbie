@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { Outlet, uploadImage } from '../firebase.js';
+import { Outlet, uploadImage, ServerValue } from '../firebase.js';
 import { logAudit, atomicAdminAction, showToast } from '../utils.js';
 import { ui } from '../ui.js';
 
@@ -86,7 +86,7 @@ function applyShake(id) {
 export async function loadStoreSettings() {
     console.log("[Settings] Loading all store settings...");
     try {
-        const [storeSnap, delSnap, botSnap, dispSnap] = await Promise.all([
+        const [storeSnap, delSnap, botSnap, dispSnap, revSnap] = await Promise.all([
             Outlet.ref(SETTINGS_PATHS.STORE).once("value"),
             Outlet.ref(SETTINGS_PATHS.DELIVERY).once("value"),
             Outlet.ref(SETTINGS_PATHS.BOT).once("value"),

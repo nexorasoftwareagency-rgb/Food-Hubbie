@@ -610,3 +610,65 @@ h1, h2, h3, h4, .font-black { font-weight: 700; letter-spacing: -0.02em; }
   background: var(--pro-primary-glow) !important;
   border: 2px dashed var(--pro-primary) !important;
 }
+
+/* ==================== PAGINATION (R5-4) ==================== */
+.pagination-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pagination-buttons .btn-sm {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--pro-border);
+  background: white;
+  color: var(--pro-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-buttons .btn-sm:hover:not(.disabled):not(.active) {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+}
+
+.pagination-buttons .btn-sm.active {
+  background: var(--pro-primary);
+  color: white;
+  border-color: var(--pro-primary);
+}
+
+.pagination-buttons .btn-sm.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-ellipsis {
+  color: #94A3B8;
+  padding: 0 4px;
+  font-weight: 600;
+}

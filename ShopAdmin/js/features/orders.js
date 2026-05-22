@@ -6,7 +6,7 @@
 import { db, Outlet, ServerValue, auth } from '../firebase.js';
 import { calculateAndLogSettlement } from './settlements.js';
 import { state } from '../state.js';
-import { escapeHtml, showToast, playNotificationSound, validateUrl, logAudit, calculateDistance, getFeeFromSlabs, addRiderNotification, getISTDateString } from '../utils.js';
+import { escapeHtml, showToast, playNotificationSound, calculateDistance, getFeeFromSlabs, getISTDateString, atomicAdminAction, getTimeAgo } from '../utils.js';
 import { showAlert, addNotification, highlightOrder } from './notifications.js';
 import { showPaymentPicker } from '../ui-utils.js';
 import { autoDeductStock } from './inventory.js';
@@ -1092,7 +1092,7 @@ export async function assignRider(id, riderId) {
                 const cleanPhone = (rider.phone || "").replace(/\D/g, '').slice(-10);
                 if (cleanPhone.length === 10) {
                     const message = `🚀 *TASK ASSIGNED:* #${id.slice(-5).toUpperCase()}\n👤 ${order.customerName}\n📞 ${order.phone}\n🏠 ${order.address}\n💰 Collect: ₹${order.total}`;
-                    const cmdRef = db.ref(`bot/outlet_${outletKey}/commands`).push();
+                    const cmdRef = Outlet.ref("botCommands").push();
                     await cmdRef.set({ action: "SEND_GENERIC_MESSAGE", phone: cleanPhone, message, timestamp: ServerValue.TIMESTAMP });
                 }
             }
@@ -1166,6 +1166,8 @@ export async function openOrderDrawer(id) {
         </div>
     `).join('');
 
+    const safeStatus = escapeHtml(order.status || 'Unknown');
+    const safeStatusClass = safeStatus.toLowerCase().replace(/\s+/g, '-');
     content.innerHTML = `
         <div class="drawer-header-v4 p-20 border-b-ghost">
             <div class="flex-between flex-center mb-10">
@@ -1289,7 +1291,7 @@ export function filterOrders(searchTerm) {
 
 
 function renderRevenueChart(orders) {
-    const canvas = document.getElementById('revenueChart');
+    const canvas = document.getElementById('revenueChartReport') || document.getElementById('revenueChart');
     if (!canvas || typeof Chart === 'undefined') return;
 
     const ctx = canvas.getContext('2d');

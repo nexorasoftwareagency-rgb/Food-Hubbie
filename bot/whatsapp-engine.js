@@ -80,9 +80,16 @@ async function handleIncomingMessage(sock, m) {
   if (!senderJid.endsWith('@s.whatsapp.net')) return;
 
   const sender = senderJid.replace(/[^0-9]/g, '');
-  const text = (m.message?.conversation || m.message?.extendedTextMessage?.text || '').trim();
+  let text = (m.message?.conversation || m.message?.extendedTextMessage?.text || '').trim();
   const location = m.message?.locationMessage;
   const pushName = m.pushName || "";
+
+  // Input validation
+  if (text.length > 1000) {
+    await sock.sendMessage(senderJid, { text: "⚠️ Message too long. Keep it under 1000 characters." });
+    return;
+  }
+  text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '').trim();
 
   // Initialize session (Load from DB if not in cache)
   let user = await getSession(senderJid);
@@ -560,14 +567,14 @@ async function handleLocationReceived(sock, jid, user, location, text) {
   if (!slabs || slabs.length === 0) {
     const globalSlabs = await getGlobalData('system/settings/delivery/slabs');
     if (globalSlabs && globalSlabs.length > 0) {
-      slabs = globalSlabs.map(s => ({ km: s.upToKm, fee: s.fee }));
+      slabs = globalSlabs;
     }
   }
 
   const fee = calculateDeliveryFee(dist, slabs || [
-    { km: 2, fee: 20 },
-    { km: 5, fee: 40 },
-    { km: 10, fee: 60 }
+    { upToKm: 2, fee: 20 },
+    { upToKm: 5, fee: 40 },
+    { upToKm: 10, fee: 60 }
   ]);
   user.deliveryFee = fee;
 

@@ -10,6 +10,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/otpauth@9.2.2/dist/otpauth.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
@@ -39,6 +41,29 @@
                 </button>
             </form>
             <p id="loginError" class="hidden text-danger mt-4 font-semibold text-xs text-center"></p>
+        </div>
+    </div>
+
+    <!-- 2FA Verification Modal -->
+    <div id="tfaModal" class="auth-overlay hidden">
+        <div class="auth-card">
+            <div class="pro-logo mb-6 justify-center">
+                <i data-lucide="shield" size="32" color="#38BDF8"></i>
+                <span class="ml-3 text-2xl font-black text-white">2FA Verification</span>
+            </div>
+            <p class="text-muted mb-6 text-sm text-center">Enter the 6-digit code from your authenticator app</p>
+            
+            <form id="tfaForm" onsubmit="event.preventDefault(); submitTFACode();">
+                <div class="form-group text-center mb-6">
+                    <input type="text" id="tfaCode" class="pro-input text-center text-2xl font-mono tracking-widest" placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code">
+                </div>
+                
+                <button type="submit" id="btnTFA" class="btn-pro w-full justify-center h-50 text-base">
+                    VERIFY CODE <i data-lucide="check-circle" size="18"></i>
+                </button>
+            </form>
+            <p id="tfaError" class="hidden text-danger mt-4 font-semibold text-xs text-center"></p>
+            <p class="text-muted mt-4 text-xs text-center">Open Google Authenticator, Authy, or your preferred TOTP app</p>
         </div>
     </div>
 
@@ -129,6 +154,7 @@
                 <div class="flex-1">
                     <p class="font-bold text-sm">Root Admin</p>
                     <p class="text-xs text-slate">Master Session</p>
+                    <span id="adminRoleBadge" class="text-xs font-mono" style="color:#38BDF8;display:none;">SUPERADMIN</span>
                 </div>
                 <i data-lucide="log-out" size="16" class="cursor-pointer text-slate" onclick="auth.signOut().catch(()=>{}); location.reload();"></i>
             </div>
@@ -397,6 +423,7 @@
                             </thead>
                             <tbody id="ridersListTable"></tbody>
                         </table>
+                        <div id="ridersPagination" class="pagination-container"></div>
                     </div>
                 </div>
             </div>
@@ -515,7 +542,7 @@
                             <thead>
                                 <tr>
                                     <th>Distance Parameter (Km)</th>
-                                    <th>Service Cost (Γé╣)</th>
+                                    <th>Service Cost (₹)</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -529,6 +556,30 @@
             <!-- Infrastructure Settings -->
             <div id="settings" class="tab-pane">
                 <div class="content-section">
+                    <!-- 2FA Configuration -->
+                    <div class="pro-card bg-dark text-white mb-8">
+                        <h3 class="text-white mb-4"><i data-lucide="shield-check" size="18"></i> Two-Factor Authentication</h3>
+                        <div id="tfaSetupContainer">
+                            <p class="text-muted text-sm mb-4">Enhance account security with TOTP-based two-factor authentication.</p>
+                            <div class="flex gap-3 items-center">
+                                <button class="btn-pro" id="tfaEnableBtn" onclick="showTFASetup()">Enable 2FA</button>
+                                <button class="btn-pro btn-muted hidden" id="tfaDisableBtn" onclick="disableTFA()">Disable 2FA</button>
+                            </div>
+                        </div>
+                        <div id="tfaQRContainer" class="hidden mt-6 text-center">
+                            <p class="text-sm text-muted mb-4">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                            <div id="tfaQRCode" class="inline-block bg-white p-4 rounded-xl"></div>
+                            <div class="mt-4">
+                                <p class="text-xs text-muted mb-2">Or enter this secret manually:</p>
+                                <code id="tfaSecretDisplay" class="bg-black-op-4 px-3 py-2 rounded text-sm font-mono"></code>
+                            </div>
+                            <div class="mt-4 flex gap-3 justify-center">
+                                <input type="text" id="tfaVerifyInput" class="auth-input" style="width:200px;" placeholder="Enter 6-digit code" maxlength="6">
+                                <button class="btn-pro" onclick="verifyTFASetup()">Verify & Enable</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="pro-card bg-dark text-white">
                         <h3 class="text-white mb-8"><i data-lucide="terminal" size="18"></i> Infrastructure Registry</h3>
                         <div class="font-mono text-xs line-height-1-6 bg-black-op-4 p-3 rounded-xl">
@@ -540,6 +591,82 @@
                             <div>[AUTH] PERMISSION LEVEL: ROOT_ADMIN</div>
                             <div>[AUTH] ENCRYPTION: TLS 1.3</div>
                             <div class="mt-4 animate-pulse">>_ Waiting for next telemetry packet...</div>
+                        </div>
+                    </div>
+
+                    <!-- R5-5: Data Retention Policies -->
+                    <div class="pro-card bg-dark text-white mt-8">
+                        <h3 class="text-white mb-4"><i data-lucide="archive" size="18"></i> Data Retention Policies</h3>
+                        <p class="text-muted text-sm mb-6">Automatically archive or purge old data to maintain system performance and compliance.</p>
+                        
+                        <div class="grid grid-cols-3 gap-6 mb-6">
+                            <div class="bg-black-op-4 p-4 rounded-xl">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i data-lucide="shopping-cart" size="16" color="#38BDF8"></i>
+                                    <span class="text-sm font-bold text-white">Orders</span>
+                                </div>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <select id="retentionOrders" class="auth-input text-sm" style="width:120px;">
+                                        <option value="30">30 days</option>
+                                        <option value="60">60 days</option>
+                                        <option value="90" selected>90 days</option>
+                                        <option value="180">180 days</option>
+                                        <option value="365">1 year</option>
+                                    </select>
+                                    <select id="retentionOrdersAction" class="auth-input text-sm" style="width:120px;">
+                                        <option value="archive">Archive</option>
+                                        <option value="purge">Purge</option>
+                                    </select>
+                                </div>
+                                <button class="btn-pro btn-sm w-full" onclick="applyDataRetention('orders')">Apply Policy</button>
+                            </div>
+                            
+                            <div class="bg-black-op-4 p-4 rounded-xl">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i data-lucide="file-text" size="16" color="#10B981"></i>
+                                    <span class="text-sm font-bold text-white">Audit Logs</span>
+                                </div>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <select id="retentionAudit" class="auth-input text-sm" style="width:120px;">
+                                        <option value="30">30 days</option>
+                                        <option value="60">60 days</option>
+                                        <option value="90" selected>90 days</option>
+                                        <option value="180">180 days</option>
+                                    </select>
+                                    <select id="retentionAuditAction" class="auth-input text-sm" style="width:120px;">
+                                        <option value="archive">Archive</option>
+                                        <option value="purge">Purge</option>
+                                    </select>
+                                </div>
+                                <button class="btn-pro btn-sm w-full" onclick="applyDataRetention('audit')">Apply Policy</button>
+                            </div>
+                            
+                            <div class="bg-black-op-4 p-4 rounded-xl">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i data-lucide="receipt" size="16" color="#F59E0B"></i>
+                                    <span class="text-sm font-bold text-white">Settlements</span>
+                                </div>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <select id="retentionSettlements" class="auth-input text-sm" style="width:120px;">
+                                        <option value="60">60 days</option>
+                                        <option value="90">90 days</option>
+                                        <option value="180" selected>180 days</option>
+                                        <option value="365">1 year</option>
+                                    </select>
+                                    <select id="retentionSettlementsAction" class="auth-input text-sm" style="width:120px;">
+                                        <option value="archive">Archive</option>
+                                        <option value="purge">Purge</option>
+                                    </select>
+                                </div>
+                                <button class="btn-pro btn-sm w-full" onclick="applyDataRetention('settlements')">Apply Policy</button>
+                            </div>
+                        </div>
+                        
+                        <div id="retentionStatus" class="hidden bg-black-op-4 p-4 rounded-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="animate-spin"><i data-lucide="loader" size="16" color="#38BDF8"></i></div>
+                                <span class="text-sm text-muted" id="retentionStatusText">Processing...</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -707,172 +834,6 @@
                 </div>
             </div>
 
-            <!-- Reports Center -->
-            <div id="reports" class="tab-pane">
-                <div class="content-section">
-                    <div class="flex justify-between items-center mb-8">
-                        <h2 class="text-xl font-black text-slate mb-0">Analytics Oversight</h2>
-                        <div class="flex gap-2">
-                            <button class="btn-pro btn-muted" onclick="exportReport('excel')"><i data-lucide="file-spreadsheet" size="18"></i> Export Excel</button>
-                            <button class="btn-pro" onclick="exportReport('pdf')"><i data-lucide="download-cloud" size="18"></i> Download PDF Report</button>
-                        </div>
-                    </div>
-                    <!-- External PDF Generator -->
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-                    <!-- Global Revenue & Volume -->
-                    <div class="metric-grid">
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon"><i data-lucide="banknote"></i></div>
-                                <div class="pro-badge badge-success">GTV</div>
-                            </div>
-                            <div>
-                                <div class="metric-value" id="reportGlobalSales">Γé╣0</div>
-                                <div class="metric-label">Total Ecosystem Revenue</div>
-                            </div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon"><i data-lucide="shopping-bag"></i></div>
-                                <div class="pro-badge badge-info">Volume</div>
-                            </div>
-                            <div>
-                                <div class="metric-value" id="reportGlobalOrders">0</div>
-                                <div class="metric-label">Lifetime Order Volume</div>
-                            </div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon"><i data-lucide="trending-up"></i></div>
-                                <div class="pro-badge badge-warning">AOV</div>
-                            </div>
-                            <div>
-                                <div class="metric-value" id="reportAvgOrderValue">Γé╣0</div>
-                                <div class="metric-label">Avg. Transaction Value</div>
-                            </div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon"><i data-lucide="heart" color="#F43F5E"></i></div>
-                                <div class="pro-badge btn-danger text-white">Loyalty</div>
-                            </div>
-                            <div>
-                                <div class="metric-value" id="reportGlobalLoyalty">Γé╣0</div>
-                                <div class="metric-label">Total Rewards Disbursed</div>
-                            </div>
-                        </div>
-                    <div class="metric-grid mt-4">
-                        <div class="metric-card" style="border-top: 3px solid #6366F1">
-                            <div class="metric-header">
-                                <div class="metric-icon" style="background: rgba(99,102,241,0.1); color: #6366F1"><i data-lucide="piggy-bank"></i></div>
-                                <div class="pro-badge badge-info">Earnings</div>
-                            </div>
-                            <div>
-                                <div class="metric-value" id="reportPlatformRev">₹0</div>
-                                <div class="metric-label">Net Platform Revenue</div>
-                            </div>
-                        </div>
-                        <div class="metric-card" style="border-top: 3px solid #F97316">
-                            <div class="metric-header">
-                                <div class="metric-icon" style="background: rgba(249,115,22,0.1); color: #F97316"><i data-lucide="wallet"></i></div>
-                                <div class="pro-badge badge-warning">Payables</div>
-                            </div>
-                            <div>
-                                <div class="metric-value" id="reportPartnerPayout">₹0</div>
-                                <div class="metric-label">Total Partner Payouts</div>
-                            </div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon"><i data-lucide="percent"></i></div>
-                                <div class="pro-badge badge-success">Yield</div>
-                            </div>
-                            <div>
-                                <div class="metric-value" id="reportTakeRate">0%</div>
-                                <div class="metric-label">Avg. Platform Take Rate</div>
-                            </div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon"><i data-lucide="arrow-up-right"></i></div>
-                                <div class="pro-badge badge-info">Growth</div>
-                            </div>
-                            <div>
-                                <div class="metric-value">+12.4%</div>
-                                <div class="metric-label">MoM Revenue Growth</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-8 mt-8">
-                        <!-- Revenue Trend -->
-                        <div class="pro-card col-span-2">
-                            <div class="table-header">
-                                <h3 class="font-bold"><i data-lucide="line-chart" size="18" color="#10B981"></i> Ecosystem Revenue Trend</h3>
-                            </div>
-                            <div class="h-300 p-3">
-                                <canvas id="revenueChart"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Business Leaderboard -->
-                        <div class="pro-card">
-                            <div class="table-header">
-                                <h3 class="font-bold"><i data-lucide="medal" size="18" color="#FACC15"></i> Partner Performance</h3>
-                            </div>
-                            <table class="pro-table">
-                                <thead>
-                                    <tr>
-                                        <th>Entity</th>
-                                        <th>Revenue (Γé╣)</th>
-                                        <th>Orders</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="reportBusinessLeaderboard"></tbody>
-                            </table>
-                        </div>
-
-                        <!-- Outlet Rankings -->
-                        <div class="pro-card">
-                            <div class="table-header">
-                                <h3 class="font-bold"><i data-lucide="store" size="18" color="#38BDF8"></i> Top Performing Nodes</h3>
-                            </div>
-                            <table class="pro-table">
-                                <thead>
-                                    <tr>
-                                        <th>Node</th>
-                                        <th>Sales (Γé╣)</th>
-                                        <th>Rating</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="reportOutletLeaderboard"></tbody>
-                            </table>
-                        </div>
-
-                        <!-- Administrative Audit Trail -->
-                        <div class="pro-card col-span-2 mt-6">
-                            <div class="table-header">
-                                <h3 class="font-bold"><i data-lucide="shield-check" size="18" color="#6366F1"></i> System Activity Audit</h3>
-                            </div>
-                            <table class="pro-table">
-                                <thead>
-                                    <tr>
-                                        <th>Action Node</th>
-                                        <th>Administrative Entity</th>
-                                        <th>Details & Meta</th>
-                                        <th>Timestamp</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="auditLogTable">
-                                    <tr><td colspan="4" class="text-center p-6 text-muted">No recent administrative activity detected.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            </div>
-
             <!-- Users Registry -->
             <div id="users" class="tab-pane">
                 <div class="content-section">
@@ -901,6 +862,7 @@
                                 <tr><td colspan="5" class="text-center p-6 text-muted">Loading user registry...</td></tr>
                             </tbody>
                         </table>
+                        <div id="usersPagination" class="pagination-container"></div>
                     </div>
                 </div>
             </div>
@@ -928,6 +890,7 @@
                             </thead>
                             <tbody id="businessListAlt"></tbody>
                         </table>
+                        <div id="businessesPagination" class="pagination-container"></div>
                     </div>
                 </div>
             </div>
@@ -970,6 +933,7 @@
                                 <tr><td colspan="5" class="text-center p-6 text-muted">Initializing telemetry stream...</td></tr>
                             </tbody>
                         </table>
+                        <div id="auditPagination" class="pagination-container"></div>
                     </div>
                 </div>
             </div>
@@ -1227,6 +1191,207 @@
                 </div>
             </div>
 
+            <!-- ============ GLOBAL ANALYTICS ============ -->
+            <div id="analytics" class="tab-pane">
+                <div class="content-section">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-black text-white mb-1">Global Analytics</h2>
+                            <p class="text-muted text-sm">Platform-wide performance metrics & growth indicators</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button class="btn-pro" onclick="loadReports()"><i data-lucide="refresh-cw" size="18"></i> Refresh Data</button>
+                        </div>
+                    </div>
+                    <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr)">
+                        <div class="metric-card">
+                            <div class="metric-icon"><i data-lucide="trending-up"></i></div>
+                            <div class="metric-value" id="analyticsTotalRevenue">₹0</div>
+                            <div class="metric-label">Total Revenue</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i data-lucide="shopping-bag"></i></div>
+                            <div class="metric-value" id="analyticsTotalOrders">0</div>
+                            <div class="metric-label">Total Orders</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i data-lucide="users"></i></div>
+                            <div class="metric-value" id="analyticsTotalCustomers">0</div>
+                            <div class="metric-label">Active Customers</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon"><i data-lucide="bike"></i></div>
+                            <div class="metric-value" id="analyticsActiveRiders">0</div>
+                            <div class="metric-label">Active Riders</div>
+                        </div>
+                    </div>
+                    <div class="pro-card mt-8">
+                        <div class="table-header">
+                            <h3 class="font-bold"><i data-lucide="line-chart" size="18" color="#10B981"></i> Growth Trend</h3>
+                        </div>
+                        <div class="h-300 p-3">
+                            <canvas id="analyticsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ ECOSYSTEM REPORTS ============ -->
+            <div id="reports" class="tab-pane">
+                <div class="content-section">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-xl font-black text-slate mb-0">Analytics Oversight</h2>
+                        <div class="flex gap-2">
+                            <button class="btn-pro btn-muted" onclick="exportReport('excel')"><i data-lucide="file-spreadsheet" size="18"></i> Export Excel</button>
+                            <button class="btn-pro" onclick="exportReport('pdf')"><i data-lucide="download-cloud" size="18"></i> Download PDF Report</button>
+                        </div>
+                    </div>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="banknote"></i></div>
+                                <div class="pro-badge badge-success">GTV</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportGlobalSales">₹0</div>
+                                <div class="metric-label">Total Ecosystem Revenue</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="shopping-bag"></i></div>
+                                <div class="pro-badge badge-info">Volume</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportGlobalOrders">0</div>
+                                <div class="metric-label">Lifetime Order Volume</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="trending-up"></i></div>
+                                <div class="pro-badge badge-warning">AOV</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportAvgOrderValue">₹0</div>
+                                <div class="metric-label">Avg. Transaction Value</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="heart" color="#F43F5E"></i></div>
+                                <div class="pro-badge btn-danger text-white">Loyalty</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportGlobalLoyalty">₹0</div>
+                                <div class="metric-label">Total Rewards Disbursed</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="metric-grid mt-4">
+                        <div class="metric-card" style="border-top: 3px solid #6366F1">
+                            <div class="metric-header">
+                                <div class="metric-icon" style="background: rgba(99,102,241,0.1); color: #6366F1"><i data-lucide="piggy-bank"></i></div>
+                                <div class="pro-badge badge-info">Earnings</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportPlatformRev">₹0</div>
+                                <div class="metric-label">Net Platform Revenue</div>
+                            </div>
+                        </div>
+                        <div class="metric-card" style="border-top: 3px solid #F97316">
+                            <div class="metric-header">
+                                <div class="metric-icon" style="background: rgba(249,115,22,0.1); color: #F97316"><i data-lucide="wallet"></i></div>
+                                <div class="pro-badge badge-warning">Payables</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportPartnerPayout">₹0</div>
+                                <div class="metric-label">Total Partner Payouts</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="percent"></i></div>
+                                <div class="pro-badge badge-success">Yield</div>
+                            </div>
+                            <div>
+                                <div class="metric-value" id="reportTakeRate">0%</div>
+                                <div class="metric-label">Avg. Platform Take Rate</div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon"><i data-lucide="arrow-up-right"></i></div>
+                                <div class="pro-badge badge-info">Growth</div>
+                            </div>
+                            <div>
+                                <div class="metric-value">+12.4%</div>
+                                <div class="metric-label">MoM Revenue Growth</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-8 mt-8">
+                        <div class="pro-card col-span-2">
+                            <div class="table-header">
+                                <h3 class="font-bold"><i data-lucide="line-chart" size="18" color="#10B981"></i> Ecosystem Revenue Trend</h3>
+                            </div>
+                            <div class="h-300 p-3">
+                                <canvas id="revenueChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="pro-card">
+                            <div class="table-header">
+                                <h3 class="font-bold"><i data-lucide="medal" size="18" color="#FACC15"></i> Partner Performance</h3>
+                            </div>
+                            <table class="pro-table">
+                                <thead>
+                                    <tr>
+                                        <th>Entity</th>
+                                        <th>Revenue (₹)</th>
+                                        <th>Orders</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportBusinessLeaderboard"></tbody>
+                            </table>
+                        </div>
+                        <div class="pro-card">
+                            <div class="table-header">
+                                <h3 class="font-bold"><i data-lucide="store" size="18" color="#38BDF8"></i> Top Performing Nodes</h3>
+                            </div>
+                            <table class="pro-table">
+                                <thead>
+                                    <tr>
+                                        <th>Node</th>
+                                        <th>Sales (₹)</th>
+                                        <th>Rating</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportOutletLeaderboard"></tbody>
+                            </table>
+                        </div>
+                        <div class="pro-card col-span-2 mt-6">
+                            <div class="table-header">
+                                <h3 class="font-bold"><i data-lucide="shield-check" size="18" color="#6366F1"></i> System Activity Audit</h3>
+                            </div>
+                            <table class="pro-table">
+                                <thead>
+                                    <tr>
+                                        <th>Action Node</th>
+                                        <th>Administrative Entity</th>
+                                        <th>Details & Meta</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="auditLogTable">
+                                    <tr><td colspan="4" class="text-center p-6 text-muted">No recent administrative activity detected.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -1398,7 +1563,7 @@
                             <label class="label-pro text-sm">Discount Type</label>
                             <select id="couponType" class="auth-input p-3 mb-0" title="Select Discount Type" aria-label="Select Discount Type">
                                 <option value="percent">Percentage (%)</option>
-                                <option value="fixed">Fixed (Γé╣)</option>
+                                <option value="fixed">Fixed (₹)</option>
                             </select>
                         </div>
                         <div>
@@ -1409,7 +1574,7 @@
 
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="label-pro text-sm">Min Order (Γé╣)</label>
+                            <label class="label-pro text-sm">Min Order (₹)</label>
                             <input type="number" id="couponMinOrder" class="auth-input p-3 mb-0" placeholder="199" required>
                         </div>
                         <div>
@@ -1447,7 +1612,7 @@
                     </div>
 
                     <div>
-                        <label class="label-pro text-sm">Amount to Credit (Γé╣)</label>
+                        <label class="label-pro text-sm">Amount to Credit (₹)</label>
                         <input type="number" id="walletAmount" class="auth-input text-2xl font-black p-3 text-center btn-success text-white" placeholder="0" required>
                     </div>
 

@@ -17,4 +17,4 @@ window.firebaseConfig = {
   measurementId: "G-SQK852HT4W"
 };
 
-window.reCaptchaSiteKey = "REPLACE_WITH_YOUR_RECAPTCHA_V3_SITE_KEY";
+window.reCaptchaSiteKey = "6LeblvYsAAAAAPhR4Uw4kHZLsW50dxE8o2D2XIo3";

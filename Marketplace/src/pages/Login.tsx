@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
@@ -10,11 +10,13 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
 
-  // If already logged in, redirect to profile
-  if (user) {
-    setLocation("/profile");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      setLocation("/profile");
+    }
+  }, [user, setLocation]);
+
+  if (user) return null;
 
   const handleGoogleLogin = async () => {
     setLoading(true);

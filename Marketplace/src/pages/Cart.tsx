@@ -313,7 +313,7 @@ export default function Cart() {
                 <Tag className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h4 className="text-emerald-700 font-black leading-tight">YAY! YOU SAVED ₹{summary.savings + couponDiscount}</h4>
+                <h4 className="text-emerald-700 font-black leading-tight">YAY! YOU SAVED ₹{summary.savings}</h4>
                 <p className="text-emerald-600/70 text-xs font-medium">This order is cheaper than usual. Great choice!</p>
               </div>
             </motion.div>
@@ -345,7 +345,7 @@ export default function Cart() {
                   {deliveryFeeLabel(summary.deliveryFee)}
                 </span>
               </div>
-              {couponApplied && couponDiscount > 0 && (
+              {appliedCoupon && couponDiscount > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>Coupon Discount</span>
                   <span className="font-medium">- ₹{couponDiscount}</span>

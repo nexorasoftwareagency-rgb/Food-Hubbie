@@ -1,63 +1,61 @@
-# 🚀 Foodhubbie — Enterprise Restaurant SaaS Ecosystem
+# Foodhubbie — Enterprise Restaurant SaaS Ecosystem
 
-A high-performance, multi-tenant platform designed for rapid restaurant scaling. Foodhubbie provides a unified experience across Marketplace, Admin ERP, WhatsApp Bot, and Rider Fleet.
+Multi-tenant restaurant platform with Marketplace, ShopAdmin, SuperAdmin, Rider App, and WhatsApp Bot.
 
-## 💎 Premium Experience Standard
-- **Universal Marketplace**: High-end React PWA with "Vibrant Orange" design tokens and glassmorphism.
-- **SaaS Discovery**: Exhaustive global crawler for cross-outlet dish search and restaurant branding.
-- **Unified Branding**: Absolute visual consistency across all touchpoints (Marketplace, Bot, Admin, Rider).
+## Architecture
 
-## 🏗️ Multi-Tenant Architecture
-- **Tenant Isolation**: Dynamic `BUSINESS_ID` and `OUTLET_ID` scoping across all Firebase interactions.
-- **Shared Service Layer**: Unified helpers in `/shared` powering both Node.js (Bot) and Browser environments.
-- **Hardened Security**: Production-grade `database.rules.json` (v2.1) with granular read/write permissions.
+| App | Tech | Purpose |
+|---|---|---|
+| **Marketplace** | React 19 / Vite / Tailwind / Firebase | Customer-facing PWA |
+| **ShopAdmin** | Vanilla JS / Firebase RTDB | Restaurant admin ERP |
+| **SuperAdmin** | Vanilla JS / Firebase RTDB | Platform management console |
+| **RiderApp** | Vanilla JS / Leaflet.js / PWA | Delivery fleet app |
+| **bot** | Node.js / Baileys / WhatsApp | WhatsApp ordering engine |
+| **shared** | Node.js modules | Shared business logic, utils, firebase helpers |
+| **config** | Node.js module | Firebase config, constants, fee slabs |
 
-## 📂 Project Structure
-root/
-├── ShopAdmin/        # Restaurant Admin ERP (Vanilla JS/CSS)
-├── RiderApp/         # Delivery Rider Application (Vanilla JS/CSS)
-├── Marketplace/      # Customer-facing PWA (React/Tailwind)
-├── SuperAdmin/       # Platform Onboarding & Management
-├── bot/              # Unified WhatsApp Bot Engine (Node.js/Baileys)
-├── shared/           # Shared Business Logic & Utilities
-├── config/           # Global SaaS Configuration & Constants
-├── docs/             # Deployment & Architecture Guides
-├── scripts/          # Automation & Maintenance Scripts
-└── firebase.json     # Multi-target Hosting & Security Rules
-```
+Manual books are in `manuals/`:
+- `ShopAdmin-Manual.md` — Restaurant workflows (menu, orders, reports)
+- `Marketplace-Manual.md` — Customer ordering guide
+- `SuperAdmin-Manual.md` — Enterprise control center (onboarding, RBAC, settlements)
+- `RiderApp-Manual.md` — Delivery partner guide
 
-## 🚀 Key Features
-
-*   **Multi-Tenancy**: Hierarchical path resolution (`businesses/{bid}/outlets/{oid}/`).
-*   **Real-time Logic**: Live order tracking, inventory deductions, and WhatsApp status updates.
-*   **Triple Isolation**: Dedicated production Firebase project, GitHub repository, and isolated EC2 environments.
-*   **Unified UI**: Shared design language across all touchpoints (Admin, Rider, Marketplace).
-
-## 🛠️ Management Commands
-
-Manage the entire platform from the root using NPM Workspaces:
+## Quick Start
 
 ```bash
-# Install dependencies for all apps
+# Install all dependencies
 npm run install:all
 
-# Start the WhatsApp Bot
-npm run dev:bot
-
-# Start the Marketplace PWA
+# Start Marketplace dev server
 npm run dev:marketplace
 
-# Deploy Hosting (Admin & Rider)
+# Start WhatsApp bot
+npm run dev:bot
+```
+
+## Deployment
+
+```bash
+# Build Marketplace (React → static)
+cd Marketplace && npm run build
+
+# Deploy all hosting targets (marketplace, admin, rider, superadmin)
 npm run deploy:hosting
 
-# Deploy Security Rules
+# Deploy database + storage rules
 npm run deploy:rules
 ```
 
-## 📖 Documentation
+Hosting targets: `foodhubbie` (marketplace), `foodhubbie-admin` (ShopAdmin), `foodhubbie-rider` (RiderApp), `foodhubbie-superadmin` (SuperAdmin).
 
-*   [Deployment Guide](docs/deployment_guide.md)
-*   [Architecture Overview](docs/architecture.md)
+## Key Paths
 
----
-Powered by **Foodhubbie SaaS Engine**
+- Marketplace: `D:\Foodhubbie\Marketplace\`
+- ShopAdmin: `D:\Foodhubbie\ShopAdmin\`
+- SuperAdmin: `D:\Foodhubbie\SuperAdmin\`
+- RiderApp: `D:\Foodhubbie\RiderApp\`
+- WhatsApp Bot: `D:\Foodhubbie\bot\`
+- Shared logic: `D:\Foodhubbie\shared\`
+- Config: `D:\Foodhubbie\config\`
+- Manuals: `D:\Foodhubbie\manuals\`
+- Firebase: `D:\Foodhubbie\firebase.json`, `D:\Foodhubbie\.firebaserc`

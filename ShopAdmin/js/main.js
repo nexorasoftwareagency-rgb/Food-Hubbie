@@ -1,4 +1,4 @@
-import { previewImage, showToast, logAudit, getISTDateString } from './utils.js';
+import { previewImage, showToast, logAudit, getISTDateString, getTimeAgo } from './utils.js';
 import { state } from './state.js';
 import { auth, db, ServerValue } from './firebase.js';
 import { switchOutlet, openOutletInNewTab } from './branding.js';
@@ -189,28 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Notifications & Logs
-        document.getElementById('btnClearAllNotif')?.addEventListener('click', clearAllNotifications);
         document.getElementById('btnClearLostSales')?.addEventListener('click', clearLostSales);
         document.getElementById('btnEnableNotif')?.addEventListener('click', requestNotificationPermission);
 
-        // Auth
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                console.log("[Auth] Login form submitted");
-                const email = document.getElementById("adminEmail")?.value.trim();
-                const pass = document.getElementById("adminPassword")?.value;
-                if (email && pass) {
-                    adminLogin(email, pass);
-                } else {
-                    showToast("Please enter email and password", "warning");
-                }
-            });
-        }
-
         // Settings
-        document.getElementById('btnSaveSettings')?.addEventListener('click', saveStoreSettings);
         document.getElementById('btnQuickToggleOutlet')?.addEventListener('click', quickUpdateOutletStatus);
         document.getElementById('btnAddFeeSlab')?.addEventListener('click', addFeeSlab);
         document.getElementById('btnMigrateAddons')?.addEventListener('click', migrateAddonsToCategories);
@@ -349,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'deleteRider': deleteRider(id); break;
                 case 'settleRider': settleRiderWallet(id, name); break;
                 case 'viewRiderLedger': viewRiderLedger(id, name); break;
-                case 'saveSettings': saveStoreSettings(); break;
+                case 'saveStoreSettings': saveStoreSettings(); break;
                 case 'saveDeliveredOrder': saveDeliveredOrder(id, val); break;
                 case 'openPOSSelectionModal': openPOSSelectionModal(id); break;
                 case 'hidePOSSelectionModal': hidePOSSelectionModal(); break;
@@ -396,6 +378,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                 }
                 case 'openOutletInNewTab': openOutletInNewTab(); break;
+                case 'clearAllNotifications': toggleNotificationSheet(); break;
+                case 'exportSettlements': {
+                    if (typeof renderSettlements === 'function') renderSettlements(true);
+                    else showToast("Export not available", "info");
+                    break;
+                }
                 case 'toggleTheme': themeManager.toggleTheme(); break;
                 case 'userLogout': userLogout(); break;
                 case 'installPWA': installPWA(); break;
@@ -460,8 +448,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('orderSearch')?.addEventListener('input', (e) => filterOrders(e.target.value));
     document.getElementById('customerSearch')?.addEventListener('input', (e) => filterCustomers(e.target.value));
     document.getElementById('menuSearch')?.addEventListener('input', (e) => filterMenu(e.target.value));
-    document.getElementById('menuSearchMobile')?.addEventListener('input', (e) => filterMenu(e.target.value));
-    document.getElementById('categorySearch')?.addEventListener('input', (e) => filterCategories(e.target.value));
     document.getElementById('partnerSearch')?.addEventListener('input', (e) => renderPartners(e.target.value));
     
     // Order Filters

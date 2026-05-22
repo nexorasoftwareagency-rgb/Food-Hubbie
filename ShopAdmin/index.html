@@ -361,7 +361,7 @@
                             <span id="walletBalance" class="font-700" style="font-size:13px;">₹0.00</span>
                         </div>
 
-                        <div class="notif-trigger-pro" data-action="switchTab" data-tab="notifications" style="position:relative; cursor:pointer;">
+                        <div class="notif-trigger-pro" data-action="toggleNotificationSheet" style="position:relative; cursor:pointer;">
                             <i data-lucide="bell" style="color:var(--text-muted);"></i>
                             <span id="notifBadge" class="badge-danger pro-badge" style="position:absolute; top:-5px; right:-5px; font-size:8px; padding:2px 4px; display:none;">0</span>
                         </div>
@@ -602,7 +602,7 @@
                                 <button data-action="addCategoryAddonField" class="btn-text-primary-sm">+ Add Custom Field</button>
                                 <div id="categoryAddonsList" class="mt-8 space-y-4"></div>
                             </div>
-                            <button data-action="addCategory" class="btn-action-v4 w-100" style="background:var(--primary); color:white; border:none;">Deploy</button>
+                            <button id="btnAddCategory" data-action="addCategory" class="btn-action-v4 w-100" style="background:var(--primary); color:white; border:none;">Deploy</button>
                         </div>
                         <div class="pro-card">
                             <h3 class="font-heading mb-24">Active Taxonomy</h3>
@@ -1250,11 +1250,11 @@
                 </div>
 
             <!-- CUSTOMERS TAB -->
-            <div id="tab-customers" class="tab-content hidden">
+            <div id="tab-customers-report" class="tab-content hidden">
                 <div class="panel">
                     <div class="panel-header">
                         <h3>Customer Database</h3>
-                        <input type="text" id="customerSearch" placeholder="Search..." class="search-input-group">
+                        <input type="text" id="customerSearchReport" placeholder="Search..." class="search-input-group">
                     </div>
                     <div class="scroll-x">
                         <table class="premium-table-v4" id="customersTable">
@@ -1360,17 +1360,14 @@
                             <div class="glass-card mb-20 p-24">
                                 <h4 class="panel-title mb-15">Revenue Trends</h4>
                                 <div class="w-full h-300">
-                                    <canvas id="revenueChart"></canvas>
+                                    <canvas id="revenueChartReport"></canvas>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div id="reportsContainer" class="hidden"></div>
             </div>
 
-            <!-- SECTION: RIDER ANALYTICS -->
             <div id="tab-riderAnalytics" class="tab-content hidden">
                 <div class="flex-row justify-between flex-center mb-20 p-0-10">
                     <h2 class="section-title fs-24 m-0">🚴 Rider Intelligence</h2>
@@ -1470,7 +1467,7 @@
                 </div>
             </div>
 
-                <div id="tab-inventory" class="tab-content hidden">
+                <div id="tab-inventory-report" class="tab-content hidden">
                 <div class="panel">
                     <div class="panel-header">
                         <div class="flex-col">
@@ -1607,130 +1604,21 @@
                 </div>
             </div>
 
-            <!-- WALK-IN SALE TAB -->
-            <div id="tab-walkin" class="tab-content hidden">
-                <div class="walkin-layout">
-                    <!-- LEFT: Dish Picker -->
-                    <div class="walkin-picker">
-                        <div class="panel">
-                            <div class="panel-header flex-wrap-mobile">
-                                <div class="flex-row flex-center flex-gap-10">
-                                    <button data-tab="dashboard" data-action="switchTab" class="btn-text mobile-only"
-                                        title="Back to Dashboard" aria-label="Back to Dashboard"><i
-                                            data-lucide="arrow-left"></i></button>
-                                    <h3 class="panel-title">🍽️ Select Items</h3>
-                                </div>
-                                <input type="text" id="walkinDishSearch" placeholder="Search dishes..."
-                                    class="search-input-group flex-1">
-                            </div>
-                            <!-- Category Tabs -->
-                            <div id="walkinCategoryTabs" class="category-tabs-container">
-                                <!-- Dynamic -->
-                            </div>
-                            <div id="walkinDishGrid" class="walkin-dish-grid">
-                                <p class="menu-loading-placeholder">Loading menu...</p>
-                            </div>
-                            <div id="walkinAddonsGrid" class="walkin-addons-grid hidden">
-                                <!-- Populated dynamically -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- RIGHT: Cart & Checkout -->
-                    <div class="walkin-cart">
-                        <div class="panel sticky-cart">
-                            <div class="flex-between flex-center mb-14">
-                                <h3 class="panel-title mb-0">🧾 Order Summary</h3>
-                                <button id="btnClearWalkinCart" data-action="clearWalkinCart"
-                                    class="btn-text-danger small-btn">Clear All</button>
-                            </div>
-
-                            <!-- Cart Items -->
-                            <div id="walkinCartItems" class="mb-14 cart-items-container">
-                                <p id="walkinEmptyMsg" class="text-muted fs-13 center-text p-32">Tap dishes to add them
-                                    here</p>
-                            </div>
-
-                            <!-- Totals -->
-                            <div class="divider-top mb-14">
-                                <div class="flex-between mb-8">
-                                    <span class="text-muted-small font-800">Subtotal</span>
-                                    <span id="walkinSubtotal" class="font-800">₹0</span>
-                                </div>
-                                <div id="walkinDiscountRow" class="flex-between mb-8 hidden">
-                                    <span class="text-danger font-800">Discount Allotted</span>
-                                    <span id="walkinDiscountVal" class="text-danger font-800">-₹0</span>
-                                </div>
-                                <div class="flex-between flex-center mb-8">
-                                    <span class="text-muted-small font-800">Discount</span>
-                                    <div class="flex-row flex-center flex-gap-10">
-                                        <div class="discount-presets" id="discountPresets">
-                                            <button class="chip btn-discount-preset" data-action="applyWalkinDiscount"
-                                                data-amount="50">₹50</button>
-                                            <button class="chip btn-discount-preset" data-action="applyWalkinDiscount"
-                                                data-amount="100">₹100</button>
-                                            <button class="chip btn-discount-preset" data-action="applyWalkinDiscount"
-                                                data-pct="10">10%</button>
-                                        </div>
-                                        <div class="flex-row flex-center">
-                                            <span class="text-muted-small mr-4">?</span>
-                                            <input type="number" id="walkinDiscount" value="0" min="0"
-                                                class="form-input mb-0 input-discount" title="Discount Amount">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex-between mt-20 checkout-total">
-                                    <span>Total</span>
-                                    <span id="walkinTotal">₹0</span>
-                                </div>
-                            </div>
-
-                            <!-- Customer Info -->
-                            <div class="divider-top mb-14">
-                                <label class="form-label-small text-muted mb-8 d-block">Customer & Table Details
-                                     (optional)</label>
-                                <div class="flex-row flex-gap-10 mb-8">
-                                    <input type="text" id="walkinCustName" placeholder="Customer Name"
-                                        class="form-input flex-1" title="Customer Name">
-                                    <input type="text" id="walkinTableNo" placeholder="Table No."
-                                        class="form-input w-100" title="Table Number">
-                                </div>
-                                <input type="text" id="walkinCustPhone" placeholder="Phone Number"
-                                    class="form-input mb-8" title="Customer Phone">
-                                <textarea id="walkinCustNote" placeholder="Order notes / instructions .... (Optional)"
-                                    class="form-input mb-0 h-60 no-resize"
-                                    title="Order instructions for this sale"></textarea>
-                            </div>
-
-                            <!-- Payment Method -->
-                            <div class="mb-14">
-                                <label class="form-label-small text-muted mb-8 d-block">Payment Method</label>
-                                <div class="flex-row flex-gap-10">
-                                    <button class="walkin-pay-btn active" data-action="selectWalkinPayment"
-                                        data-method="Cash" title="Pay by Cash">💵 Cash</button>
-                                    <button class="walkin-pay-btn" data-action="selectWalkinPayment" data-method="UPI"
-                                        title="Pay by UPI / Scanner">📱 UPI</button>
-                                </div>
-                            </div>
-
-                            <!-- Submit -->
-                            <button id="walkinSubmitBtn" data-action="submitWalkinSale"
-                                class="btn-primary w-full btn-checkout">
-                                ✅ Record Sale
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                            <input type="file" id="dishFile" accept="image/*" class="hidden" title="Upload dish photo">
-                            <button id="btnUpdateDishPhoto" class="btn-secondary update-photo-btn">Update Photo</button>
-                        </div>
-                    </div>
+    <!-- DISH EDIT MODAL -->
+    <div id="dishModal" class="modal">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h2 id="modalTitle" class="modal-title">Add New Dish</h2>
+                <button class="close-btn btn-hide-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="display:grid; grid-template-columns:200px 1fr; gap:20px;">
+                <div class="modal-media-section">
+                    <img id="dishPreview" src="https://placehold.co/100" class="dish-preview" alt="Dish Photo">
+                    <input type="file" id="dishFile" accept="image/*" class="hidden" title="Upload dish photo">
+                    <button id="btnUpdateDishPhoto" class="btn-secondary update-photo-btn">Update Photo</button>
                     <input id="dishImage" type="hidden">
                     <small id="uploadStatus" class="hidden upload-status-text">Uploading...</small>
                 </div>
-
-                <!-- Right: Details -->
                 <div class="modal-details-scroll">
                     <div class="step-box">
                         <label class="form-label step-label">STEP 1: SELECT CATEGORY</label>
@@ -1738,7 +1626,6 @@
                             <option value="">Choose Category...</option>
                         </select>
                     </div>
-
                     <div class="flex-row flex-gap-10 mb-20">
                         <div class="flex-3">
                             <label class="form-label">Dish Name</label>
@@ -1749,10 +1636,8 @@
                             <input id="dishOrder" type="number" placeholder="0" class="form-input w-full" title="Sorting Order">
                         </div>
                     </div>
-
                     <label class="form-label">Base Price (₹)</label>
                     <input id="dishPriceBase" type="number" placeholder="499" class="form-input w-full mb-20">
-
                     <div class="divider-top">
                         <div class="variation-label-row">
                             <label class="form-label">Sizes & Variations</label>
@@ -1760,7 +1645,6 @@
                         </div>
                         <div id="sizesContainer" class="mt-10"></div>
                     </div>
-
                     <div class="divider-top">
                         <div class="variation-label-row">
                             <label class="form-label">Add-ons (Toppings/Extras)</label>
@@ -1770,12 +1654,9 @@
                     </div>
                 </div>
             </div>
-
             <div class="modal-footer">
-                <button id="saveDishBtn" class="btn-primary save-dish-btn" title="Save Product Data">💾 Save Dish
-                    Information</button>
-                <button class="btn-secondary cancel-dish-btn btn-hide-modal"
-                    title="Discard Changes">Cancel</button>
+                <button id="saveDishBtn" class="btn-primary save-dish-btn" title="Save Product Data">Save Dish Information</button>
+                <button class="btn-secondary cancel-dish-btn btn-hide-modal" title="Discard Changes">Cancel</button>
             </div>
         </div>
     </div>

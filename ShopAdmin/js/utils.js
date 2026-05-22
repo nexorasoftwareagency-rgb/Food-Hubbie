@@ -13,15 +13,31 @@ export const formatDate = (ts) => {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ", " + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 };
 
+export const getTimeAgo = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+};
+
 /**
  * Returns YYYY-MM-DD in IST (GMT+5:30) for accurate report filtering
  */
 export const getISTDateString = (dateInput = new Date()) => {
     const date = new Date(dateInput);
-    // Add 5.5 hours to UTC time to get IST
     const istOffset = 5.5 * 60 * 60 * 1000;
     const istDate = new Date(date.getTime() + istOffset);
-    return istDate.toISOString().split('T')[0];
+    const y = istDate.getUTCFullYear();
+    const m = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(istDate.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 };
 
 

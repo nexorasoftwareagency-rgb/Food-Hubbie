@@ -1,4 +1,4 @@
-import { Outlet, uploadImage, deleteImage } from '../firebase.js';
+import { Outlet, uploadImage, deleteImage, ServerValue } from '../firebase.js';
 import { showToast, escapeHtml, logAudit, atomicAdminAction } from '../utils.js';
 import { state } from '../state.js';
 import { requireAdminReauth } from '../auth.js';
@@ -621,7 +621,7 @@ export function cleanupCatalog() {
 export const toggleStock = (id, current) => Outlet.ref(`dishes/${id}`).update({ stock: !current });
 export const toggleDishAvailable = (id, available) => Outlet.ref(`dishes/${id}`).update({ stock: available });
 export const editDish = (id) => showDishModal(id);
-export const editCategory = (id) => showToast("Category editing coming soon!", "info");
+// editCategory is defined above
 
 export function filterMenu(searchTerm) {
     const term = (searchTerm || '').toLowerCase().trim();

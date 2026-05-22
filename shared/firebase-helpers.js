@@ -54,11 +54,6 @@ function resolvePath(path, businessId, outletId) {
     return path;
   }
 
-  // Bot commands use a special path structure
-  if (rootNode === 'botCommands' || rootNode === 'botStatus') {
-    return `bot/${businessId}/${outletId}/${path.split('/').slice(1).join('/')}`;
-  }
-
   // All other paths are scoped to business → outlet
   if (!businessId || !outletId) {
     console.warn(`⚠️ [resolvePath] Missing businessId or outletId for path: ${path}`);

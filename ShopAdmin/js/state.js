@@ -34,6 +34,7 @@ export const state = {
     currentPOSModalAddons: {},
     currentActiveTab: 'dashboard',
     editingCartKey: null,
+    editingCategoryId: null,
 
     settingsDirty: false,      // Tracks unsaved changes in settings form
 };

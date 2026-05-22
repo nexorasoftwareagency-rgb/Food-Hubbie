@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import { CartProvider } from "@/context/CartContext";
 import { LocationProvider } from "@/context/LocationContext";
@@ -52,6 +53,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
       <AuthProvider>
         <LocationProvider>
           <OrderProvider>
@@ -68,6 +70,7 @@ function App() {
           </OrderProvider>
         </LocationProvider>
       </AuthProvider>
+      </ErrorBoundary>
     </QueryClientProvider>
   );
 }

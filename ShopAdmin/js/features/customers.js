@@ -268,7 +268,7 @@ export async function generateCustomReport() {
         renderRevenueChart(salesData);
     } catch (e) {
         console.error("[Reports] Generation Error:", e);
-        showToast("Error generating report", "error");
+        ui.showToast("Error generating report", "error");
         tableBody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px; color:var(--danger);'>⚠️ Failed to load report data.</td></tr>";
     }
 }

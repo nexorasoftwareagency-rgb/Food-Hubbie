@@ -56,8 +56,14 @@ function _toRad(deg) {
 function calculateDeliveryFee(distanceKm, feeStructure) {
   if (!feeStructure || !feeStructure.length) return 0;
 
+  // Normalise slabs — accept both `upToKm` and `km`
+  const normalised = feeStructure.map(s => ({
+    upToKm: s.upToKm ?? s.km ?? 0,
+    fee: s.fee ?? 0
+  }));
+
   // Sort slabs by distance ascending
-  const sorted = [...feeStructure].sort((a, b) => a.upToKm - b.upToKm);
+  const sorted = [...normalised].sort((a, b) => a.upToKm - b.upToKm);
 
   for (const slab of sorted) {
     if (distanceKm <= slab.upToKm) {

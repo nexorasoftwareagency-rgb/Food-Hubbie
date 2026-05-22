@@ -174,9 +174,11 @@ export type Order = {
   cashbackBonus?: number;
   cashbackStatus?: "pending" | "credited" | "failed";
   estimatedMinutes: number;
+  riderId?: string;
   riderName?: string;
   riderPhone?: string;
   riderVehicle?: string;
+  assignedRider?: string;
   isReviewed?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -228,6 +230,9 @@ export type Review = {
   outletId: string;
   outletName: string;
   rating: number;
+  riderRating?: number;
+  riderId?: string;
+  riderName?: string;
   comment: string;
   date: string;
   likes: number;

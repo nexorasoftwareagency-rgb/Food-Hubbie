@@ -120,8 +120,18 @@ async function handleStatusUpdate(sock, orderId, order, isNew = false) {
 
     case "Out for Delivery":
     case "Picked Up":
+      if (!order.riderName) {
+        console.log(`[Monitor] Skipping customer notification for #${orderId.slice(-6)} — no rider assigned yet.`);
+        break;
+      }
       const otp = order.otp || order.deliveryOTP || "N/A";
-      msg = `🛵 *OUT FOR DELIVERY!* 🚀\n━━━━━━━━━━━━━━━━━━━━\nOur rider is on the way! 🛵💨\n\n🆔 *Order:* #${orderId.slice(-6).toUpperCase()}\n🔑 *OTP:* ${otp}\n💰 *Total:* ₹${order.total}\n\n_Please share the OTP ONLY with the rider._`;
+      const items = Array.isArray(order.cart) ? order.cart :
+                    (Array.isArray(order.items) ? order.items :
+                    (order.items ? Object.values(order.items) : []));
+      const invoice = items.length > 0 ?
+        items.map(i => `• ${i.qty || 1}x ${i.name || i.item || 'Item'} — ₹${(i.price || i.total || 0) * (i.qty || 1)}`).join('\n') :
+        "_Items summary unavailable_";
+      msg = `🛵 *OUT FOR DELIVERY!* 🚀\n━━━━━━━━━━━━━━━━━━━━\n🛵 *Rider:* ${order.riderName}\n📞 *Contact:* ${order.riderPhone || 'N/A'}\n🔑 *OTP:* ${otp}\n━━━━━━━━━━━━━━━━━━━━\n🧾 *INVOICE*\n${invoice}\n━━━━━━━━━━━━━━━━━━━━\n💰 *Total:* ₹${order.total}\n\n_Please share the OTP ONLY with the rider._`;
       img = botSettings.imgOut;
       break;
 

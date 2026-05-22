@@ -66,7 +66,18 @@ async function handleDailyReport(sock, cmd) {
 
   const orders = await getData('orders') || {};
   const dailyOrders = Object.values(orders).filter(o => {
-    const orderDate = (o.createdAt || "").split('T')[0];
+    const raw = o.createdAt;
+    let orderDate = '';
+    if (typeof raw === 'number') {
+      const d = new Date(raw);
+      const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+      const y = ist.getUTCFullYear();
+      const m = String(ist.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(ist.getUTCDate()).padStart(2, '0');
+      orderDate = `${y}-${m}-${day}`;
+    } else if (raw) {
+      orderDate = String(raw).split('T')[0];
+    }
     return orderDate === targetDate && o.status !== "Cancelled";
   });
 

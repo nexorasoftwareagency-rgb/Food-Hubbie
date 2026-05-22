@@ -237,9 +237,23 @@ export const switchTab = async (tabId, skipHistory = false) => {
 
 export const toggleMobileCart = (state) => import('./features/pos.js').then(m => m.toggleMobileCart(state));
 
+export function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) {
+        btn._origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Loading...';
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = btn._origHtml || btn.innerHTML;
+    }
+}
+
 export const ui = {
     showConfirm,
     showToast,
+    setLoading,
     toggleSidebar,
     closeSidebar,
     switchTab,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, X, Send, CheckCircle2 } from "lucide-react";
+import { Star, X, Send, CheckCircle2, Bike } from "lucide-react";
 import { submitReview } from "@/services/reviewService";
 import type { Order } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +16,8 @@ interface ReviewModalProps {
 export default function ReviewModal({ isOpen, onClose, order, onSuccess }: ReviewModalProps) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
+  const [riderRating, setRiderRating] = useState(0);
+  const [riderHover, setRiderHover] = useState(0);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -42,6 +44,9 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
         outletId: order.outletId,
         outletName: order.outletName,
         rating,
+        riderRating: riderRating || undefined,
+        riderId: order.riderId || order.assignedRider || undefined,
+        riderName: order.riderName || undefined,
         comment,
       });
 
@@ -49,6 +54,7 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
       setTimeout(() => {
         setIsSuccess(false);
         setRating(0);
+        setRiderRating(0);
         setComment("");
         onClose();
         if (onSuccess) onSuccess();
@@ -63,6 +69,8 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
       setIsSubmitting(false);
     }
   };
+
+  const hasRider = !!(order.riderId || order.assignedRider || order.riderName);
 
   return (
     <AnimatePresence>
@@ -106,11 +114,11 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
                   </button>
                 </div>
 
-                <div className="p-6 space-y-8">
-                  {/* Star Rating */}
-                  <div className="flex flex-col items-center gap-4">
+                <div className="p-6 space-y-6">
+                  {/* Outlet/Food Rating */}
+                  <div className="flex flex-col items-center gap-3">
                     <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">How was the food?</p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
@@ -120,7 +128,7 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
                           className="p-1 transition-transform active:scale-90"
                         >
                           <Star
-                            className={`h-10 w-10 transition-colors ${
+                            className={`h-8 w-8 transition-colors ${
                               star <= (hover || rating)
                                 ? "fill-yellow-400 text-yellow-400"
                                 : "text-muted"
@@ -134,6 +142,40 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
                     </p>
                   </div>
 
+                  {/* Rider Rating (if applicable) */}
+                  {hasRider && (
+                    <div className="flex flex-col items-center gap-3 p-4 bg-muted/30 rounded-2xl">
+                      <div className="flex items-center gap-2">
+                        <Bike className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Rate your rider</p>
+                      </div>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onMouseEnter={() => setRiderHover(star)}
+                            onMouseLeave={() => setRiderHover(0)}
+                            onClick={() => setRiderRating(star)}
+                            className="p-1 transition-transform active:scale-90"
+                          >
+                            <Star
+                              className={`h-7 w-7 transition-colors ${
+                                star <= (riderHover || riderRating)
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-muted"
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      {riderRating > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {riderRating === 5 ? "Excellent delivery!" : riderRating === 4 ? "Great service" : riderRating === 3 ? "Good" : riderRating === 2 ? "Could be better" : "Poor experience"}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Comment */}
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-foreground">Any feedback? (Optional)</label>
@@ -141,7 +183,7 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       placeholder="Share your experience..."
-                      className="w-full min-h-[120px] bg-muted/50 border border-border rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                      className="w-full min-h-[100px] bg-muted/50 border border-border rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
                     />
                   </div>
 

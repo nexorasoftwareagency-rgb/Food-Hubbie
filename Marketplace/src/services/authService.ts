@@ -1,7 +1,8 @@
 // ─── Auth Service ─────────────────────────────────────────────────────────────
 // Real Firebase Authentication Integration.
 
-import { auth, googleProvider, signInWithPopup, firebaseSignOut, onAuthStateChanged } from "@/lib/firebase";
+import { auth, db, ref, set, googleProvider, signInWithPopup, firebaseSignOut, onAuthStateChanged, getRedirectResult } from "@/lib/firebase";
+import { updateProfile as fbUpdateProfile } from "firebase/auth";
 import type { User } from "@/types";
 
 /** 
@@ -42,8 +43,16 @@ export async function signInWithGoogle(): Promise<User | null> {
   return null;
 }
 
-/** Handle the redirect result (Keep for compatibility, though we use popup now) */
+/** Handle the redirect result */
 export async function handleRedirectResult(): Promise<User | null> {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      return mapFirebaseUser(result.user);
+    }
+  } catch (err) {
+    console.error("Redirect result failed:", err);
+  }
   return null;
 }
 
@@ -56,10 +65,22 @@ export async function signOut(): Promise<void> {
 export async function updateProfile(
   updates: Partial<Pick<User, "name" | "phone" | "email">>
 ): Promise<User | null> {
-  // In production: use firebase updateProfile and update DB user node
-  console.log("Profile update requested:", updates);
-  if (auth.currentUser) {
-     return mapFirebaseUser(auth.currentUser);
+  const fbUser = auth.currentUser;
+  if (!fbUser) return null;
+  try {
+    if (updates.name || updates.phone) {
+      await fbUpdateProfile(fbUser, {
+        displayName: updates.name || fbUser.displayName || undefined,
+      });
+    }
+    const profileRef = ref(db, `users/${fbUser.uid}`);
+    await set(profileRef, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+    return mapFirebaseUser(auth.currentUser);
+  } catch (err) {
+    console.error("Profile update failed:", err);
+    return mapFirebaseUser(fbUser);
   }
-  return null;
 }
