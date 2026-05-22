@@ -27,13 +27,17 @@
           <i data-lucide="layout-dashboard"></i>
           <span>Dashboard</span>
         </a>
+        <a href="#" class="nav-link" data-tab="onboarding">
+          <i data-lucide="user-plus"></i>
+          <span>Partner Onboarding</span>
+        </a>
         <a href="#" class="nav-link" data-tab="businesses">
           <i data-lucide="building-2"></i>
           <span>Businesses</span>
         </a>
-        <a href="#" class="nav-link" data-tab="orders">
+        <a href="#" class="nav-link" data-tab="liveorders">
           <i data-lucide="shopping-bag"></i>
-          <span>Orders</span>
+          <span>Live Orders</span>
         </a>
         <a href="#" class="nav-link" data-tab="riders">
           <i data-lucide="bike"></i>
@@ -51,9 +55,33 @@
           <i data-lucide="wallet"></i>
           <span>Settlements</span>
         </a>
+        <a href="#" class="nav-link" data-tab="delivery">
+          <i data-lucide="layers"></i>
+          <span>Service Slabs</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="inventory">
+          <i data-lucide="package"></i>
+          <span>Inventory</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="reviews">
+          <i data-lucide="star"></i>
+          <span>Reviews</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="broadcast">
+          <i data-lucide="megaphone"></i>
+          <span>Broadcast</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="audit">
+          <i data-lucide="clipboard-list"></i>
+          <span>Audit</span>
+        </a>
         <a href="#" class="nav-link" data-tab="reports">
           <i data-lucide="bar-chart-3"></i>
           <span>Reports</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="settings">
+          <i data-lucide="settings"></i>
+          <span>Settings</span>
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -98,7 +126,7 @@
 
       <!-- Page Content -->
       <div class="page-content">
-        <!-- Dashboard Tab -->
+        <!-- ======================== DASHBOARD ======================== -->
         <div class="tab-content active" id="tab-dashboard">
           <div class="page-header">
             <div>
@@ -109,8 +137,6 @@
               <span class="date-display" id="dateDisplay"></span>
             </div>
           </div>
-
-          <!-- KPI Cards -->
           <div class="kpi-grid">
             <div class="kpi-card">
               <div class="kpi-icon" style="background:#EEF2FF;color:#4F46E5">
@@ -173,8 +199,6 @@
               <span class="kpi-trend up" id="trendRiders">+0%</span>
             </div>
           </div>
-
-          <!-- Charts Row -->
           <div class="charts-row">
             <div class="chart-card">
               <div class="chart-card-header">
@@ -198,8 +222,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Recent Activity -->
           <div class="activity-section">
             <div class="section-header">
               <h3>Recent Activity</h3>
@@ -211,38 +233,1316 @@
           </div>
         </div>
 
-        <!-- Placeholder tabs -->
-        <div class="tab-content" id="tab-businesses"><div class="placeholder-tab"><i data-lucide="building-2"></i><h2>Businesses</h2><p>Coming soon</p></div></div>
-        <div class="tab-content" id="tab-orders"><div class="placeholder-tab"><i data-lucide="shopping-bag"></i><h2>Orders</h2><p>Coming soon</p></div></div>
-        <div class="tab-content" id="tab-riders"><div class="placeholder-tab"><i data-lucide="bike"></i><h2>Riders</h2><p>Coming soon</p></div></div>
-        <div class="tab-content" id="tab-users"><div class="placeholder-tab"><i data-lucide="users"></i><h2>Users</h2><p>Coming soon</p></div></div>
-        <div class="tab-content" id="tab-promotions"><div class="placeholder-tab"><i data-lucide="tags"></i><h2>Promotions</h2><p>Coming soon</p></div></div>
-        <div class="tab-content" id="tab-settlements"><div class="placeholder-tab"><i data-lucide="wallet"></i><h2>Settlements</h2><p>Coming soon</p></div></div>
-        <div class="tab-content" id="tab-reports"><div class="placeholder-tab"><i data-lucide="bar-chart-3"></i><h2>Reports</h2><p>Coming soon</p></div></div>
+        <!-- ======================== PARTNER ONBOARDING ======================== -->
+        <div class="tab-content" id="tab-onboarding">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Partner Onboarding</h1>
+              <p class="page-subtitle">Review and manage partner applications</p>
+            </div>
+            <div class="page-header-actions">
+              <button class="btn-pro" id="btnProvisionNode">
+                <i data-lucide="server" style="width:16px;height:16px"></i>
+                Provision Node
+              </button>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Business Name</th>
+                      <th>Owner</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Documents</th>
+                      <th>Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="onboardingTableBody">
+                    <tr>
+                      <td colspan="7" class="table-empty">No pending applications</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== BUSINESSES ======================== -->
+        <div class="tab-content" id="tab-businesses">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Businesses</h1>
+              <p class="page-subtitle">Manage all registered businesses and their outlets</p>
+            </div>
+            <div class="page-header-actions">
+              <input type="text" class="pro-input" id="businessSearchInput" placeholder="Search businesses..." style="max-width:260px">
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Business Name</th>
+                      <th>Outlets</th>
+                      <th>Status</th>
+                      <th>Commission</th>
+                      <th>Created</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="businessesTableBody">
+                    <tr>
+                      <td colspan="6" class="table-empty">No businesses found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="pagination-container" id="businessPagination"></div>
+        </div>
+
+        <!-- ======================== LIVE ORDERS ======================== -->
+        <div class="tab-content" id="tab-liveorders">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Live Orders</h1>
+              <p class="page-subtitle">Monitor and manage all active orders in real-time</p>
+            </div>
+            <div class="page-header-actions">
+              <div class="view-toggle" id="ordersViewToggle">
+                <button class="btn-pro-sm active" id="ordersTableViewBtn" data-view="table">
+                  <i data-lucide="table" style="width:14px;height:14px"></i>
+                  Table
+                </button>
+                <button class="btn-pro-sm" id="ordersKanbanViewBtn" data-view="kanban">
+                  <i data-lucide="columns" style="width:14px;height:14px"></i>
+                  Kanban
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="orders-filter-bar" id="ordersFilterBar">
+            <button class="btn-pro-sm active" data-status="all">All</button>
+            <button class="btn-pro-sm" data-status="Pending">Pending</button>
+            <button class="btn-pro-sm" data-status="Confirmed">Confirmed</button>
+            <button class="btn-pro-sm" data-status="Preparing">Preparing</button>
+            <button class="btn-pro-sm" data-status="Out for Delivery">Out for Delivery</button>
+            <button class="btn-pro-sm" data-status="Delivered">Delivered</button>
+            <button class="btn-pro-sm" data-status="Cancelled">Cancelled</button>
+          </div>
+
+          <!-- Table View -->
+          <div class="content-section" id="ordersTableView">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Outlet</th>
+                      <th>Customer</th>
+                      <th>Items</th>
+                      <th>Total</th>
+                      <th>Status</th>
+                      <th>Time</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="liveOrdersTableBody">
+                    <tr>
+                      <td colspan="8" class="table-empty">No orders found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kanban View -->
+          <div class="kanban-board" id="ordersKanbanView" style="display:none">
+            <div class="kanban-column" data-status="Pending">
+              <div class="kanban-column-header">
+                <span class="kanban-title">Pending</span>
+                <span class="kanban-count" id="kanbanCountPending">0</span>
+              </div>
+              <div class="kanban-cards" id="kanbanCardsPending"></div>
+            </div>
+            <div class="kanban-column" data-status="Confirmed">
+              <div class="kanban-column-header">
+                <span class="kanban-title">Confirmed</span>
+                <span class="kanban-count" id="kanbanCountConfirmed">0</span>
+              </div>
+              <div class="kanban-cards" id="kanbanCardsConfirmed"></div>
+            </div>
+            <div class="kanban-column" data-status="Preparing">
+              <div class="kanban-column-header">
+                <span class="kanban-title">Preparing</span>
+                <span class="kanban-count" id="kanbanCountPreparing">0</span>
+              </div>
+              <div class="kanban-cards" id="kanbanCardsPreparing"></div>
+            </div>
+            <div class="kanban-column" data-status="Out for Delivery">
+              <div class="kanban-column-header">
+                <span class="kanban-title">Out for Delivery</span>
+                <span class="kanban-count" id="kanbanCountOutForDelivery">0</span>
+              </div>
+              <div class="kanban-cards" id="kanbanCardsOutForDelivery"></div>
+            </div>
+            <div class="kanban-column" data-status="Delivered">
+              <div class="kanban-column-header">
+                <span class="kanban-title">Delivered</span>
+                <span class="kanban-count" id="kanbanCountDelivered">0</span>
+              </div>
+              <div class="kanban-cards" id="kanbanCardsDelivered"></div>
+            </div>
+            <div class="kanban-column" data-status="Cancelled">
+              <div class="kanban-column-header">
+                <span class="kanban-title">Cancelled</span>
+                <span class="kanban-count" id="kanbanCountCancelled">0</span>
+              </div>
+              <div class="kanban-cards" id="kanbanCardsCancelled"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== RIDERS ======================== -->
+        <div class="tab-content" id="tab-riders">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Riders</h1>
+              <p class="page-subtitle">Manage delivery partners and their profiles</p>
+            </div>
+            <div class="page-header-actions">
+              <input type="text" class="pro-input" id="riderSearchInput" placeholder="Search riders..." style="max-width:220px">
+              <button class="btn-pro" id="btnAddRider">
+                <i data-lucide="plus" style="width:16px;height:16px"></i>
+                Add Rider
+              </button>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ridersTableBody">
+                    <tr>
+                      <td colspan="6" class="table-empty">No riders found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== USERS ======================== -->
+        <div class="tab-content" id="tab-users">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Users</h1>
+              <p class="page-subtitle">View and manage platform users</p>
+            </div>
+            <div class="page-header-actions">
+              <input type="text" class="pro-input" id="userSearchInput" placeholder="Search users..." style="max-width:220px">
+              <button class="btn-pro" id="btnExportUsers">
+                <i data-lucide="download" style="width:16px;height:16px"></i>
+                Export
+              </button>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Wallet</th>
+                      <th>Last Active</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTableBody">
+                    <tr>
+                      <td colspan="6" class="table-empty">No users found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== PROMOTIONS ======================== -->
+        <div class="tab-content" id="tab-promotions">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Promotions</h1>
+              <p class="page-subtitle">Manage surge pricing, discounts, and coupons</p>
+            </div>
+          </div>
+
+          <!-- Promo Cards Row -->
+          <div class="promo-cards-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+            <!-- Surge Pricing Card -->
+            <div class="pro-card">
+              <div class="pro-card-header" style="padding:16px 20px;border-bottom:1px solid var(--color-border)">
+                <h3 style="font-size:15px;font-weight:600">Surge Pricing</h3>
+              </div>
+              <div class="pro-card-body" style="padding:20px">
+                <div class="form-group">
+                  <label for="surgeMultiplier">Multiplier</label>
+                  <input type="number" class="pro-input" id="surgeMultiplier" step="0.1" min="1" placeholder="1.5">
+                </div>
+                <div class="form-group">
+                  <label for="surgeReason">Reason</label>
+                  <input type="text" class="pro-input" id="surgeReason" placeholder="High demand period">
+                </div>
+                <button class="btn-pro" id="btnApplySurge" style="margin-top:12px;width:100%">Apply</button>
+                <div class="surge-status" id="surgeStatus" style="margin-top:12px;font-size:13px;color:var(--color-muted)">Current: Inactive</div>
+              </div>
+            </div>
+
+            <!-- Global Discount Card -->
+            <div class="pro-card">
+              <div class="pro-card-header" style="padding:16px 20px;border-bottom:1px solid var(--color-border)">
+                <h3 style="font-size:15px;font-weight:600">Global Discount</h3>
+              </div>
+              <div class="pro-card-body" style="padding:20px">
+                <div class="form-group">
+                  <label for="discountValue">Discount Value</label>
+                  <input type="number" class="pro-input" id="discountValue" placeholder="10">
+                </div>
+                <div class="form-group">
+                  <label for="discountType">Type</label>
+                  <select class="pro-input" id="discountType">
+                    <option value="Percentage">Percentage</option>
+                    <option value="Fixed">Fixed</option>
+                  </select>
+                </div>
+                <button class="btn-pro" id="btnApplyDiscount" style="margin-top:12px;width:100%">Apply</button>
+              </div>
+            </div>
+
+            <!-- Platform Fee Card -->
+            <div class="pro-card">
+              <div class="pro-card-header" style="padding:16px 20px;border-bottom:1px solid var(--color-border)">
+                <h3 style="font-size:15px;font-weight:600">Platform Fee</h3>
+              </div>
+              <div class="pro-card-body" style="padding:20px">
+                <div class="form-group">
+                  <label for="platformFee">Fee (₹)</label>
+                  <input type="number" class="pro-input" id="platformFee" step="0.5" placeholder="5">
+                </div>
+                <button class="btn-pro" id="btnUpdatePlatformFee" style="margin-top:12px;width:100%">Update</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coupons Section -->
+          <div class="content-section">
+            <div class="section-header">
+              <h3>Coupons</h3>
+              <div style="display:flex;gap:8px">
+                <button class="btn-pro-sm" id="btnPauseAllCoupons">Pause All</button>
+                <button class="btn-pro-sm" id="btnExportCoupons">Export</button>
+                <button class="btn-pro" id="btnAddCoupon">
+                  <i data-lucide="plus" style="width:16px;height:16px"></i>
+                  Add Coupon
+                </button>
+              </div>
+            </div>
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Type</th>
+                      <th>Value</th>
+                      <th>Min Order</th>
+                      <th>Usage Limit</th>
+                      <th>Used</th>
+                      <th>Active</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="couponsTableBody">
+                    <tr>
+                      <td colspan="8" class="table-empty">No coupons created</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== SETTLEMENTS ======================== -->
+        <div class="tab-content" id="tab-settlements">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Settlements</h1>
+              <p class="page-subtitle">Manage partner payouts and commissions</p>
+            </div>
+            <div class="page-header-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="date" class="pro-input" id="settlementDateFrom" style="max-width:160px">
+              <input type="date" class="pro-input" id="settlementDateTo" style="max-width:160px">
+              <select class="pro-input" id="settlementOutletFilter" style="max-width:180px">
+                <option value="all">All Outlets</option>
+              </select>
+              <select class="pro-input" id="settlementStatusFilter" style="max-width:150px">
+                <option value="all">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Settled">Settled</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Settlement KPI Cards -->
+          <div class="kpi-grid" style="margin-bottom:24px">
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#EEF2FF;color:#4F46E5">
+                <i data-lucide="indian-rupee"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiSettlementVolume">₹0</span>
+                <span class="kpi-label">Total Volume</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#F0FDF4;color:#22C55E">
+                <i data-lucide="percent"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiPlatformCommission">₹0</span>
+                <span class="kpi-label">Platform Commissions</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#FFF7ED;color:#F97316">
+                <i data-lucide="clock"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiPendingSettlements">₹0</span>
+                <span class="kpi-label">Pending Settlements</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#ECFDF5;color:#10B981">
+                <i data-lucide="check-circle"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiTotalSettled">₹0</span>
+                <span class="kpi-label">Total Settled</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Ref ID</th>
+                      <th>Date</th>
+                      <th>Partner Node</th>
+                      <th>Order Total</th>
+                      <th>Commission</th>
+                      <th>Rider Payout</th>
+                      <th>Net Payout</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="settlementsTableBody">
+                    <tr>
+                      <td colspan="9" class="table-empty">No settlements found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== SERVICE SLABS ======================== -->
+        <div class="tab-content" id="tab-delivery">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Service Slabs</h1>
+              <p class="page-subtitle">Configure delivery distance-based fee slabs</p>
+            </div>
+            <div class="page-header-actions">
+              <button class="btn-pro" id="btnAddSlab">
+                <i data-lucide="plus" style="width:16px;height:16px"></i>
+                Add Slab
+              </button>
+              <button class="btn-pro" id="btnSaveDeliveryFlow" style="background:#0F172A">
+                <i data-lucide="save" style="width:16px;height:16px"></i>
+                Save Global Delivery Flow
+              </button>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Distance (km)</th>
+                      <th>Fee (₹)</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="slabsTableBody">
+                    <tr>
+                      <td colspan="3" class="table-empty">No slabs configured</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== INVENTORY ======================== -->
+        <div class="tab-content" id="tab-inventory">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Inventory</h1>
+              <p class="page-subtitle">Track dish stock across all outlets</p>
+            </div>
+            <div class="page-header-actions">
+              <input type="text" class="pro-input" id="inventorySearchInput" placeholder="Search dishes..." style="max-width:260px">
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Dish Name</th>
+                      <th>Outlet</th>
+                      <th>Business</th>
+                      <th>Stock</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventoryTableBody">
+                    <tr>
+                      <td colspan="6" class="table-empty">No inventory items found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== REVIEWS ======================== -->
+        <div class="tab-content" id="tab-reviews">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Reviews</h1>
+              <p class="page-subtitle">Customer feedback and ratings for outlets and riders</p>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Outlet</th>
+                      <th>Customer</th>
+                      <th>Rating</th>
+                      <th>Review</th>
+                      <th>Rider Rating</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reviewsTableBody">
+                    <tr>
+                      <td colspan="6" class="table-empty">No reviews found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== BROADCAST ======================== -->
+        <div class="tab-content" id="tab-broadcast">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Broadcast</h1>
+              <p class="page-subtitle">Send push notifications to users, partners, or riders</p>
+            </div>
+          </div>
+
+          <div class="content-section" style="margin-bottom:24px">
+            <div class="pro-card">
+              <div class="pro-card-header" style="padding:16px 20px;border-bottom:1px solid var(--color-border)">
+                <h3 style="font-size:15px;font-weight:600">New Broadcast</h3>
+              </div>
+              <div class="pro-card-body" style="padding:20px">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                  <div class="form-group">
+                    <label for="broadcastTitle">Title</label>
+                    <input type="text" class="pro-input" id="broadcastTitle" placeholder="Notification title">
+                  </div>
+                  <div class="form-group">
+                    <label for="broadcastTarget">Target</label>
+                    <select class="pro-input" id="broadcastTarget">
+                      <option value="all">All Users</option>
+                      <option value="partners">Restaurant Partners</option>
+                      <option value="riders">Riders</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="grid-column:1/-1">
+                    <label for="broadcastMessage">Message</label>
+                    <textarea class="pro-input" id="broadcastMessage" rows="3" placeholder="Notification message content" style="resize:vertical"></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="broadcastCategory">Category</label>
+                    <select class="pro-input" id="broadcastCategory">
+                      <option value="general">General</option>
+                      <option value="promotion">Promotion</option>
+                      <option value="update">Update</option>
+                      <option value="alert">Alert</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="broadcastImage">Image URL</label>
+                    <input type="text" class="pro-input" id="broadcastImage" placeholder="https://...">
+                  </div>
+                </div>
+                <button class="btn-pro" id="btnSendBroadcast" style="margin-top:16px">
+                  <i data-lucide="send" style="width:16px;height:16px"></i>
+                  Send Broadcast
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="section-header">
+              <h3>Broadcast History</h3>
+            </div>
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Audience</th>
+                      <th>Category</th>
+                      <th>Sent</th>
+                      <th>Sender</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="broadcastHistoryBody">
+                    <tr>
+                      <td colspan="6" class="table-empty">No broadcasts sent yet</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== AUDIT ======================== -->
+        <div class="tab-content" id="tab-audit">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Audit Log</h1>
+              <p class="page-subtitle">Track all admin actions and system events</p>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>Admin Email</th>
+                      <th>Action</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditTableBody">
+                    <tr>
+                      <td colspan="4" class="table-empty">No audit logs found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="pagination-container" id="auditPagination"></div>
+        </div>
+
+        <!-- ======================== REPORTS ======================== -->
+        <div class="tab-content" id="tab-reports">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Reports</h1>
+              <p class="page-subtitle">Platform performance metrics and analytics</p>
+            </div>
+            <div class="page-header-actions">
+              <button class="btn-pro-sm" id="btnExportCSV">
+                <i data-lucide="file-text" style="width:14px;height:14px"></i>
+                CSV
+              </button>
+              <button class="btn-pro-sm" id="btnExportPDF">
+                <i data-lucide="file" style="width:14px;height:14px"></i>
+                PDF
+              </button>
+            </div>
+          </div>
+
+          <!-- Report KPI Cards -->
+          <div class="kpi-grid" style="margin-bottom:24px">
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#EEF2FF;color:#4F46E5">
+                <i data-lucide="indian-rupee"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiTotalRevenue">₹0</span>
+                <span class="kpi-label">Total Revenue</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#F0FDF4;color:#22C55E">
+                <i data-lucide="shopping-bag"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiTotalOrders">0</span>
+                <span class="kpi-label">Total Orders</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#FFF7ED;color:#F97316">
+                <i data-lucide="trending-up"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiAvgOrderValue">₹0</span>
+                <span class="kpi-label">Avg Order Value</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#FEF2F2;color:#EF4444">
+                <i data-lucide="percent"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiNetPlatformRevenue">₹0</span>
+                <span class="kpi-label">Net Platform Revenue</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#ECFDF5;color:#10B981">
+                <i data-lucide="banknote"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiTotalPartnerPayouts">₹0</span>
+                <span class="kpi-label">Total Partner Payouts</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#F5F3FF;color:#8B5CF6">
+                <i data-lucide="pie-chart"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiTakeRate">0%</span>
+                <span class="kpi-label">Platform Take Rate</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily Revenue Trend Chart -->
+          <div class="chart-card" style="margin-bottom:24px">
+            <div class="chart-card-header">
+              <h3>Daily Revenue Trend</h3>
+            </div>
+            <div class="chart-body">
+              <canvas id="reportsRevenueChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Top 10 Businesses -->
+          <div class="content-section" style="margin-bottom:24px">
+            <div class="section-header">
+              <h3>Top 10 Businesses</h3>
+            </div>
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Business Name</th>
+                      <th>Total Orders</th>
+                      <th>Revenue</th>
+                      <th>Commission</th>
+                    </tr>
+                  </thead>
+                  <tbody id="topBusinessesBody">
+                    <tr>
+                      <td colspan="5" class="table-empty">No data</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top 10 Outlets -->
+          <div class="content-section">
+            <div class="section-header">
+              <h3>Top 10 Outlets</h3>
+            </div>
+            <div class="pro-card">
+              <div class="pro-table">
+                <table class="table-header">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Outlet Name</th>
+                      <th>Business</th>
+                      <th>Total Orders</th>
+                      <th>Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody id="topOutletsBody">
+                    <tr>
+                      <td colspan="5" class="table-empty">No data</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================== SETTINGS ======================== -->
+        <div class="tab-content" id="tab-settings">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Settings</h1>
+              <p class="page-subtitle">Platform configuration and security settings</p>
+            </div>
+          </div>
+
+          <!-- TFA Section -->
+          <div class="content-section" style="margin-bottom:24px">
+            <div class="pro-card">
+              <div class="pro-card-header" style="padding:16px 20px;border-bottom:1px solid var(--color-border)">
+                <h3 style="font-size:15px;font-weight:600">Two-Factor Authentication</h3>
+              </div>
+              <div class="pro-card-body" style="padding:20px">
+                <p style="font-size:14px;color:var(--color-muted);margin-bottom:12px">
+                  Secure your admin account with two-factor authentication.
+                </p>
+                <div id="tfaStatus" style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--color-muted)">
+                  Status: <span id="tfaStatusText">Not Enabled</span>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button class="btn-pro" id="btnSetupTFA">
+                    <i data-lucide="shield" style="width:16px;height:16px"></i>
+                    Setup TFA
+                  </button>
+                  <button class="btn-pro-sm" id="btnDisableTFA" style="background:#EF4444;color:white">
+                    Disable
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Retention Section -->
+          <div class="content-section">
+            <div class="pro-card">
+              <div class="pro-card-header" style="padding:16px 20px;border-bottom:1px solid var(--color-border)">
+                <h3 style="font-size:15px;font-weight:600">Data Retention</h3>
+              </div>
+              <div class="pro-card-body" style="padding:20px">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px">
+                  <!-- Orders Retention -->
+                  <div>
+                    <div class="form-group">
+                      <label for="retentionOrders">Orders Retention (days)</label>
+                      <input type="number" class="pro-input" id="retentionOrders" value="90" min="1">
+                    </div>
+                    <div class="form-group" style="margin-top:8px">
+                      <label>Action</label>
+                      <div style="display:flex;gap:12px;margin-top:4px">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+                          <input type="radio" name="retentionOrdersAction" value="archive" checked>
+                          Archive
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+                          <input type="radio" name="retentionOrdersAction" value="purge">
+                          Purge
+                        </label>
+                      </div>
+                    </div>
+                    <button class="btn-pro-sm" id="btnApplyRetentionOrders" style="margin-top:8px;width:100%">Apply</button>
+                  </div>
+
+                  <!-- Audit Logs Retention -->
+                  <div>
+                    <div class="form-group">
+                      <label for="retentionAudit">Audit Logs Retention (days)</label>
+                      <input type="number" class="pro-input" id="retentionAudit" value="180" min="1">
+                    </div>
+                    <div class="form-group" style="margin-top:8px">
+                      <label>Action</label>
+                      <div style="display:flex;gap:12px;margin-top:4px">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+                          <input type="radio" name="retentionAuditAction" value="archive" checked>
+                          Archive
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+                          <input type="radio" name="retentionAuditAction" value="purge">
+                          Purge
+                        </label>
+                      </div>
+                    </div>
+                    <button class="btn-pro-sm" id="btnApplyRetentionAudit" style="margin-top:8px;width:100%">Apply</button>
+                  </div>
+
+                  <!-- Settlements Retention -->
+                  <div>
+                    <div class="form-group">
+                      <label for="retentionSettlements">Settlements Retention (days)</label>
+                      <input type="number" class="pro-input" id="retentionSettlements" value="365" min="1">
+                    </div>
+                    <div class="form-group" style="margin-top:8px">
+                      <label>Action</label>
+                      <div style="display:flex;gap:12px;margin-top:4px">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+                          <input type="radio" name="retentionSettlementsAction" value="archive" checked>
+                          Archive
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+                          <input type="radio" name="retentionSettlementsAction" value="purge">
+                          Purge
+                        </label>
+                      </div>
+                    </div>
+                    <button class="btn-pro-sm" id="btnApplyRetentionSettlements" style="margin-top:8px;width:100%">Apply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   </div>
 
-  <!-- Login Overlay -->
-  <div class="auth-overlay" id="authOverlay">
-    <div class="auth-card">
-      <div class="auth-brand">
-        <div class="auth-logo">FH</div>
-        <h2>Supreme Admin</h2>
-        <p>Sign in to manage your platform</p>
+  <!-- ============================= MODALS ============================= -->
+
+  <!-- Confirm Modal (global) -->
+  <div class="modal-overlay" id="confirmModal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Confirm Action</h3>
+        <button class="modal-close" id="confirmModalClose">&times;</button>
       </div>
-      <form id="loginForm" class="auth-form">
-        <div class="form-group">
-          <label for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" placeholder="admin@foodhubbie.com" required>
+      <div class="modal-body">
+        <p id="confirmMessage">Are you sure you want to proceed?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="confirmModalCancel">Cancel</button>
+        <button class="btn-pro" id="confirmAction">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Overlay (auto-dismiss 3s) -->
+  <div class="modal-overlay" id="successOverlay" style="display:none">
+    <div class="modal" style="text-align:center;max-width:360px">
+      <div class="modal-body" style="padding:40px 32px">
+        <i data-lucide="check-circle" style="width:48px;height:48px;color:#22C55E;margin-bottom:16px"></i>
+        <h3 style="font-size:18px;font-weight:700;margin-bottom:8px">Success</h3>
+        <p id="successMessage" style="font-size:14px;color:var(--color-muted)">Operation completed successfully.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="modal-overlay" id="loadingOverlay" style="display:none">
+    <div class="modal" style="text-align:center;max-width:300px;box-shadow:none;background:transparent">
+      <div class="modal-body" style="padding:32px">
+        <div class="loading-spinner" style="width:40px;height:40px;border:3px solid var(--color-border);border-top-color:var(--color-cta);border-radius:50%;animation:spin 600ms linear infinite;margin:0 auto 16px"></div>
+        <p id="loadingMessage" style="font-size:14px;color:white;font-weight:600">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onboarding Modal -->
+  <div class="modal-overlay" id="onboardingModal" style="display:none">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <h3 class="modal-title">Provision Partner Node</h3>
+        <button class="modal-close" id="onboardingModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label for="onboardingBusinessName">Business Name</label>
+            <input type="text" class="pro-input" id="onboardingBusinessName" placeholder="My Restaurant">
+          </div>
+          <div class="form-group">
+            <label for="onboardingBusinessId">Business ID</label>
+            <input type="text" class="pro-input" id="onboardingBusinessId" placeholder="biz_001">
+          </div>
+          <div class="form-group">
+            <label for="onboardingOutletName">Outlet Name</label>
+            <input type="text" class="pro-input" id="onboardingOutletName" placeholder="Downtown Branch">
+          </div>
+          <div class="form-group">
+            <label for="onboardingOutletId">Outlet ID</label>
+            <input type="text" class="pro-input" id="onboardingOutletId" placeholder="outlet_001">
+          </div>
+          <div class="form-group">
+            <label for="onboardingSlug">Slug</label>
+            <input type="text" class="pro-input" id="onboardingSlug" placeholder="downtown-branch">
+          </div>
+          <div class="form-group">
+            <label for="onboardingAddress">Address</label>
+            <input type="text" class="pro-input" id="onboardingAddress" placeholder="123 Main St">
+          </div>
+          <div class="form-group">
+            <label for="onboardingLat">Latitude</label>
+            <input type="text" class="pro-input" id="onboardingLat" placeholder="28.6139">
+          </div>
+          <div class="form-group">
+            <label for="onboardingLng">Longitude</label>
+            <input type="text" class="pro-input" id="onboardingLng" placeholder="77.2090">
+          </div>
+          <div class="form-group">
+            <label for="onboardingAdminEmail">Admin Email</label>
+            <input type="email" class="pro-input" id="onboardingAdminEmail" placeholder="admin@restaurant.com">
+          </div>
+          <div class="form-group">
+            <label for="onboardingAdminPhone">Admin Phone</label>
+            <input type="text" class="pro-input" id="onboardingAdminPhone" placeholder="+91 9876543210">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="onboardingAdminPassword">Admin Password</label>
+            <input type="password" class="pro-input" id="onboardingAdminPassword" placeholder="Min 6 characters">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="loginPassword">Password</label>
-          <input type="password" id="loginPassword" placeholder="Enter your password" required>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="onboardingModalCancel">Cancel</button>
+        <button class="btn-pro" id="onboardingModalSave">Provision Node</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approve Confirm Modal -->
+  <div class="modal-overlay" id="approveConfirmModal" style="display:none">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <h3 class="modal-title">Approve Application</h3>
+        <button class="modal-close" id="approveConfirmClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="approveConfirmMessage" style="font-size:14px;color:var(--color-muted)">Are you sure you want to approve this application?</p>
+        <div id="approveDetails" style="margin-top:12px;padding:12px;background:var(--color-background);border-radius:var(--radius-md);font-size:13px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="approveConfirmCancel">Cancel</button>
+        <button class="btn-pro" id="approveConfirmAction">Approve</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outlet Edit Modal -->
+  <div class="modal-overlay" id="outletEditModal" style="display:none">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Outlet</h3>
+        <button class="modal-close" id="outletEditClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="editOutletName">Outlet Name</label>
+            <input type="text" class="pro-input" id="editOutletName" placeholder="Outlet name">
+          </div>
+          <div class="form-group">
+            <label for="editOutletSlug">Slug</label>
+            <input type="text" class="pro-input" id="editOutletSlug" placeholder="outlet-slug">
+          </div>
+          <div class="form-group">
+            <label for="editOutletPhone">Phone</label>
+            <input type="text" class="pro-input" id="editOutletPhone" placeholder="+91 9876543210">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="editOutletAddress">Address</label>
+            <input type="text" class="pro-input" id="editOutletAddress" placeholder="Full address">
+          </div>
+          <div class="form-group">
+            <label for="editOutletLat">Latitude</label>
+            <input type="text" class="pro-input" id="editOutletLat" placeholder="28.6139">
+          </div>
+          <div class="form-group">
+            <label for="editOutletLng">Longitude</label>
+            <input type="text" class="pro-input" id="editOutletLng" placeholder="77.2090">
+          </div>
+          <div class="form-group">
+            <label for="editOutletPassword">Password</label>
+            <input type="password" class="pro-input" id="editOutletPassword" placeholder="Leave blank to keep">
+          </div>
         </div>
-        <button type="submit" class="btn-primary btn-full" id="loginBtn">Sign In</button>
-        <p class="auth-error" id="loginError"></p>
-      </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="outletEditCancel">Cancel</button>
+        <button class="btn-pro" id="outletEditSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commission Modal -->
+  <div class="modal-overlay" id="commissionModal" style="display:none">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <h3 class="modal-title">Set Commission</h3>
+        <button class="modal-close" id="commissionModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="commissionPercent">Commission (%)</label>
+          <input type="number" class="pro-input" id="commissionPercent" step="0.1" min="0" max="100" placeholder="15">
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label for="commissionFixedFee">Fixed Fee (₹)</label>
+          <input type="number" class="pro-input" id="commissionFixedFee" step="0.5" min="0" placeholder="5">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="commissionModalCancel">Cancel</button>
+        <button class="btn-pro" id="commissionModalSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rider Modal -->
+  <div class="modal-overlay" id="riderModal" style="display:none">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <h3 class="modal-title" id="riderModalTitle">Add Rider</h3>
+        <button class="modal-close" id="riderModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label for="riderName">Name</label>
+            <input type="text" class="pro-input" id="riderName" placeholder="Full name">
+          </div>
+          <div class="form-group">
+            <label for="riderEmail">Email</label>
+            <input type="email" class="pro-input" id="riderEmail" placeholder="rider@email.com">
+          </div>
+          <div class="form-group">
+            <label for="riderPassword">Password</label>
+            <input type="password" class="pro-input" id="riderPassword" placeholder="Min 6 characters">
+          </div>
+          <div class="form-group">
+            <label for="riderPhone">Phone</label>
+            <input type="text" class="pro-input" id="riderPhone" placeholder="+91 9876543210">
+          </div>
+          <div class="form-group">
+            <label for="riderFatherName">Father's Name</label>
+            <input type="text" class="pro-input" id="riderFatherName" placeholder="Father's name">
+          </div>
+          <div class="form-group">
+            <label for="riderAge">Age</label>
+            <input type="number" class="pro-input" id="riderAge" min="18" max="65" placeholder="25">
+          </div>
+          <div class="form-group">
+            <label for="riderAadharNo">Aadhar Number</label>
+            <input type="text" class="pro-input" id="riderAadharNo" placeholder="1234 5678 9012">
+          </div>
+          <div class="form-group">
+            <label for="riderQualification">Qualification</label>
+            <input type="text" class="pro-input" id="riderQualification" placeholder="12th Pass">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="riderAddress">Address</label>
+            <input type="text" class="pro-input" id="riderAddress" placeholder="Full address">
+          </div>
+          <div class="form-group">
+            <label for="riderProfilePhoto">Profile Photo</label>
+            <input type="file" class="pro-input" id="riderProfilePhoto" accept="image/*">
+          </div>
+          <div class="form-group">
+            <label for="riderAadharPhoto">Aadhar Photo</label>
+            <input type="file" class="pro-input" id="riderAadharPhoto" accept="image/*">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="riderModalCancel">Cancel</button>
+        <button class="btn-pro" id="riderModalSave">Save Rider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wallet Credit Modal -->
+  <div class="modal-overlay" id="walletModal" style="display:none">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <h3 class="modal-title">Credit Wallet</h3>
+        <button class="modal-close" id="walletModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--color-muted);margin-bottom:16px" id="walletUserInfo">
+          Crediting wallet for <strong id="walletUserName">—</strong> (<span id="walletUserEmail">—</span>)
+        </p>
+        <div class="form-group">
+          <label for="walletAmount">Amount (₹)</label>
+          <input type="number" class="pro-input" id="walletAmount" step="1" min="1" placeholder="100">
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label for="walletReason">Reason</label>
+          <input type="text" class="pro-input" id="walletReason" placeholder="Bonus / Refund / Adjustment">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="walletModalCancel">Cancel</button>
+        <button class="btn-pro" id="walletModalSave">Credit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wallet History Modal -->
+  <div class="modal-overlay" id="walletHistoryModal" style="display:none">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header">
+        <h3 class="modal-title">Wallet History</h3>
+        <button class="modal-close" id="walletHistoryClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--color-muted);margin-bottom:16px">
+          Transaction history for <strong id="walletHistoryUserName">—</strong>
+        </p>
+        <div id="walletHistoryList" style="max-height:300px;overflow-y:auto">
+          <div style="text-align:center;padding:20px;color:var(--color-muted);font-size:13px">No transactions found</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="walletHistoryCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Coupon Modal -->
+  <div class="modal-overlay" id="couponModal" style="display:none">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <h3 class="modal-title" id="couponModalTitle">Add Coupon</h3>
+        <button class="modal-close" id="couponModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label for="couponCode">Code</label>
+            <input type="text" class="pro-input" id="couponCode" placeholder="FLAT50">
+          </div>
+          <div class="form-group">
+            <label for="couponType">Type</label>
+            <select class="pro-input" id="couponType">
+              <option value="Percentage">Percentage</option>
+              <option value="Fixed">Fixed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="couponValue">Value</label>
+            <input type="number" class="pro-input" id="couponValue" step="0.5" min="0" placeholder="50">
+          </div>
+          <div class="form-group">
+            <label for="couponMinOrder">Min Order (₹)</label>
+            <input type="number" class="pro-input" id="couponMinOrder" step="1" min="0" placeholder="200">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="couponUsageLimit">Usage Limit</label>
+            <input type="number" class="pro-input" id="couponUsageLimit" min="1" placeholder="100">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="couponModalCancel">Cancel</button>
+        <button class="btn-pro" id="couponModalSave">Save Coupon</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slab Modal -->
+  <div class="modal-overlay" id="slabModal" style="display:none">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <h3 class="modal-title" id="slabModalTitle">Add Slab</h3>
+        <button class="modal-close" id="slabModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="slabDistance">Distance (km)</label>
+          <input type="number" class="pro-input" id="slabDistance" step="0.1" min="0" placeholder="5">
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label for="slabFee">Fee (₹)</label>
+          <input type="number" class="pro-input" id="slabFee" step="0.5" min="0" placeholder="20">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro-sm" id="slabModalCancel">Cancel</button>
+        <button class="btn-pro" id="slabModalSave">Save Slab</button>
+      </div>
     </div>
   </div>
 
