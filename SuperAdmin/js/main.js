@@ -497,15 +497,13 @@ window.showTFASetup = function() {
     secretDisplay.textContent = _tfaTempSecret;
     
     // Generate QR code using qrcode library
-    QRCode.toCanvas(otpauthURL, { width: 200, margin: 2 }, function (error, canvas) {
-        if (error) {
-            console.error("QR Code generation failed:", error);
-            showToast("Failed to generate QR code", "error");
-            return;
-        }
+    try {
         qrCodeEl.innerHTML = '';
-        qrCodeEl.appendChild(canvas);
-    });
+        new QRCode(qrCodeEl, { text: otpauthURL, width: 200, height: 200 });
+    } catch (e) {
+        console.error("QR Code generation failed:", e);
+        showToast("Failed to generate QR code", "error");
+    }
     
     document.getElementById('tfaVerifyInput').value = '';
 };
