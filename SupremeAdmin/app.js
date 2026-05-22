@@ -76,9 +76,10 @@ $('btnLogout').addEventListener('click', async () => {
 
 function showTab(tabName) {
   currentTab = tabName;
-  document.querySelectorAll('.tab-content').forEach((el) => {
+document.querySelectorAll('.tab-content').forEach((el) => {
     el.style.display = 'none';
   });
+  if (window.lucide) setTimeout(() => lucide.createIcons(), 100);
   document.querySelectorAll('.nav-link').forEach((el) => {
     el.classList.remove('active');
   });
@@ -2145,6 +2146,12 @@ function initApp() {
   showTab('dashboard');
 }
 
+// Auto-render lucide icons whenever new DOM is injected
+const lucideObserver = new MutationObserver(() => {
+  if (window.lucide) lucide.createIcons();
+});
+lucideObserver.observe(document.getElementById('app'), { childList: true, subtree: true });
+
 // Init date display before auth
 updateDateDisplay();
 
@@ -2161,4 +2168,5 @@ document.querySelectorAll('.modal-overlay').forEach((modal) => {
 $('successDialogClose')?.addEventListener('click', () => {
   $('successDialog').style.display = 'none';
 });
+
 
