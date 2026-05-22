@@ -2569,10 +2569,6 @@ window._doRenderAllOrders = () => {
     }
 }
 
-    // Global slider is already initialized via event delegation
-
-};
-
 document.addEventListener('DOMContentLoaded', () => {
     // Nav Click Listeners
     document.querySelectorAll('[data-section]').forEach(el => el.addEventListener('click', e => {
