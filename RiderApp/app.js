@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from
 import { getDatabase, ref, onValue, get, set, update, runTransaction, query, orderByChild, equalTo, off, serverTimestamp, remove, limitToLast, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
-import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
+// App Check intentionally omitted — Spark plan, no enforcement needed
 // Utility for haptic feedback
 window.haptic = (pattern) => {
     try {
@@ -26,25 +26,9 @@ const firebaseConfig = {
     measurementId: "G-SQK852HT4W"
 };
 
-const reCaptchaSiteKey = "6LeAlcwsAAAAAH4F3p5aCNvyPlhC3BRHOXTdDEGK";
-
 let app, auth, db, dbStorage, messaging;
 try {
     app = initializeApp(firebaseConfig);
-    
-    // Initialize App Check with error handling
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    try {
-        initializeAppCheck(app, {
-            provider: new ReCaptchaV3Provider(reCaptchaSiteKey),
-            isTokenAutoRefreshEnabled: true,
-            debug: isLocalhost
-        });
-        console.log("[App Check] Activated for Rider Portal");
-    } catch (appCheckErr) {
-        console.warn("[App Check] Initialization failed, continuing without App Check:", appCheckErr.message);
-    }
-
     auth = getAuth(app);
     db = getDatabase(app);
     
