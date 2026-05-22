@@ -72,7 +72,8 @@ debug_test.js
 button_audit.js
 add_nilesh.js
 
-# Old documentation (replaced by new SaaS docs)
+# Credentials & site info (not secrets, but convenience file)
+Credentials.md
 Credential.md
 COMPREHENSIVE_FIX_SUMMARY.md
 RIDER_CREDENTIALS_HELP.md
