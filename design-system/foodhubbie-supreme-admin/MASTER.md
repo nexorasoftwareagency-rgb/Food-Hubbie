@@ -19,12 +19,14 @@
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
 | Primary | `#0F172A` | `--color-primary` |
-| Secondary | `#1E293B` | `--color-secondary` |
+| Secondary | `#475569` | `--color-secondary` |
 | CTA/Accent | `#22C55E` | `--color-cta` |
-| Background | `#020617` | `--color-background` |
-| Text | `#F8FAFC` | `--color-text` |
+| Background | `#F8FAFC` | `--color-background` |
+| Surface | `#FFFFFF` | `--color-surface` |
+| Text | `#0F172A` | `--color-text` |
+| Muted | `#64748B` | `--color-muted` |
 
-**Color Notes:** Dark bg + green positive indicators
+**Color Notes:** Light bg + green CTA, dark text for readability
 
 ### Typography
 
@@ -86,12 +88,17 @@
 .btn-secondary {
   background: transparent;
   color: #0F172A;
-  border: 2px solid #0F172A;
+  border: 2px solid #E2E8F0;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: #0F172A;
+  background: #F1F5F9;
 }
 ```
 
@@ -99,12 +106,13 @@
 
 ```css
 .card {
-  background: #020617;
+  background: var(--color-surface, #FFFFFF);
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
   transition: all 200ms ease;
   cursor: pointer;
+  border: 1px solid #E2E8F0;
 }
 
 .card:hover {
@@ -125,9 +133,9 @@
 }
 
 .input:focus {
-  border-color: #0F172A;
+  border-color: #22C55E;
   outline: none;
-  box-shadow: 0 0 0 3px #0F172A20;
+  box-shadow: 0 0 0 3px #22C55E20;
 }
 ```
 
@@ -135,12 +143,13 @@
 
 ```css
 .modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(6px);
 }
 
 .modal {
-  background: white;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
   border-radius: 16px;
   padding: 32px;
   box-shadow: var(--shadow-xl);

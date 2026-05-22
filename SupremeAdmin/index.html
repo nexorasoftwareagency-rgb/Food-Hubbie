@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foodhubbie | Supreme Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/lucide.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">FH</div>
+        <div class="brand-text">
+          <span class="brand-name">Foodhubbie</span>
+          <span class="brand-role">Supreme Admin</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-link active" data-tab="dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="businesses">
+          <i data-lucide="building-2"></i>
+          <span>Businesses</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="orders">
+          <i data-lucide="shopping-bag"></i>
+          <span>Orders</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="riders">
+          <i data-lucide="bike"></i>
+          <span>Riders</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="users">
+          <i data-lucide="users"></i>
+          <span>Users</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="promotions">
+          <i data-lucide="tags"></i>
+          <span>Promotions</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="settlements">
+          <i data-lucide="wallet"></i>
+          <span>Settlements</span>
+        </a>
+        <a href="#" class="nav-link" data-tab="reports">
+          <i data-lucide="bar-chart-3"></i>
+          <span>Reports</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="admin-info">
+          <div class="admin-avatar" id="adminAvatar">A</div>
+          <div>
+            <div class="admin-name" id="adminName">Admin</div>
+            <div class="admin-email" id="adminEmail">admin@foodhubbie.com</div>
+          </div>
+        </div>
+        <button class="btn-logout" id="btnLogout" title="Sign Out">
+          <i data-lucide="log-out"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="top-header">
+        <button class="btn-icon sidebar-toggle" id="sidebarToggle">
+          <i data-lucide="menu"></i>
+        </button>
+        <div class="header-search">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" placeholder="Search businesses, orders, users..." class="search-input">
+        </div>
+        <div class="header-actions">
+          <div class="sync-status" id="syncStatus">
+            <i data-lucide="check-circle"></i>
+            <span>Synced</span>
+          </div>
+          <button class="btn-icon" id="btnRefresh" title="Refresh">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+          <button class="btn-icon" id="btnNotifications" title="Notifications">
+            <i data-lucide="bell"></i>
+            <span class="notif-badge" id="notifBadge">0</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="page-content">
+        <!-- Dashboard Tab -->
+        <div class="tab-content active" id="tab-dashboard">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Dashboard</h1>
+              <p class="page-subtitle">Real-time overview of your platform</p>
+            </div>
+            <div class="page-header-actions">
+              <span class="date-display" id="dateDisplay"></span>
+            </div>
+          </div>
+
+          <!-- KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#EEF2FF;color:#4F46E5">
+                <i data-lucide="building-2"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiBusinesses">—</span>
+                <span class="kpi-label">Businesses</span>
+              </div>
+              <span class="kpi-trend up" id="trendBiz">+0%</span>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#F0FDF4;color:#22C55E">
+                <i data-lucide="store"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiOutlets">—</span>
+                <span class="kpi-label">Outlets</span>
+              </div>
+              <span class="kpi-trend up" id="trendOutlets">+0%</span>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#FFF7ED;color:#F97316">
+                <i data-lucide="shopping-bag"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiOrdersToday">—</span>
+                <span class="kpi-label">Orders Today</span>
+              </div>
+              <span class="kpi-trend up" id="trendOrders">+0%</span>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#FEF2F2;color:#EF4444">
+                <i data-lucide="indian-rupee"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiRevenue">—</span>
+                <span class="kpi-label">Revenue Today</span>
+              </div>
+              <span class="kpi-trend up" id="trendRevenue">+0%</span>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#ECFDF5;color:#10B981">
+                <i data-lucide="users"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiUsers">—</span>
+                <span class="kpi-label">Total Users</span>
+              </div>
+              <span class="kpi-trend up" id="trendUsers">+0%</span>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" style="background:#F5F3FF;color:#8B5CF6">
+                <i data-lucide="bike"></i>
+              </div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="kpiRiders">—</span>
+                <span class="kpi-label">Active Riders</span>
+              </div>
+              <span class="kpi-trend up" id="trendRiders">+0%</span>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="charts-row">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <h3>Revenue Overview</h3>
+                <select class="chart-select" id="revenueRange">
+                  <option value="7">Last 7 days</option>
+                  <option value="14" selected>Last 14 days</option>
+                  <option value="30">Last 30 days</option>
+                </select>
+              </div>
+              <div class="chart-body">
+                <canvas id="revenueChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <h3>Orders Breakdown</h3>
+              </div>
+              <div class="chart-body">
+                <canvas id="ordersChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="activity-section">
+            <div class="section-header">
+              <h3>Recent Activity</h3>
+              <button class="btn-text" id="btnViewAll">View All</button>
+            </div>
+            <div class="activity-list" id="activityList">
+              <div class="activity-placeholder">Loading activity...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placeholder tabs -->
+        <div class="tab-content" id="tab-businesses"><div class="placeholder-tab"><i data-lucide="building-2"></i><h2>Businesses</h2><p>Coming soon</p></div></div>
+        <div class="tab-content" id="tab-orders"><div class="placeholder-tab"><i data-lucide="shopping-bag"></i><h2>Orders</h2><p>Coming soon</p></div></div>
+        <div class="tab-content" id="tab-riders"><div class="placeholder-tab"><i data-lucide="bike"></i><h2>Riders</h2><p>Coming soon</p></div></div>
+        <div class="tab-content" id="tab-users"><div class="placeholder-tab"><i data-lucide="users"></i><h2>Users</h2><p>Coming soon</p></div></div>
+        <div class="tab-content" id="tab-promotions"><div class="placeholder-tab"><i data-lucide="tags"></i><h2>Promotions</h2><p>Coming soon</p></div></div>
+        <div class="tab-content" id="tab-settlements"><div class="placeholder-tab"><i data-lucide="wallet"></i><h2>Settlements</h2><p>Coming soon</p></div></div>
+        <div class="tab-content" id="tab-reports"><div class="placeholder-tab"><i data-lucide="bar-chart-3"></i><h2>Reports</h2><p>Coming soon</p></div></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Login Overlay -->
+  <div class="auth-overlay" id="authOverlay">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-logo">FH</div>
+        <h2>Supreme Admin</h2>
+        <p>Sign in to manage your platform</p>
+      </div>
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="admin@foodhubbie.com" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="btn-primary btn-full" id="loginBtn">Sign In</button>
+        <p class="auth-error" id="loginError"></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
