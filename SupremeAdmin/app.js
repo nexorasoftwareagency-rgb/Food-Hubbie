@@ -96,6 +96,7 @@ document.addEventListener('click', (e) => {
 
 // --- Dashboard ---
 function initDashboard() {
+  if (window.lucide) lucide.createIcons();
   $('dateDisplay').textContent = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   loadDashboardData();
 }
