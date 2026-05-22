@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 
 type LocationState = {
   coords: { lat: number; lng: number } | null;
@@ -75,10 +75,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Auto-request location on mount
-  useEffect(() => {
-    requestLocation();
-  }, []);
+  // Location is NOT auto-requested on mount — user must opt-in via "Allow"/"Detect" button
 
   const setAddress = (address: string) => {
     setState((prev) => ({ ...prev, address }));

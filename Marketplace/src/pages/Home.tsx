@@ -94,13 +94,13 @@ export default function Home() {
             {locationState.address || "Detecting location..."}
           </span>
         </div>
-        {locationState.permissionStatus === "prompt" && (
+        {locationState.permissionStatus !== "granted" && (
           <button
             onClick={requestLocation}
             data-testid="btn-allow-location"
             className="text-xs bg-primary-foreground/20 px-2.5 py-1 rounded-lg font-bold whitespace-nowrap ml-2"
           >
-            Allow
+            {locationState.permissionStatus === "denied" ? "Enable" : "Allow"}
           </button>
         )}
       </div>
