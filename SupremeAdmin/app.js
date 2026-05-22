@@ -1,9 +1,5 @@
-/* =============================
-   Foodhubbie Supreme Admin
-   Full Dashboard Controller v2
-   ============================= */
+const $ = (id) => document.getElementById(id);
 
-// --- Firebase Config ---
 const firebaseConfig = {
   apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
   authDomain: "food-hubbie.firebaseapp.com",
@@ -12,169 +8,155 @@ const firebaseConfig = {
   storageBucket: "food-hubbie.firebasestorage.app",
   messagingSenderId: "952017160550",
   appId: "1:952017160550:web:80bbb75933f431ab54e0a7",
-  measurementId: "G-SQK852HT4W"
+  measurementId: "G-SQ852HT4W"
 };
-
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
 
-// --- State ---
-let revenueChart = null;
-let ordersChart = null;
-let currentUser = null;
-let businessesData = {};
-let todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-let allOrders = {};
+const API_KEY = firebaseConfig.apiKey;
+const PAGE_SIZE = 15;
+const RIDER_PAGE_SIZE = 20;
+const USER_PAGE_SIZE = 20;
+const AUDIT_PAGE_SIZE = 50;
+
+let appInitialized = false;
+let currentTab = 'dashboard';
+let allBusinesses = {};
 let allRiders = {};
 let allUsers = {};
-let allReviews = [];
-let allInventory = [];
-let allSettlements = [];
-let currentPage = { businesses: 1, riders: 1, users: 1, audit: 1, reviews: 1 };
-let businessFilter = '';
-let riderFilter = '';
-let userFilter = '';
-let inventoryFilter = '';
-let selectedStatusFilter = 'All';
-let currentView = 'table';
-let currentDragOrder = null;
-let allPromotions = {};
-let allCoupons = {};
-let broadcastRateLimit = [];
-let couponRateLimit = [];
-let deliverySlabs = [];
-let auditLogs = [];
-let currentAdminUid = null;
-let tabListeners = {};
+let allOrders = {};
+let allReviews = {};
+let broadcastCount = 0;
+let broadcastResetTime = Date.now();
 
-// --- DOM refs ---
-const $ = (id) => document.getElementById(id);
+// ======================== AUTH ========================
 
-// --- Auth ---
-$('loginForm')?.addEventListener('submit', async (e) => {
+$('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const email = $('loginEmail').value;
+  const email = $('loginEmail').value.trim();
   const password = $('loginPassword').value;
-  const btn = $('loginBtn');
-  btn.disabled = true;
-  btn.textContent = 'Signing in...';
+  $('loginBtn').disabled = true;
+  $('loginBtn').textContent = 'Signing in...';
   $('loginError').textContent = '';
   try {
-    const cred = await auth.signInWithEmailAndPassword(email, password);
-    currentUser = cred.user;
-    $('authOverlay').classList.add('hidden');
-    $('app').classList.add('visible');
-    initDashboard();
+    await auth.signInWithEmailAndPassword(email, password);
   } catch (err) {
-    $('loginError').textContent = err.message.replace('Firebase: ', '');
-    btn.disabled = false;
-    btn.textContent = 'Sign In';
+    $('loginError').textContent = err.message;
+    $('loginBtn').disabled = false;
+    $('loginBtn').textContent = 'Sign In';
   }
 });
 
-auth.onAuthStateChanged((user) => {
+auth.onAuthStateChanged(async (user) => {
   if (user) {
-    currentUser = user;
-    $('authOverlay').classList.add('hidden');
-    $('app').classList.add('visible');
-    $('adminName').textContent = user.displayName || 'Admin';
+    $('authOverlay').style.display = 'none';
+    $('adminName').textContent = user.displayName || user.email;
     $('adminEmail').textContent = user.email;
-    $('adminAvatar').textContent = (user.displayName || user.email || 'A')[0].toUpperCase();
-    initDashboard();
+    if (!appInitialized) {
+      appInitialized = true;
+      initApp();
+    }
+  } else {
+    $('authOverlay').style.display = 'flex';
+    $('loginBtn').disabled = false;
+    $('loginBtn').textContent = 'Sign In';
   }
 });
 
-$('btnLogout')?.addEventListener('click', () => {
-  auth.signOut();
-  currentUser = null;
-  $('authOverlay').classList.remove('hidden');
-  $('app').classList.remove('visible');
-});
-
-// --- Tab Navigation ---
-document.querySelectorAll('.nav-link').forEach((link) => {
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    document.querySelectorAll('.nav-link').forEach((l) => l.classList.remove('active'));
-    link.classList.add('active');
-    const tab = link.dataset.tab;
-    document.querySelectorAll('.tab-content').forEach((t) => t.classList.remove('active'));
-    const target = $('tab-' + tab);
-    if (target) target.classList.add('active');
-    showTab(tab);
-  });
-});
-
-// --- Sidebar Toggle (mobile) ---
-$('sidebarToggle')?.addEventListener('click', () => {
-  document.getElementById('sidebar')?.classList.toggle('open');
-});
-document.addEventListener('click', (e) => {
-  const sidebar = document.getElementById('sidebar');
-  if (window.innerWidth <= 768 && sidebar?.classList.contains('open') && !sidebar.contains(e.target) && e.target !== $('sidebarToggle')) {
-    sidebar.classList.remove('open');
+$('btnLogout').addEventListener('click', async () => {
+  try {
+    await auth.signOut();
+  } catch (err) {
+    showToast('Logout failed: ' + err.message, 'error');
   }
 });
 
-// ============================
-// GLOBAL UTILITY FUNCTIONS
-// ============================
+// ======================== UTILITIES ========================
 
 function showTab(tabName) {
-  if (tabListeners[tabName]) tabListeners[tabName]();
-  switch (tabName) {
-    case 'onboarding': loadOnboardingRequests(); break;
-    case 'businesses': loadBusinesses(); break;
-    case 'liveorders': loadAllOrders(); break;
-    case 'riders': loadRiders(); break;
-    case 'users': loadUsers(); break;
-    case 'promotions': loadPromotions(); break;
-    case 'settlements': loadSettlements(); break;
-    case 'delivery': loadDeliverySlabs(); break;
-    case 'inventory': loadInventory(); break;
-    case 'reviews': loadReviews(); break;
-    case 'broadcast': loadBroadcasts(); break;
-    case 'audit': loadAuditLogs(); break;
-    case 'reports': loadReports(); break;
-    case 'settings': checkTFAStatus(); break;
-  }
+  currentTab = tabName;
+  document.querySelectorAll('.tab-content').forEach((el) => {
+    el.style.display = 'none';
+  });
+  document.querySelectorAll('.nav-link').forEach((el) => {
+    el.classList.remove('active');
+  });
+  const tabEl = $(tabName);
+  if (tabEl) tabEl.style.display = 'block';
+  const navLink = document.querySelector(`.nav-link[data-tab="${tabName}"]`);
+  if (navLink) navLink.classList.add('active');
+  const initMap = {
+    dashboard: initDashboard,
+    onboarding: initOnboarding,
+    businesses: initBusinesses,
+    'live-orders': initLiveOrders,
+    riders: initRiders,
+    users: initUsers,
+    promotions: initPromotions,
+    settlements: initSettlements,
+    'delivery-slabs': initDeliverySlabs,
+    inventory: initInventory,
+    reviews: initReviews,
+    broadcast: initBroadcast,
+    audit: initAudit,
+    reports: initReports,
+    settings: initSettings
+  };
+  const initFn = initMap[tabName];
+  if (initFn && typeof initFn === 'function') initFn();
 }
 
 function confirmAction(msg, callback) {
-  const modal = $('confirmModal');
-  if (!modal) return;
-  $('confirmMsg').textContent = msg;
-  modal.classList.add('active');
-  const confirmBtn = $('confirmYes');
-  const cancelBtn = $('confirmNo');
-  const handler = (e) => {
-    if (e.target === confirmBtn) callback();
-    modal.classList.remove('active');
-    confirmBtn.removeEventListener('click', handler);
-    cancelBtn.removeEventListener('click', handler);
-  };
-  confirmBtn.addEventListener('click', handler);
-  cancelBtn.addEventListener('click', handler);
+  $('confirmMessage').textContent = msg;
+  $('confirmModal').style.display = 'flex';
+  const yesBtn = $('confirmYes');
+  const newYes = yesBtn.cloneNode(true);
+  yesBtn.parentNode.replaceChild(newYes, yesBtn);
+  newYes.addEventListener('click', () => {
+    $('confirmModal').style.display = 'none';
+    if (typeof callback === 'function') callback();
+  });
 }
 
-function showToast(msg, type) {
-  const toast = $('toast');
-  if (!toast) return;
+$('confirmClose').addEventListener('click', () => {
+  $('confirmModal').style.display = 'none';
+});
+$('confirmNo').addEventListener('click', () => {
+  $('confirmModal').style.display = 'none';
+});
+
+function showToast(msg, type = 'info') {
+  const container = $('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
   toast.textContent = msg;
-  toast.className = 'toast visible toast-' + (type || 'info');
-  clearTimeout(toast._hide);
-  toast._hide = setTimeout(() => toast.classList.remove('visible'), 4000);
+  container.appendChild(toast);
+  setTimeout(() => {
+    if (toast.parentNode) toast.remove();
+  }, 3000);
 }
 
 function formatDate(ts) {
-  if (!ts) return '—';
-  const d = typeof ts === 'number' ? new Date(ts) : new Date(ts);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (!ts) return '-';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-IN', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
 }
 
 function timeAgo(ts) {
-  return formatTimeAgo(ts);
+  if (!ts) return '-';
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return formatDate(ts);
 }
 
 function escapeHtml(str) {
@@ -184,156 +166,140 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
 function exportCSV(headers, rows, filename) {
-  const csvContent = [headers.join(','), ...rows.map(r => headers.map((h, i) => {
-    const val = (r[i] || '').toString();
-    return val.includes(',') || val.includes('"') ? '"' + val.replace(/"/g, '""') + '"' : val;
-  }).join(','))].join('\n');
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((r) => r.map((c) => {
+      const val = String(c == null ? '' : c);
+      return val.includes(',') || val.includes('"') || val.includes('\n')
+        ? `"${val.replace(/"/g, '""')}"` : val;
+    }).join(','))
+  ].join('\n');
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = filename + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+  link.download = filename;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(link.href);
 }
 
-function formatTimeAgo(ts) {
-  if (!ts) return '';
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return mins + 'm ago';
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + 'h ago';
-  return Math.floor(hrs / 24) + 'd ago';
-}
-
-function generateLastNDays(n) {
-  const result = [];
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    result.push({
-      label: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-      dateStr: d.toDateString(),
-      ts: d.getTime()
-    });
-  }
-  return result;
-}
-
-// ============================
-// 1. DASHBOARD
-// ============================
+// ======================== DASHBOARD ========================
 
 function initDashboard() {
-  if (window.lucide) lucide.createIcons();
-  $('dateDisplay').textContent = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  loadDashboardData();
-}
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTs = today.getTime();
 
-function loadDashboardData() {
-  const bizRef = db.ref('businesses');
-  bizRef.on('value', (snap) => {
-    businessesData = snap.val() || {};
-    updateKPIs();
-    updateCharts();
-    updateActivity();
-  }, (err) => {
-    console.error('Dashboard load error:', err);
-    document.querySelectorAll('.kpi-value').forEach((el) => el.textContent = '—');
-  });
-}
+  db.ref('businesses').on('value', (snap) => {
+    const data = snap.val() || {};
+    const bizCount = Object.keys(data).length;
+    let outletCount = 0;
+    let ordersTodayCount = 0;
+    let revenueToday = 0;
+    const recentOrders = [];
+    const dailyRevenue = {};
+    const statusCounts = { Pending: 0, Confirmed: 0, Preparing: 0, 'Out for Delivery': 0, Delivered: 0, Cancelled: 0 };
 
-function updateKPIs() {
-  const bizIds = Object.keys(businessesData);
-  $('kpiBusinesses').textContent = bizIds.length;
-
-  let outletCount = 0;
-  let ordersToday = 0;
-  let revenueToday = 0;
-  let userSet = new Set();
-
-  bizIds.forEach((bid) => {
-    const biz = businessesData[bid];
-    if (biz.outlets) {
-      const oids = Object.keys(biz.outlets);
-      outletCount += oids.length;
-      oids.forEach((oid) => {
-        const outlet = biz.outlets[oid];
-        if (outlet.orders) {
-          Object.values(outlet.orders).forEach((order) => {
-            if (order.createdAt && order.createdAt >= todayStart.getTime()) {
-              ordersToday++;
-              revenueToday += order.total || 0;
-            }
-            if (order.phone) userSet.add(order.phone);
-          });
-        }
-      });
-    }
-  });
-
-  $('kpiOutlets').textContent = outletCount;
-  $('kpiOrdersToday').textContent = ordersToday;
-  $('kpiRevenue').textContent = '\u20B9' + revenueToday.toLocaleString('en-IN');
-  $('kpiUsers').textContent = userSet.size || '—';
-
-  db.ref('riders').once('value', (snap) => {
-    const riders = snap.val() || {};
-    const total = Object.keys(riders).length;
-    const active = Object.values(riders).filter((r) => (r.status || '').toLowerCase() === 'online').length;
-    $('kpiRiders').textContent = active + '/' + total;
-  });
-}
-
-function updateCharts() {
-  buildRevenueChart();
-  buildOrdersChart();
-}
-
-function buildRevenueChart() {
-  const days = generateLastNDays(14);
-  const revenueData = days.map((d) => {
-    let total = 0;
-    Object.values(businessesData).forEach((biz) => {
+    for (const bid of Object.keys(data)) {
+      const biz = data[bid];
       if (biz.outlets) {
-        Object.values(biz.outlets).forEach((outlet) => {
+        for (const oid of Object.keys(biz.outlets)) {
+          outletCount++;
+          const outlet = biz.outlets[oid];
           if (outlet.orders) {
-            Object.values(outlet.orders).forEach((order) => {
-              if (order.createdAt && new Date(order.createdAt).toDateString() === d.dateStr) {
-                total += order.total || 0;
+            for (const orderId of Object.keys(outlet.orders)) {
+              const order = outlet.orders[orderId];
+              const orderTs = order.createdAt || order.timestamp || 0;
+              const orderDate = new Date(orderTs);
+              const dayKey = orderDate.toISOString().slice(0, 10);
+
+              if (orderTs >= todayTs) {
+                ordersTodayCount++;
+                revenueToday += Number(order.total || order.amount || 0);
               }
-            });
+
+              const status = order.status || 'Pending';
+              statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+              const rev = Number(order.total || order.amount || 0);
+              dailyRevenue[dayKey] = (dailyRevenue[dayKey] || 0) + rev;
+
+              recentOrders.push({
+                id: orderId,
+                business: biz.name || bid,
+                outlet: outlet.name || oid,
+                customer: order.customerName || order.userName || 'Guest',
+                total: rev,
+                status,
+                timestamp: orderTs
+              });
+            }
           }
-        });
+        }
       }
-    });
-    return total;
+    }
+
+    $('kpiBusinesses').textContent = bizCount;
+    $('kpiOutlets').textContent = outletCount;
+    $('kpiOrdersToday').textContent = ordersTodayCount;
+    $('kpiRevenue').textContent = '\u20B9' + revenueToday.toLocaleString('en-IN');
+
+    recentOrders.sort((a, b) => b.timestamp - a.timestamp);
+    const recent = recentOrders.slice(0, 10);
+    const activityList = document.getElementById('activityList') || document.querySelector('#dashboard .activity-list');
+    if (activityList) {
+      activityList.innerHTML = recent.map((o) =>
+        `<div class="activity-item">
+          <div class="activity-icon ${o.status.toLowerCase().replace(/\s+/g, '-')}"></div>
+          <div class="activity-info">
+            <p><strong>${escapeHtml(o.customer)}</strong> ordered from <strong>${escapeHtml(o.business)}</strong></p>
+            <span class="activity-time">${timeAgo(o.timestamp)}</span>
+          </div>
+          <div class="activity-status status-${o.status.toLowerCase().replace(/\s+/g, '-')}">${o.status}</div>
+        </div>`
+      ).join('');
+    }
+
+    db.ref('users').once('value').then((uSnap) => {
+      $('kpiUsers').textContent = uSnap.numChildren() || 0;
+    }).catch(() => {});
+    db.ref('riders').once('value').then((rSnap) => {
+      $('kpiRiders').textContent = rSnap.numChildren() || 0;
+    }).catch(() => {});
+
+    buildRevenueChart(dailyRevenue);
+    buildOrdersChart(statusCounts);
+  }, (err) => {
+    showToast('Dashboard load error: ' + err.message, 'error');
+  });
+}
+
+let revenueChartInstance = null;
+function buildRevenueChart(dailyRevenue) {
+  const canvas = $('reportsChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const sortedDays = Object.keys(dailyRevenue).sort().slice(-14);
+  const values = sortedDays.map((d) => dailyRevenue[d]);
+  const labels = sortedDays.map((d) => {
+    const parts = d.split('-');
+    return `${parts[2]}/${parts[1]}`;
   });
 
-  const ctx = document.getElementById('revenueChart')?.getContext('2d');
-  if (!ctx) return;
-  if (revenueChart) revenueChart.destroy();
-
-  revenueChart = new Chart(ctx, {
+  if (revenueChartInstance) revenueChartInstance.destroy();
+  revenueChartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: days.map((d) => d.label),
+      labels: labels.length ? labels : ['No Data'],
       datasets: [{
-        label: 'Revenue (\u20B9)',
-        data: revenueData,
-        borderColor: '#22C55E',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        label: 'Revenue',
+        data: labels.length ? values : [0],
+        borderColor: '#4f46e5',
+        backgroundColor: 'rgba(79,70,229,0.1)',
         fill: true,
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#22C55E',
-        borderWidth: 2
+        tension: 0.4
       }]
     },
     options: {
@@ -341,2013 +307,1858 @@ function buildRevenueChart() {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        y: { beginAtZero: true, ticks: { callback: (v) => '\u20B9' + v.toLocaleString('en-IN') } },
-        x: { grid: { display: false } }
+        y: { beginAtZero: true, ticks: { callback: (v) => '\u20B9' + v } }
       }
     }
   });
 }
 
-function buildOrdersChart() {
-  const statusCounts = { Placed: 0, Confirmed: 0, Preparing: 0, 'Out for Delivery': 0, Delivered: 0, Cancelled: 0 };
-  Object.values(businessesData).forEach((biz) => {
-    if (biz.outlets) {
-      Object.values(biz.outlets).forEach((outlet) => {
-        if (outlet.orders) {
-          Object.values(outlet.orders).forEach((order) => {
-            const s = order.status || 'Placed';
-            if (statusCounts[s] !== undefined) statusCounts[s]++;
-            else statusCounts.Placed++;
-          });
-        }
-      });
-    }
-  });
-
+let ordersChartInstance = null;
+function buildOrdersChart(statusCounts) {
+  const canvas = document.querySelector('#dashboard canvas.chart-doughnut');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
   const labels = Object.keys(statusCounts);
   const data = Object.values(statusCounts);
-  const colors = ['#3B82F6', '#F97316', '#A855F7', '#22C55E', '#10B981', '#EF4444'];
+  const colors = {
+    Pending: '#f59e0b',
+    Confirmed: '#3b82f6',
+    Preparing: '#8b5cf6',
+    'Out for Delivery': '#06b6d4',
+    Delivered: '#10b981',
+    Cancelled: '#ef4444'
+  };
 
-  const ctx = document.getElementById('ordersChart')?.getContext('2d');
-  if (!ctx) return;
-  if (ordersChart) ordersChart.destroy();
-
-  ordersChart = new Chart(ctx, {
+  if (ordersChartInstance) ordersChartInstance.destroy();
+  ordersChartInstance = new Chart(ctx, {
     type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: labels.map((l) => colors[l] || '#6b7280')
+      }]
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { size: 12 } } }
-      },
-      cutout: '65%'
-    }
-  });
-}
-
-function updateActivity() {
-  const list = $('activityList');
-  if (!list) return;
-  const activities = [];
-
-  Object.entries(businessesData).forEach(([bid, biz]) => {
-    if (biz.outlets) {
-      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
-        if (outlet.orders) {
-          Object.values(outlet.orders).forEach((order) => {
-            const name = outlet.name || biz.name || 'Unknown Store';
-            const status = order.status || 'Placed';
-            const time = order.createdAt ? formatTimeAgo(order.createdAt) : 'recently';
-            activities.push({ id: order.orderId || generateId(), store: name, status, time, total: order.total, ts: order.createdAt || 0 });
-          });
-        }
-      });
-    }
-  });
-
-  activities.sort((a, b) => b.ts - a.ts);
-  const recent = activities.slice(0, 10);
-
-  if (recent.length === 0) {
-    list.innerHTML = '<div class="activity-placeholder">No recent orders found.</div>';
-    return;
-  }
-
-  list.innerHTML = recent.map((a) => {
-    const dotClass = { Delivered: 'success', Cancelled: 'error', 'Out for Delivery': 'info', Preparing: 'warning', Confirmed: 'info' }[a.status] || 'info';
-    return '<div class="activity-item">' +
-      '<span class="activity-dot ' + dotClass + '"></span>' +
-      '<div class="activity-text">' +
-      '<strong>#' + escapeHtml(a.id).slice(-6) + '</strong> from <strong>' + escapeHtml(a.store) + '</strong> \u2014 ' + escapeHtml(a.status) +
-      (a.total ? ' <span class="activity-total">\u20B9' + a.total.toLocaleString('en-IN') + '</span>' : '') +
-      '</div>' +
-      '<span class="activity-time">' + escapeHtml(a.time) + '</span>' +
-      '</div>';
-  }).join('');
-}
-
-$('btnRefresh')?.addEventListener('click', () => {
-  const icon = $('btnRefresh').querySelector('i');
-  if (icon) icon.classList.add('spin');
-  loadDashboardData();
-  setTimeout(() => { if (icon) icon.classList.remove('spin'); }, 600);
-});
-
-// ============================
-// 2. PARTNER ONBOARDING
-// ============================
-
-function loadOnboardingRequests() {
-  const tbody = $('onboardingTableBody');
-  if (!tbody) return;
-  db.ref('onboarding_requests').on('value', (snap) => {
-    const requests = snap.val() || {};
-    const keys = Object.keys(requests);
-    if (keys.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No onboarding requests found.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = keys.map((key) => {
-      const r = requests[key];
-      return '<tr>' +
-        '<td>' + escapeHtml(r.businessName || '—') + '</td>' +
-        '<td>' + escapeHtml(r.ownerName || '—') + '</td>' +
-        '<td>' + escapeHtml(r.email || '—') + '</td>' +
-        '<td>' + escapeHtml(r.phone || '—') + '</td>' +
-        '<td>' + formatDate(r.submittedAt) + '</td>' +
-        '<td class="actions-cell">' +
-        '<button class="btn btn-sm btn-success" onclick="approveRequest(\'' + key + '\', event)" title="Approve"><i data-lucide="check-circle" class="icon-sm"></i></button> ' +
-        '<button class="btn btn-sm btn-danger" onclick="rejectRequest(\'' + key + '\', event)" title="Reject"><i data-lucide="x-circle" class="icon-sm"></i></button>' +
-        '</td>' +
-        '</tr>';
-    }).join('');
-    if (window.lucide) lucide.createIcons();
-  });
-}
-
-async function approveRequest(key, event) {
-  if (event) event.stopPropagation();
-  const snap = await db.ref('onboarding_requests/' + key).once('value');
-  const data = snap.val();
-  if (!data) { showToast('Request not found', 'error'); return; }
-
-  try {
-    const businessId = 'biz_' + Date.now();
-    const outletId = 'outlet_' + Date.now();
-    const adminPassword = 'Admin@' + Math.random().toString(36).slice(2, 8).toUpperCase();
-    const adminEmail = data.email;
-
-    const businessNode = {
-      name: data.businessName || 'New Business',
-      email: data.email || '',
-      phone: data.phone || '',
-      ownerName: data.ownerName || '',
-      commission: 15,
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      createdBy: currentUser ? currentUser.uid : 'system'
-    };
-
-    const outletNode = {
-      name: data.outletName || data.businessName || 'Main Outlet',
-      address: data.address || '',
-      phone: data.phone || '',
-      meta: {
-        cuisine: data.cuisine || '',
-        openingHours: data.openingHours || '9:00 AM - 10:00 PM',
-        status: 'active',
-        deliveryRadius: data.deliveryRadius || 5
-      },
-      createdAt: firebase.database.ServerValue.TIMESTAMP
-    };
-
-    const updates = {};
-    updates['businesses/' + businessId] = businessNode;
-    updates['businesses/' + businessId + '/outlets/' + outletId] = outletNode;
-    updates['system/admins/' + businessId] = {
-      email: adminEmail,
-      businessId: businessId,
-      outletId: outletId,
-      role: 'business_admin',
-      createdAt: firebase.database.ServerValue.TIMESTAMP
-    };
-    updates['system/businessIndex/' + adminEmail.replace(/\./g, ',')] = {
-      businessId: businessId,
-      outletId: outletId,
-      name: businessNode.name
-    };
-    updates['onboarding_history/' + key] = Object.assign({}, data, {
-      approvedAt: firebase.database.ServerValue.TIMESTAMP,
-      approvedBy: currentUser ? currentUser.email : 'system',
-      businessId: businessId,
-      outletId: outletId,
-      status: 'approved'
-    });
-    updates['onboarding_requests/' + key] = null;
-
-    await db.ref().update(updates);
-
-    try {
-      const signupUrl = 'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + firebaseConfig.apiKey;
-      await fetch(signupUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: adminEmail, password: adminPassword, returnSecureToken: true })
-      });
-    } catch (signupErr) {
-      console.warn('Auth account creation via REST failed (may need Admin SDK):', signupErr);
-    }
-
-    showSuccessDialog(adminEmail, adminPassword, businessNode.name);
-    showToast('Request approved successfully', 'success');
-  } catch (err) {
-    console.error('Approve error:', err);
-    showToast('Error approving request: ' + err.message, 'error');
-  }
-}
-
-function showSuccessDialog(email, password, businessName) {
-  const modal = $('successDialog');
-  if (!modal) return;
-  const body = $('successDialogBody');
-  if (body) {
-    body.innerHTML = '<p><strong>Business:</strong> ' + escapeHtml(businessName) + '</p>' +
-      '<p><strong>Email:</strong> ' + escapeHtml(email) + '</p>' +
-      '<p><strong>Password:</strong> <code>' + escapeHtml(password) + '</code></p>' +
-      '<p class="text-warning">Please share these credentials securely with the partner.</p>';
-  }
-  modal.classList.add('active');
-}
-
-$('successDialogClose')?.addEventListener('click', () => {
-  $('successDialog')?.classList.remove('active');
-});
-
-async function rejectRequest(key, event) {
-  if (event) event.stopPropagation();
-  confirmAction('Reject this onboarding request?', async () => {
-    try {
-      const snap = await db.ref('onboarding_requests/' + key).once('value');
-      const data = snap.val();
-      const updates = {};
-      updates['onboarding_history/' + key] = Object.assign({}, data || {}, {
-        rejectedAt: firebase.database.ServerValue.TIMESTAMP,
-        rejectedBy: currentUser ? currentUser.email : 'system',
-        status: 'rejected'
-      });
-      updates['onboarding_requests/' + key] = null;
-      await db.ref().update(updates);
-      showToast('Request rejected', 'info');
-    } catch (err) {
-      showToast('Error: ' + err.message, 'error');
-    }
-  });
-}
-
-$('provisionBtn')?.addEventListener('click', () => {
-  $('onboardingModal')?.classList.add('active');
-});
-
-$('onboardingModalClose')?.addEventListener('click', () => {
-  $('onboardingModal')?.classList.remove('active');
-});
-
-$('saveOnboarding')?.addEventListener('click', async () => {
-  const data = {
-    businessName: $('onboardBizName')?.value,
-    ownerName: $('onboardOwnerName')?.value,
-    email: $('onboardEmail')?.value,
-    phone: $('onboardPhone')?.value,
-    address: $('onboardAddress')?.value,
-    cuisine: $('onboardCuisine')?.value,
-    outletName: $('onboardOutletName')?.value,
-    submittedAt: firebase.database.ServerValue.TIMESTAMP,
-    provisionedBy: currentUser ? currentUser.email : 'system'
-  };
-  if (!data.businessName || !data.email) { showToast('Business name and email are required', 'error'); return; }
-  try {
-    const key = db.ref('onboarding_requests').push().key;
-    await db.ref('onboarding_requests/' + key).set(data);
-    showToast('Business provisioned successfully', 'success');
-    $('onboardingModal')?.classList.remove('active');
-    document.querySelectorAll('#onboardingModal input, #onboardingModal textarea').forEach((el) => el.value = '');
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-});
-
-// ============================
-// 3. BUSINESSES
-// ============================
-
-function loadBusinesses() {
-  const tbody = $('businessesTableBody');
-  if (!tbody) return;
-  db.ref('businesses').on('value', (snap) => {
-    businessesData = snap.val() || {};
-    renderBusinessesTable();
-  });
-}
-
-$('businessSearch')?.addEventListener('input', (e) => {
-  businessFilter = e.target.value.toLowerCase();
-  renderBusinessesTable();
-});
-
-$('myBusinessesOnly')?.addEventListener('change', () => {
-  renderBusinessesTable();
-});
-
-function renderBusinessesTable() {
-  const tbody = $('businessesTableBody');
-  if (!tbody) return;
-  const showMine = $('myBusinessesOnly')?.checked;
-  const adminEmail = currentUser ? currentUser.email : '';
-  const entries = Object.entries(businessesData);
-  const filtered = entries.filter(([bid, biz]) => {
-    if (businessFilter && !biz.name?.toLowerCase().includes(businessFilter)) return false;
-    if (showMine && biz.email !== adminEmail) return false;
-    return true;
-  });
-
-  const pageSize = 15;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  if (currentPage.businesses > totalPages) currentPage.businesses = totalPages;
-  const start = (currentPage.businesses - 1) * pageSize;
-  const page = filtered.slice(start, start + pageSize);
-
-  if (page.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No businesses found.</td></tr>';
-    renderPagination('businessesPagination', totalPages, currentPage.businesses, (p) => { currentPage.businesses = p; renderBusinessesTable(); });
-    return;
-  }
-
-  tbody.innerHTML = page.map(([bid, biz]) => {
-    const outletCount = biz.outlets ? Object.keys(biz.outlets).length : 0;
-    const orderCount = countBusinessOrders(biz);
-    return '<tr>' +
-      '<td>' + escapeHtml(biz.name || 'Unnamed') + '</td>' +
-      '<td>' + escapeHtml(biz.email || '—') + '</td>' +
-      '<td>' + escapeHtml(biz.phone || '—') + '</td>' +
-      '<td>' + outletCount + '</td>' +
-      '<td>' + orderCount + '</td>' +
-      '<td class="actions-cell">' +
-      '<button class="btn btn-sm btn-outline" onclick="editBusiness(\'' + bid + '\')" title="Edit"><i data-lucide="edit" class="icon-sm"></i></button> ' +
-      '<button class="btn btn-sm btn-outline" onclick="showCommissionModal(\'' + bid + '\')" title="Commission"><i data-lucide="percent" class="icon-sm"></i></button>' +
-      '</td>' +
-      '</tr>';
-  }).join('');
-  if (window.lucide) lucide.createIcons();
-  renderPagination('businessesPagination', totalPages, currentPage.businesses, (p) => { currentPage.businesses = p; renderBusinessesTable(); });
-}
-
-function countBusinessOrders(biz) {
-  let count = 0;
-  if (biz.outlets) {
-    Object.values(biz.outlets).forEach((outlet) => {
-      if (outlet.orders) count += Object.keys(outlet.orders).length;
-    });
-  }
-  return count;
-}
-
-function editBusiness(bid) {
-  const biz = businessesData[bid];
-  if (!biz) return;
-  const modal = $('outletEditModal');
-  if (!modal) return;
-  $('editBid')?.value = bid;
-  $('editBizName')?.value = biz.name || '';
-  $('editBizEmail')?.value = biz.email || '';
-  $('editBizPhone')?.value = biz.phone || '';
-
-  const outletSelect = $('editOutletSelect');
-  if (outletSelect && biz.outlets) {
-    outletSelect.innerHTML = '<option value="">Select Outlet...</option>' +
-      Object.keys(biz.outlets).map((oid) => '<option value="' + oid + '">' + escapeHtml(biz.outlets[oid].name || 'Outlet') + '</option>').join('');
-  }
-  modal.classList.add('active');
-}
-
-$('editOutletSelect')?.addEventListener('change', () => {
-  const bid = $('editBid')?.value;
-  const oid = $('editOutletSelect')?.value;
-  if (!bid || !oid) return;
-  const outlet = businessesData[bid]?.outlets?.[oid];
-  if (!outlet) return;
-  $('editOutletName')?.value = outlet.name || '';
-  $('editOutletAddress')?.value = outlet.address || '';
-  $('editOutletPhone')?.value = outlet.phone || '';
-  if (outlet.meta) {
-    $('editOutletCuisine')?.value = outlet.meta.cuisine || '';
-    $('editOutletHours')?.value = outlet.meta.openingHours || '';
-    $('editOutletRadius')?.value = outlet.meta.deliveryRadius || 5;
-  }
-});
-
-$('saveOutletEdit')?.addEventListener('click', async () => {
-  const bid = $('editBid')?.value;
-  const oid = $('editOutletSelect')?.value;
-  if (!bid || !oid) { showToast('Select an outlet to edit', 'error'); return; }
-  try {
-    const updates = {};
-    updates['businesses/' + bid + '/outlets/' + oid + '/name'] = $('editOutletName')?.value || '';
-    updates['businesses/' + bid + '/outlets/' + oid + '/address'] = $('editOutletAddress')?.value || '';
-    updates['businesses/' + bid + '/outlets/' + oid + '/phone'] = $('editOutletPhone')?.value || '';
-    updates['businesses/' + bid + '/outlets/' + oid + '/meta/cuisine'] = $('editOutletCuisine')?.value || '';
-    updates['businesses/' + bid + '/outlets/' + oid + '/meta/openingHours'] = $('editOutletHours')?.value || '';
-    updates['businesses/' + bid + '/outlets/' + oid + '/meta/deliveryRadius'] = parseInt($('editOutletRadius')?.value) || 5;
-    await db.ref().update(updates);
-    showToast('Outlet updated successfully', 'success');
-    $('outletEditModal')?.classList.remove('active');
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-});
-
-$('outletEditModalClose')?.addEventListener('click', () => {
-  $('outletEditModal')?.classList.remove('active');
-});
-
-function showCommissionModal(bid) {
-  const biz = businessesData[bid];
-  if (!biz) return;
-  $('commissionBid')?.value = bid;
-  $('commissionValue')?.value = biz.commission || 15;
-  $('commissionModal')?.classList.add('active');
-}
-
-$('commissionModalClose')?.addEventListener('click', () => {
-  $('commissionModal')?.classList.remove('active');
-});
-
-$('saveCommission')?.addEventListener('click', async () => {
-  const bid = $('commissionBid')?.value;
-  const val = parseFloat($('commissionValue')?.value);
-  if (!bid || isNaN(val) || val < 0 || val > 100) { showToast('Enter a valid commission (0-100)', 'error'); return; }
-  try {
-    await db.ref('businesses/' + bid + '/commission').set(val);
-    showToast('Commission updated', 'success');
-    $('commissionModal')?.classList.remove('active');
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-});
-
-// ============================
-// 4. LIVE ORDERS
-// ============================
-
-function loadAllOrders() {
-  allOrders = {};
-  Object.entries(businessesData).forEach(([bid, biz]) => {
-    if (biz.outlets) {
-      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
-        if (outlet.orders) {
-          Object.entries(outlet.orders).forEach(([orderId, order]) => {
-            allOrders[orderId] = Object.assign({}, order, { bid, oid, storeName: outlet.name || biz.name || 'Unknown' });
-          });
-        }
-        const orderRef = db.ref('businesses/' + bid + '/outlets/' + oid + '/orders');
-        orderRef.on('child_added', (snap) => {
-          const o = snap.val();
-          allOrders[snap.key] = Object.assign({}, o, { bid, oid, storeName: outlet.name || biz.name || 'Unknown' });
-          renderOrders();
-        });
-        orderRef.on('child_changed', (snap) => {
-          const o = snap.val();
-          if (allOrders[snap.key]) Object.assign(allOrders[snap.key], o);
-          renderOrders();
-        });
-        orderRef.on('child_removed', (snap) => {
-          delete allOrders[snap.key];
-          renderOrders();
-        });
-      });
-    }
-  });
-  renderOrders();
-}
-
-$('orderStatusFilter')?.addEventListener('change', (e) => {
-  selectedStatusFilter = e.target.value;
-  renderOrders();
-});
-
-$('orderViewToggle')?.addEventListener('change', (e) => {
-  currentView = e.target.checked ? 'kanban' : 'table';
-  renderOrders();
-});
-
-function renderOrders() {
-  if (currentView === 'kanban') {
-    $('ordersTableView')?.classList.add('hidden');
-    $('ordersKanbanView')?.classList.remove('hidden');
-    renderKanban();
-  } else {
-    $('ordersTableView')?.classList.remove('hidden');
-    $('ordersKanbanView')?.classList.add('hidden');
-    renderOrdersTable();
-  }
-}
-
-function renderOrdersTable() {
-  const tbody = $('ordersTableBody');
-  if (!tbody) return;
-  const orders = Object.values(allOrders).filter((o) => selectedStatusFilter === 'All' || o.status === selectedStatusFilter);
-  orders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
-  if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No orders found.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = orders.map((o) => {
-    const statusClass = (o.status || 'Placed').toLowerCase().replace(/\s+/g, '-');
-    return '<tr>' +
-      '<td>#' + escapeHtml(o.orderId || o._id || '').slice(-8) + '</td>' +
-      '<td>' + escapeHtml(o.storeName) + '</td>' +
-      '<td>' + escapeHtml(o.customerName || o.name || '—') + '</td>' +
-      '<td>\u20B9' + (o.total || 0).toLocaleString('en-IN') + '</td>' +
-      '<td><span class="status-badge status-' + statusClass + '">' + escapeHtml(o.status || 'Placed') + '</span></td>' +
-      '<td>' + formatDate(o.createdAt) + '</td>' +
-      '<td class="actions-cell">' +
-      '<select class="form-select form-select-sm" onchange="updateOrderStatus(\'' + o.bid + '\',\'' + o.oid + '\',\'' + (o.orderId || Object.keys(allOrders).find(k => allOrders[k] === o)) + '\',this.value)">' +
-      '<option value="Placed"' + (o.status === 'Placed' ? ' selected' : '') + '>Placed</option>' +
-      '<option value="Confirmed"' + (o.status === 'Confirmed' ? ' selected' : '') + '>Confirmed</option>' +
-      '<option value="Preparing"' + (o.status === 'Preparing' ? ' selected' : '') + '>Preparing</option>' +
-      '<option value="Out for Delivery"' + (o.status === 'Out for Delivery' ? ' selected' : '') + '>Out for Delivery</option>' +
-      '<option value="Delivered"' + (o.status === 'Delivered' ? ' selected' : '') + '>Delivered</option>' +
-      '<option value="Cancelled"' + (o.status === 'Cancelled' ? ' selected' : '') + '>Cancelled</option>' +
-      '</select>' +
-      '</td>' +
-      '</tr>';
-  }).join('');
-}
-
-const ORDER_STATUSES = ['Placed', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'];
-
-function renderKanban() {
-  const container = $('kanbanContainer');
-  if (!container) return;
-  const columns = ORDER_STATUSES.map((status) => {
-    const orders = Object.values(allOrders).filter((o) => (o.status || 'Placed') === status);
-    return '<div class="kanban-column" data-status="' + status + '" ondrop="handleDrop(event)" ondragover="handleDragOver(event)">' +
-      '<div class="kanban-header">' +
-      '<span class="kanban-title">' + status + '</span>' +
-      '<span class="kanban-count">' + orders.length + '</span>' +
-      '</div>' +
-      '<div class="kanban-body">' +
-      orders.map((o) => {
-        const orderKey = o.orderId || Object.keys(allOrders).find(k => allOrders[k] === o) || '';
-        return '<div class="kanban-card" draggable="true" ' +
-          'ondragstart="handleDragStart(event, \'' + o.bid + '\', \'' + o.oid + '\', \'' + orderKey + '\')" ' +
-          'data-order-id="' + orderKey + '">' +
-          '<div class="kanban-card-id">#' + escapeHtml(orderKey).slice(-8) + '</div>' +
-          '<div class="kanban-card-store">' + escapeHtml(o.storeName) + '</div>' +
-          '<div class="kanban-card-customer">' + escapeHtml(o.customerName || o.name || '—') + '</div>' +
-          '<div class="kanban-card-total">\u20B9' + (o.total || 0).toLocaleString('en-IN') + '</div>' +
-          '</div>';
-      }).join('') +
-      '</div>' +
-      '</div>';
-  }).join('');
-  container.innerHTML = columns.join('');
-}
-
-function handleDragStart(event, bid, oid, orderId) {
-  currentDragOrder = { bid, oid, orderId };
-  event.dataTransfer.effectAllowed = 'move';
-  event.dataTransfer.setData('text/plain', JSON.stringify(currentDragOrder));
-}
-
-function handleDragOver(event) {
-  event.preventDefault();
-  event.dataTransfer.dropEffect = 'move';
-  const column = event.target.closest('.kanban-column');
-  if (column) column.classList.add('drag-over');
-}
-
-document.addEventListener('dragend', () => {
-  document.querySelectorAll('.kanban-column').forEach((c) => c.classList.remove('drag-over'));
-});
-
-function handleDrop(event) {
-  event.preventDefault();
-  const column = event.target.closest('.kanban-column');
-  if (!column) return;
-  const newStatus = column.dataset.status;
-  if (!currentDragOrder) {
-    try { currentDragOrder = JSON.parse(event.dataTransfer.getData('text/plain')); } catch (e) { return; }
-  }
-  if (currentDragOrder && newStatus) {
-    updateOrderStatus(currentDragOrder.bid, currentDragOrder.oid, currentDragOrder.orderId, newStatus);
-  }
-  currentDragOrder = null;
-  document.querySelectorAll('.kanban-column').forEach((c) => c.classList.remove('drag-over'));
-}
-
-async function updateOrderStatus(bid, oid, orderId, status) {
-  if (!bid || !oid || !orderId) return;
-  try {
-    await db.ref('businesses/' + bid + '/outlets/' + oid + '/orders/' + orderId + '/status').set(status);
-
-    const order = allOrders[orderId];
-    if (order && status === 'Delivered' && order.riderId) {
-      const riderRef = db.ref('riders/' + order.riderId);
-      const riderSnap = await riderRef.once('value');
-      const rider = riderSnap.val();
-      if (rider) {
-        await riderRef.update({
-          totalDeliveries: (rider.totalDeliveries || 0) + 1,
-          totalEarnings: (rider.totalEarnings || 0) + (order.deliveryFee || 0),
-          lastDelivery: firebase.database.ServerValue.TIMESTAMP
-        });
+        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8 } }
       }
     }
-
-    showToast('Order status updated to ' + status, 'success');
-  } catch (err) {
-    console.error('Status update error:', err);
-    showToast('Error updating status', 'error');
-  }
-}
-
-// ============================
-// 5. RIDERS
-// ============================
-
-function loadRiders() {
-  const tbody = $('ridersTableBody');
-  if (!tbody) return;
-  db.ref('riders').on('value', (snap) => {
-    allRiders = snap.val() || {};
-    renderRidersTable();
   });
 }
 
-$('riderSearch')?.addEventListener('input', (e) => {
-  riderFilter = e.target.value.toLowerCase();
-  renderRidersTable();
+$('btnRefresh').addEventListener('click', () => {
+  if (currentTab === 'dashboard') initDashboard();
 });
 
-function renderRidersTable() {
-  const tbody = $('ridersTableBody');
-  if (!tbody) return;
-  const entries = Object.entries(allRiders).filter(([uid, r]) => {
-    const name = (r.name || r.displayName || '').toLowerCase();
-    const email = (r.email || '').toLowerCase();
-    const phone = (r.phone || '').toLowerCase();
-    return !riderFilter || name.includes(riderFilter) || email.includes(riderFilter) || phone.includes(riderFilter);
+// ======================== ONBOARDING ========================
+
+function initOnboarding() {
+  db.ref('onboarding_requests').off();
+  db.ref('onboarding_requests').on('value', (snap) => {
+    const data = snap.val() || {};
+    const tbody = $('onboardingBody');
+    if (!tbody) return;
+    const entries = Object.entries(data);
+    if (!entries.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No onboarding requests</td></tr>';
+      return;
+    }
+    tbody.innerHTML = entries.map(([id, req]) =>
+      `<tr>
+        <td>${escapeHtml(req.businessName || '-')}</td>
+        <td>${escapeHtml(req.ownerName || '-')}</td>
+        <td>${escapeHtml(req.email || '-')}</td>
+        <td>${escapeHtml(req.phone || '-')}</td>
+        <td>${escapeHtml(req.address || '-')}</td>
+        <td>${escapeHtml(req.outletName || '-')}</td>
+        <td>${formatDate(req.timestamp || req.createdAt)}</td>
+        <td><span class="badge badge-${req.status === 'approved' ? 'success' : req.status === 'rejected' ? 'danger' : 'warning'}">${escapeHtml(req.status || 'pending')}</span></td>
+        <td class="action-cell">
+          ${req.status !== 'approved' ? `<button class="btn btn-sm btn-success" onclick="approveOnboarding('${id}')">Approve</button>` : ''}
+          ${req.status !== 'rejected' ? `<button class="btn btn-sm btn-danger" onclick="rejectOnboarding('${id}')">Reject</button>` : ''}
+        </td>
+      </tr>`
+    ).join('');
   });
+}
 
-  const pageSize = 20;
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
-  if (currentPage.riders > totalPages) currentPage.riders = totalPages;
-  const start = (currentPage.riders - 1) * pageSize;
-  const page = entries.slice(start, start + pageSize);
+window.approveOnboarding = async (id) => {
+  confirmAction('Approve this onboarding request?', async () => {
+    try {
+      const snap = await db.ref(`onboarding_requests/${id}`).once('value');
+      const req = snap.val();
+      if (!req) throw new Error('Request not found');
+      const bid = req.businessId || `biz_${Date.now()}`;
+      const oid = `outlet_${Date.now()}`;
+      const updates = {};
+      updates[`businesses/${bid}`] = {
+        name: req.businessName || 'Unnamed Business',
+        ownerName: req.ownerName || '',
+        email: req.email || '',
+        phone: req.phone || '',
+        address: req.address || '',
+        slug: req.slug || bid,
+        status: 'active',
+        createdAt: firebase.database.ServerValue.TIMESTAMP
+      };
+      updates[`businesses/${bid}/outlets/${oid}`] = {
+        name: req.outletName || 'Main Outlet',
+        address: req.address || '',
+        phone: req.phone || '',
+        lat: req.lat || 0,
+        lng: req.lng || 0,
+        status: 'active',
+        createdAt: firebase.database.ServerValue.TIMESTAMP
+      };
+      updates[`onboarding_requests/${id}/status`] = 'approved';
+      updates[`onboarding_requests/${id}/approvedAt`] = firebase.database.ServerValue.TIMESTAMP;
+      await db.ref().update(updates);
+      showToast('Onboarding approved successfully', 'success');
+    } catch (err) {
+      showToast('Approve failed: ' + err.message, 'error');
+    }
+  });
+};
 
-  if (page.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No riders found.</td></tr>';
-    renderPagination('ridersPagination', totalPages, currentPage.riders, (p) => { currentPage.riders = p; renderRidersTable(); });
+window.rejectOnboarding = async (id) => {
+  confirmAction('Reject this onboarding request? It will be removed.', async () => {
+    try {
+      await db.ref(`onboarding_requests/${id}`).remove();
+      showToast('Request rejected and removed', 'success');
+    } catch (err) {
+      showToast('Reject failed: ' + err.message, 'error');
+    }
+  });
+};
+
+$('btnProvisionNode').addEventListener('click', () => {
+  $('onboardingModal').style.display = 'flex';
+});
+$('onboardingModalClose').addEventListener('click', () => {
+  $('onboardingModal').style.display = 'none';
+});
+$('onboardingSave').addEventListener('click', async () => {
+  const data = {
+    businessName: $('onboardingBusinessName').value.trim(),
+    ownerName: $('onboardingOwnerName').value.trim(),
+    email: $('onboardingAdminEmail').value.trim(),
+    phone: $('onboardingAdminPhone').value.trim(),
+    address: $('onboardingAddress').value.trim(),
+    outletName: $('onboardingOutletName').value.trim(),
+    businessId: $('onboardingBusinessId').value.trim() || `biz_${Date.now()}`,
+    slug: $('onboardingSlug').value.trim() || $('onboardingBusinessId').value.trim() || `biz_${Date.now()}`,
+    lat: parseFloat($('onboardingLat').value) || 0,
+    lng: parseFloat($('onboardingLng').value) || 0,
+    timestamp: firebase.database.ServerValue.TIMESTAMP,
+    status: 'approved'
+  };
+  if (!data.businessName || !data.email) {
+    showToast('Business name and email are required', 'error');
     return;
   }
+  try {
+    const bid = data.businessId;
+    const oid = `outlet_${Date.now()}`;
+    const updates = {};
+    updates[`businesses/${bid}`] = {
+      name: data.businessName, ownerName: data.ownerName, email: data.email,
+      phone: data.phone, address: data.address, slug: data.slug,
+      status: 'active', createdAt: firebase.database.ServerValue.TIMESTAMP
+    };
+    updates[`businesses/${bid}/outlets/${oid}`] = {
+      name: data.outletName, address: data.address, phone: data.phone,
+      lat: data.lat, lng: data.lng, status: 'active',
+      createdAt: firebase.database.ServerValue.TIMESTAMP
+    };
+    await db.ref().update(updates);
+    $('onboardingModal').style.display = 'none';
+    ['onboardingBusinessName', 'onboardingOwnerName', 'onboardingAdminEmail',
+     'onboardingAdminPhone', 'onboardingAddress', 'onboardingOutletName',
+     'onboardingBusinessId', 'onboardingSlug', 'onboardingLat', 'onboardingLng'
+    ].forEach((id) => { $(id).value = ''; });
+    showToast('Business provisioned successfully', 'success');
+  } catch (err) {
+    showToast('Provision failed: ' + err.message, 'error');
+  }
+});
 
-  tbody.innerHTML = page.map(([uid, r]) => {
-    const statusClass = (r.status || 'offline').toLowerCase();
-    return '<tr>' +
-      '<td>' + escapeHtml(r.name || r.displayName || '—') + '</td>' +
-      '<td>' + escapeHtml(r.email || '—') + '</td>' +
-      '<td>' + escapeHtml(r.phone || '—') + '</td>' +
-      '<td><span class="status-dot status-' + statusClass + '"></span> ' + escapeHtml(r.status || 'Offline') + '</td>' +
-      '<td>' + (r.totalDeliveries || 0) + '</td>' +
-      '<td>\u20B9' + (r.totalEarnings || 0).toLocaleString('en-IN') + '</td>' +
-      '<td class="actions-cell">' +
-      '<button class="btn btn-sm btn-outline" onclick="editRider(\'' + uid + '\')" title="Edit"><i data-lucide="edit" class="icon-sm"></i></button> ' +
-      '<button class="btn btn-sm btn-outline" onclick="resetRiderPassword(\'' + escapeHtml(r.email || '') + '\')" title="Reset Password"><i data-lucide="key" class="icon-sm"></i></button> ' +
-      '<button class="btn btn-sm btn-danger" onclick="deleteRider(\'' + uid + '\')" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>' +
-      '</td>' +
-      '</tr>';
-  }).join('');
-  if (window.lucide) lucide.createIcons();
-  renderPagination('ridersPagination', totalPages, currentPage.riders, (p) => { currentPage.riders = p; renderRidersTable(); });
+// ======================== BUSINESSES ========================
+
+let businessesPage = 1;
+let filteredBusinesses = [];
+
+function initBusinesses() {
+  businessesPage = 1;
+  db.ref('businesses').off();
+  db.ref('businesses').on('value', (snap) => {
+    allBusinesses = snap.val() || {};
+    filterBusinesses();
+  });
 }
 
-$('addRiderBtn')?.addEventListener('click', () => {
-  $('riderModal')?.classList.add('active');
-  $('riderModalTitle').textContent = 'Add Rider';
-  ['riderName', 'riderEmail', 'riderPhone', 'riderVehicle'].forEach((id) => {
-    const el = $(id);
-    if (el) el.value = '';
+function filterBusinesses() {
+  const q = ($('businessSearchInput').value || '').toLowerCase().trim();
+  const entries = Object.entries(allBusinesses);
+  filteredBusinesses = q
+    ? entries.filter(([_, b]) =>
+        (b.name || '').toLowerCase().includes(q) ||
+        (b.ownerName || '').toLowerCase().includes(q) ||
+        (b.email || '').toLowerCase().includes(q)
+      )
+    : entries;
+  renderBusinessesPage(1);
+}
+
+$('businessSearchInput').addEventListener('input', () => {
+  businessesPage = 1;
+  filterBusinesses();
+});
+
+function renderBusinessesPage(page) {
+  businessesPage = page;
+  const tbody = $('businessesBody');
+  if (!tbody) return;
+  const totalPages = Math.ceil(filteredBusinesses.length / PAGE_SIZE) || 1;
+  const start = (page - 1) * PAGE_SIZE;
+  const pageEntries = filteredBusinesses.slice(start, start + PAGE_SIZE);
+  if (!pageEntries.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No businesses found</td></tr>';
+    $('businessesPagination').innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = pageEntries.map(([bid, biz]) => {
+    const outlets = biz.outlets ? Object.keys(biz.outlets).length : 0;
+    return `<tr>
+      <td>${escapeHtml(bid)}</td>
+      <td>${escapeHtml(biz.name || '-')}</td>
+      <td>${escapeHtml(biz.ownerName || '-')}</td>
+      <td>${escapeHtml(biz.email || '-')}</td>
+      <td>${escapeHtml(biz.phone || '-')}</td>
+      <td>${outlets}</td>
+      <td class="action-cell">
+        <button class="btn btn-sm btn-primary" onclick="editOutlet('${bid}')">Edit Outlet</button>
+        <button class="btn btn-sm btn-info" onclick="editCommission('${bid}')">Commission</button>
+      </td>
+    </tr>`;
+  }).join('');
+  renderPagination($('businessesPagination'), totalPages, page, renderBusinessesPage);
+}
+
+window.editOutlet = async (bid) => {
+  const biz = allBusinesses[bid];
+  if (!biz) return;
+  const outlets = biz.outlets || {};
+  const oids = Object.keys(outlets);
+  if (!oids.length) {
+    showToast('No outlets found for this business', 'error');
+    return;
+  }
+  const oid = oids[0];
+  const outlet = outlets[oid];
+  $('editOutletName').value = outlet.name || '';
+  $('editOutletAddress').value = outlet.address || '';
+  $('editOutletPhone').value = outlet.phone || '';
+  $('editOutletLat').value = outlet.lat || '';
+  $('editOutletLng').value = outlet.lng || '';
+  $('outletEditModal').dataset.bid = bid;
+  $('outletEditModal').dataset.oid = oid;
+  $('outletEditModal').style.display = 'flex';
+};
+
+$('outletEditClose').addEventListener('click', () => {
+  $('outletEditModal').style.display = 'none';
+});
+
+$('outletEditSave').addEventListener('click', async () => {
+  const modal = $('outletEditModal');
+  const bid = modal.dataset.bid;
+  const oid = modal.dataset.oid;
+  try {
+    await db.ref(`businesses/${bid}/outlets/${oid}`).update({
+      name: $('editOutletName').value.trim(),
+      address: $('editOutletAddress').value.trim(),
+      phone: $('editOutletPhone').value.trim(),
+      lat: parseFloat($('editOutletLat').value) || 0,
+      lng: parseFloat($('editOutletLng').value) || 0,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    $('outletEditModal').style.display = 'none';
+    showToast('Outlet updated successfully', 'success');
+  } catch (err) {
+    showToast('Update failed: ' + err.message, 'error');
+  }
+});
+
+window.editCommission = (bid) => {
+  const biz = allBusinesses[bid];
+  const comm = biz.commission || {};
+  $('commissionPercent').value = comm.percent || comm.percentage || '';
+  $('commissionFixedFee').value = comm.fixedFee || comm.fixed_fee || '';
+  $('commissionModal').dataset.bid = bid;
+  $('commissionModal').style.display = 'flex';
+};
+
+$('commissionClose').addEventListener('click', () => {
+  $('commissionModal').style.display = 'none';
+});
+
+$('commissionSave').addEventListener('click', async () => {
+  const modal = $('commissionModal');
+  const bid = modal.dataset.bid;
+  try {
+    await db.ref(`businesses/${bid}/commission`).set({
+      percent: parseFloat($('commissionPercent').value) || 0,
+      fixedFee: parseFloat($('commissionFixedFee').value) || 0,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    $('commissionModal').style.display = 'none';
+    showToast('Commission updated', 'success');
+  } catch (err) {
+    showToast('Commission update failed: ' + err.message, 'error');
+  }
+});
+
+// ======================== LIVE ORDERS ========================
+
+let allOrdersData = [];
+let ordersFilterStatus = 'All';
+
+function initLiveOrders() {
+  allOrdersData = [];
+  const promises = [];
+  const allBiz = allBusinesses;
+  const bizSnap = Object.keys(allBiz).length
+    ? Promise.resolve({ val: () => allBiz })
+    : db.ref('businesses').once('value');
+
+  bizSnap.then((snap) => {
+    const data = snap.val ? snap.val() : snap;
+    allOrdersData = [];
+    for (const bid of Object.keys(data || {})) {
+      const biz = data[bid];
+      if (biz.outlets) {
+        for (const oid of Object.keys(biz.outlets)) {
+          const outlet = biz.outlets[oid];
+          if (outlet.orders) {
+            for (const orderId of Object.keys(outlet.orders)) {
+              const order = outlet.orders[orderId];
+              allOrdersData.push({
+                id: orderId,
+                bid,
+                oid,
+                businessName: biz.name || bid,
+                outletName: outlet.name || oid,
+                customerName: order.customerName || order.userName || 'Guest',
+                items: order.items || [],
+                total: order.total || order.amount || 0,
+                status: order.status || 'Pending',
+                paymentMethod: order.paymentMethod || order.payment_mode || '-',
+                paymentStatus: order.paymentStatus || order.payment_status || '-',
+                address: order.deliveryAddress || order.address || '-',
+                timestamp: order.createdAt || order.timestamp || 0
+              });
+            }
+          }
+        }
+      }
+    }
+    allOrdersData.sort((a, b) => b.timestamp - a.timestamp);
+    renderLiveOrders();
+  }).catch((err) => {
+    showToast('Failed to load orders: ' + err.message, 'error');
   });
-  $('saveRiderBtn')?.dataset.mode = 'add';
+}
+
+function renderLiveOrders() {
+  const viewMode = document.querySelector('.orders-view-toggle .active')?.dataset?.view || 'table';
+  const filtered = ordersFilterStatus === 'All'
+    ? allOrdersData : allOrdersData.filter((o) => o.status === ordersFilterStatus);
+
+  $('liveOrdersBody').innerHTML = viewMode === 'table'
+    ? filtered.map((o) =>
+        `<tr draggable="true" data-order-id="${escapeHtml(o.id)}" data-bid="${escapeHtml(o.bid)}" data-oid="${escapeHtml(o.oid)}">
+          <td>${escapeHtml(o.id.slice(-8))}</td>
+          <td>${escapeHtml(o.businessName)}</td>
+          <td>${escapeHtml(o.customerName)}</td>
+          <td>\u20B9${Number(o.total).toLocaleString('en-IN')}</td>
+          <td><span class="badge badge-${o.status.toLowerCase().replace(/\s+/g, '-')}">${o.status}</span></td>
+          <td>${formatDate(o.timestamp)}</td>
+          <td class="action-cell">
+            <select class="form-select form-select-sm" onchange="updateOrderStatus('${escapeHtml(o.bid)}','${escapeHtml(o.oid)}','${escapeHtml(o.id)}',this.value)">
+              <option value="Pending" ${o.status === 'Pending' ? 'selected' : ''}>Pending</option>
+              <option value="Confirmed" ${o.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
+              <option value="Preparing" ${o.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
+              <option value="Out for Delivery" ${o.status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
+              <option value="Delivered" ${o.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+              <option value="Cancelled" ${o.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+            </select>
+          </td>
+        </tr>`).join('')
+    : '';
+
+  const kanbanView = $('ordersKanbanView');
+  if (kanbanView) {
+    if (viewMode === 'kanban') {
+      kanbanView.style.display = 'flex';
+      const statuses = ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'];
+      kanbanView.innerHTML = statuses.map((status) => {
+        const cards = filtered.filter((o) => o.status === status);
+        return `<div class="kanban-column" data-status="${status}">
+          <div class="kanban-header">${status} <span class="kanban-count">${cards.length}</span></div>
+          <div class="kanban-cards" ondragover="event.preventDefault()" ondrop="onKanbanDrop(event, '${status}')">
+            ${cards.map((o) =>
+              `<div class="kanban-card" draggable="true"
+                    data-order-id="${escapeHtml(o.id)}"
+                    data-bid="${escapeHtml(o.bid)}"
+                    data-oid="${escapeHtml(o.oid)}"
+                    ondragstart="onKanbanDragStart(event)">
+                <div class="kanban-card-title">#${escapeHtml(o.id.slice(-8))}</div>
+                <div class="kanban-card-sub">${escapeHtml(o.customerName)}</div>
+                <div class="kanban-card-amount">\u20B9${Number(o.total).toLocaleString('en-IN')}</div>
+              </div>`
+            ).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      kanbanView.style.display = 'none';
+    }
+  }
+}
+
+window.updateOrderStatus = async (bid, oid, orderId, newStatus) => {
+  try {
+    await db.ref(`businesses/${bid}/outlets/${oid}/orders/${orderId}/status`).set(newStatus);
+    showToast(`Order ${orderId.slice(-8)} updated to ${newStatus}`, 'success');
+    initLiveOrders();
+  } catch (err) {
+    showToast('Status update failed: ' + err.message, 'error');
+  }
+};
+
+window.onKanbanDragStart = (e) => {
+  e.dataTransfer.setData('text/plain', JSON.stringify({
+    orderId: e.target.dataset.orderId,
+    bid: e.target.dataset.bid,
+    oid: e.target.dataset.oid
+  }));
+};
+
+window.onKanbanDrop = (e, newStatus) => {
+  e.preventDefault();
+  try {
+    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+    updateOrderStatus(data.bid, data.oid, data.orderId, newStatus);
+  } catch (err) {
+    // ignore
+  }
+};
+
+$('ordersViewToggle')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.view-toggle-btn');
+  if (!btn) return;
+  document.querySelectorAll('.orders-view-toggle .view-toggle-btn').forEach((b) => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLiveOrders();
 });
 
-$('riderModalClose')?.addEventListener('click', () => {
-  $('riderModal')?.classList.remove('active');
+$('ordersViewToggle')?.querySelectorAll('.view-toggle-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.orders-view-toggle .view-toggle-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderLiveOrders();
+  });
 });
 
-$('saveRiderBtn')?.addEventListener('click', async () => {
-  const mode = $('saveRiderBtn')?.dataset.mode || 'add';
-  const name = $('riderName')?.value;
-  const email = $('riderEmail')?.value;
-  const phone = $('riderPhone')?.value;
-  const vehicle = $('riderVehicle')?.value;
+// Status filter buttons for live orders
+document.querySelectorAll('.order-status-filter').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.order-status-filter').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    ordersFilterStatus = btn.dataset.status || 'All';
+    renderLiveOrders();
+  });
+});
 
-  if (!name || !email || !phone) { showToast('Name, email, and phone are required', 'error'); return; }
+// ======================== RIDERS ========================
+
+let ridersPage = 1;
+let filteredRiders = [];
+
+function initRiders() {
+  ridersPage = 1;
+  db.ref('riders').off();
+  db.ref('riders').on('value', (snap) => {
+    allRiders = snap.val() || {};
+    filterRiders();
+  });
+}
+
+function filterRiders() {
+  const q = ($('riderSearchInput').value || '').toLowerCase().trim();
+  const entries = Object.entries(allRiders);
+  filteredRiders = q
+    ? entries.filter(([_, r]) =>
+        (r.name || '').toLowerCase().includes(q) ||
+        (r.email || '').toLowerCase().includes(q) ||
+        (r.phone || '').toLowerCase().includes(q)
+      )
+    : entries;
+  renderRidersPage(1);
+}
+
+$('riderSearchInput').addEventListener('input', () => {
+  ridersPage = 1;
+  filterRiders();
+});
+
+function renderRidersPage(page) {
+  ridersPage = page;
+  const tbody = $('ridersBody');
+  if (!tbody) return;
+  const totalPages = Math.ceil(filteredRiders.length / RIDER_PAGE_SIZE) || 1;
+  const start = (page - 1) * RIDER_PAGE_SIZE;
+  const pageEntries = filteredRiders.slice(start, start + RIDER_PAGE_SIZE);
+  if (!pageEntries.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No riders found</td></tr>';
+    $('ridersPagination').innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = pageEntries.map(([uid, rider]) =>
+    `<tr>
+      <td>${escapeHtml(uid.slice(-8))}</td>
+      <td>${escapeHtml(rider.name || '-')}</td>
+      <td>${escapeHtml(rider.email || '-')}</td>
+      <td>${escapeHtml(rider.phone || '-')}</td>
+      <td>${escapeHtml(rider.status || 'active')}</td>
+      <td>${rider.isOnline ? '<span class="badge badge-success">Online</span>' : '<span class="badge badge-secondary">Offline</span>'}</td>
+      <td>${formatDate(rider.createdAt)}</td>
+      <td class="action-cell">
+        <button class="btn btn-sm btn-primary" onclick="editRider('${uid}')">Edit</button>
+        <button class="btn btn-sm btn-warning" onclick="resetRiderPassword('${uid}')">Reset Pwd</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteRider('${uid}')">Delete</button>
+      </td>
+    </tr>`
+  ).join('');
+  renderPagination($('ridersPagination'), totalPages, page, renderRidersPage);
+}
+
+$('btnAddRider').addEventListener('click', () => {
+  $('riderModal').dataset.mode = 'add';
+  $('riderModal').dataset.uid = '';
+  ['riderName', 'riderEmail', 'riderPassword', 'riderPhone',
+   'riderFatherName', 'riderAge', 'riderAadharNo', 'riderQualification', 'riderAddress'
+  ].forEach((id) => { $(id).value = ''; });
+  $('riderPassword').style.display = 'block';
+  $('riderModal').querySelector('.modal-title').textContent = 'Add Rider';
+  $('riderModal').style.display = 'flex';
+});
+
+$('riderClose').addEventListener('click', () => {
+  $('riderModal').style.display = 'none';
+});
+
+$('riderSave').addEventListener('click', async () => {
+  const mode = $('riderModal').dataset.mode;
+  const uid = $('riderModal').dataset.uid;
+  const name = $('riderName').value.trim();
+  const email = $('riderEmail').value.trim();
+  const password = $('riderPassword').value;
+  const phone = $('riderPhone').value.trim();
+
+  if (!name || !email) {
+    showToast('Name and email are required', 'error');
+    return;
+  }
+  if (mode === 'add' && !password) {
+    showToast('Password is required for new riders', 'error');
+    return;
+  }
 
   try {
     if (mode === 'add') {
-      const password = 'Rider@' + Math.random().toString(36).slice(2, 8).toUpperCase();
-      const signupUrl = 'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + firebaseConfig.apiKey;
-      const resp = await fetch(signupUrl, {
+      const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, returnSecureToken: true })
       });
-      const authData = await resp.json();
-      if (authData.error) throw new Error(authData.error.message);
-
-      const uid = authData.localId;
-      await db.ref('riders/' + uid).set({
-        name,
-        email,
-        phone,
-        vehicle: vehicle || '',
-        status: 'Offline',
-        totalDeliveries: 0,
-        totalEarnings: 0,
-        createdAt: firebase.database.ServerValue.TIMESTAMP,
-        createdBy: currentUser ? currentUser.email : 'system'
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error?.message || 'Auth creation failed');
+      const riderUid = data.localId;
+      await db.ref(`riders/${riderUid}`).set({
+        name, email, phone,
+        fatherName: $('riderFatherName').value.trim(),
+        age: parseInt($('riderAge').value) || 0,
+        aadharNo: $('riderAadharNo').value.trim(),
+        qualification: $('riderQualification').value.trim(),
+        address: $('riderAddress').value.trim(),
+        status: 'active',
+        isOnline: false,
+        createdAt: firebase.database.ServerValue.TIMESTAMP
       });
-
-      showToast('Rider added. Password: ' + password, 'success');
+      showToast('Rider added successfully', 'success');
     } else {
-      const uid = $('saveRiderBtn')?.dataset.uid;
-      if (!uid) return;
-      await db.ref('riders/' + uid).update({ name, email, phone, vehicle });
-      showToast('Rider updated', 'success');
+      const updates = {
+        name, email, phone,
+        fatherName: $('riderFatherName').value.trim(),
+        age: parseInt($('riderAge').value) || 0,
+        aadharNo: $('riderAadharNo').value.trim(),
+        qualification: $('riderQualification').value.trim(),
+        address: $('riderAddress').value.trim(),
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+      };
+      await db.ref(`riders/${uid}`).update(updates);
+      showToast('Rider updated successfully', 'success');
     }
-    $('riderModal')?.classList.remove('active');
+    $('riderModal').style.display = 'none';
   } catch (err) {
-    console.error('Rider save error:', err);
-    showToast('Error: ' + err.message, 'error');
+    showToast('Rider save failed: ' + err.message, 'error');
   }
 });
 
-function editRider(uid) {
-  const r = allRiders[uid];
-  if (!r) return;
-  $('riderModal')?.classList.add('active');
-  $('riderModalTitle').textContent = 'Edit Rider';
-  $('riderName').value = r.name || r.displayName || '';
-  $('riderEmail').value = r.email || '';
-  $('riderPhone').value = r.phone || '';
-  $('riderVehicle').value = r.vehicle || '';
-  $('saveRiderBtn').dataset.mode = 'edit';
-  $('saveRiderBtn').dataset.uid = uid;
-}
+window.editRider = (uid) => {
+  const rider = allRiders[uid];
+  if (!rider) return;
+  $('riderModal').dataset.mode = 'edit';
+  $('riderModal').dataset.uid = uid;
+  $('riderName').value = rider.name || '';
+  $('riderEmail').value = rider.email || '';
+  $('riderPassword').value = '';
+  $('riderPassword').style.display = 'none';
+  $('riderPhone').value = rider.phone || '';
+  $('riderFatherName').value = rider.fatherName || '';
+  $('riderAge').value = rider.age || '';
+  $('riderAadharNo').value = rider.aadharNo || '';
+  $('riderQualification').value = rider.qualification || '';
+  $('riderAddress').value = rider.address || '';
+  $('riderModal').querySelector('.modal-title').textContent = 'Edit Rider';
+  $('riderModal').style.display = 'flex';
+};
 
-function resetRiderPassword(email) {
-  if (!email) { showToast('No email address', 'error'); return; }
-  confirmAction('Send password reset email to ' + email + '?', async () => {
-    try {
-      await auth.sendPasswordResetEmail(email);
-      showToast('Password reset email sent to ' + email, 'success');
-    } catch (err) {
-      showToast('Error: ' + err.message, 'error');
-    }
-  });
-}
-
-function deleteRider(uid) {
-  confirmAction('Delete this rider permanently?', async () => {
-    try {
-      await db.ref('riders/' + uid).remove();
-      showToast('Rider deleted', 'success');
-    } catch (err) {
-      showToast('Error: ' + err.message, 'error');
-    }
-  });
-}
-
-// ============================
-// 6. USERS
-// ============================
-
-function loadUsers() {
-  const tbody = $('usersTableBody');
-  if (!tbody) return;
-  db.ref('users').on('value', (snap) => {
-    allUsers = snap.val() || {};
-    renderUsersTable();
-  });
-}
-
-$('userSearch')?.addEventListener('input', (e) => {
-  userFilter = e.target.value.toLowerCase();
-  renderUsersTable();
-});
-
-function renderUsersTable() {
-  const tbody = $('usersTableBody');
-  if (!tbody) return;
-  const entries = Object.entries(allUsers).filter(([uid, u]) => {
-    const name = (u.name || u.displayName || '').toLowerCase();
-    const email = (u.email || '').toLowerCase();
-    const phone = (u.phone || '').toLowerCase();
-    return !userFilter || name.includes(userFilter) || email.includes(userFilter) || phone.includes(userFilter);
-  });
-
-  const pageSize = 20;
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
-  if (currentPage.users > totalPages) currentPage.users = totalPages;
-  const start = (currentPage.users - 1) * pageSize;
-  const page = entries.slice(start, start + pageSize);
-
-  if (page.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No users found.</td></tr>';
-    renderPagination('usersPagination', totalPages, currentPage.users, (p) => { currentPage.users = p; renderUsersTable(); });
+window.resetRiderPassword = (uid) => {
+  const rider = allRiders[uid];
+  if (!rider || !rider.email) {
+    showToast('Rider email not found', 'error');
     return;
   }
-
-  tbody.innerHTML = page.map(([uid, u]) => {
-    const wallet = u.wallet || 0;
-    return '<tr>' +
-      '<td>' + escapeHtml(u.name || u.displayName || '—') + '</td>' +
-      '<td>' + escapeHtml(u.email || '—') + '</td>' +
-      '<td>' + escapeHtml(u.phone || '—') + '</td>' +
-      '<td>\u20B9' + (typeof wallet === 'number' ? wallet.toLocaleString('en-IN') : wallet) + '</td>' +
-      '<td>' + formatDate(u.createdAt || u.created_at) + '</td>' +
-      '<td class="actions-cell">' +
-      '<button class="btn btn-sm btn-outline" onclick="showWalletModal(\'' + uid + '\')" title="Credit Wallet"><i data-lucide="wallet" class="icon-sm"></i></button> ' +
-      '<button class="btn btn-sm btn-outline" onclick="showWalletHistory(\'' + uid + '\')" title="Wallet History"><i data-lucide="clock" class="icon-sm"></i></button> ' +
-      '<button class="btn btn-sm btn-outline" onclick="resetUserPassword(\'' + escapeHtml(u.email || '') + '\')" title="Reset Password"><i data-lucide="key" class="icon-sm"></i></button>' +
-      '</td>' +
-      '</tr>';
-  }).join('');
-  if (window.lucide) lucide.createIcons();
-  renderPagination('usersPagination', totalPages, currentPage.users, (p) => { currentPage.users = p; renderUsersTable(); });
-}
-
-function showWalletModal(uid) {
-  const u = allUsers[uid];
-  if (!u) return;
-  $('walletUid')?.value = uid;
-  $('walletCurrentBalance')?.textContent = '\u20B9' + ((u.wallet || 0).toLocaleString('en-IN'));
-  $('walletAmount')?.value = '';
-  $('walletNote')?.value = '';
-  $('walletModal')?.classList.add('active');
-}
-
-$('walletModalClose')?.addEventListener('click', () => {
-  $('walletModal')?.classList.remove('active');
-});
-
-$('creditWalletBtn')?.addEventListener('click', async () => {
-  const uid = $('walletUid')?.value;
-  const amount = parseFloat($('walletAmount')?.value);
-  const note = $('walletNote')?.value || 'Manual credit';
-  if (!uid || isNaN(amount) || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
-  try {
-    const userRef = db.ref('users/' + uid);
-    const txId = 'txn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-    const tx = {
-      type: 'credit',
-      amount: amount,
-      balance: (allUsers[uid].wallet || 0) + amount,
-      note: note,
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      createdBy: currentUser ? currentUser.email : 'system'
-    };
-    const updates = {};
-    updates['users/' + uid + '/wallet'] = firebase.database.ServerValue.increment(amount);
-    updates['users/' + uid + '/walletHistory/' + txId] = tx;
-    updates['system/auditLogs/' + txId] = Object.assign({}, tx, { userId: uid, action: 'wallet_credit' });
-    await db.ref().update(updates);
-    if (allUsers[uid]) allUsers[uid].wallet = (allUsers[uid].wallet || 0) + amount;
-    showToast('\u20B9' + amount.toLocaleString('en-IN') + ' credited successfully', 'success');
-    $('walletModal')?.classList.remove('active');
-    renderUsersTable();
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-});
-
-function resetUserPassword(email) {
-  if (!email) { showToast('No email address', 'error'); return; }
-  confirmAction('Send password reset email to ' + email + '?', async () => {
+  confirmAction(`Send password reset email to ${rider.email}?`, async () => {
     try {
-      await auth.sendPasswordResetEmail(email);
+      await auth.sendPasswordResetEmail(rider.email);
       showToast('Password reset email sent', 'success');
     } catch (err) {
-      showToast('Error: ' + err.message, 'error');
+      showToast('Reset failed: ' + err.message, 'error');
     }
+  });
+};
+
+window.deleteRider = (uid) => {
+  const rider = allRiders[uid];
+  confirmAction(`Delete rider ${rider?.name || uid}? This cannot be undone.`, async () => {
+    try {
+      await db.ref(`riders/${uid}`).remove();
+      showToast('Rider deleted', 'success');
+    } catch (err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    }
+  });
+};
+
+// ======================== USERS ========================
+
+let usersPage = 1;
+let filteredUsers = [];
+
+function initUsers() {
+  usersPage = 1;
+  db.ref('users').off();
+  db.ref('users').on('value', (snap) => {
+    allUsers = snap.val() || {};
+    filterUsers();
   });
 }
 
-function showWalletHistory(uid) {
-  const u = allUsers[uid];
-  if (!u || !u.walletHistory) { showToast('No wallet history', 'info'); return; }
-  const history = Object.values(u.walletHistory);
-  history.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  const recent = history.slice(0, 5);
-
-  const modal = $('walletHistoryModal');
-  if (!modal) return;
-  const body = $('walletHistoryBody');
-  if (body) {
-    if (recent.length === 0) {
-      body.innerHTML = '<tr><td colspan="4" class="empty-row">No transactions</td></tr>';
-    } else {
-      body.innerHTML = recent.map((t) => {
-        const typeClass = t.type === 'credit' ? 'text-success' : 'text-danger';
-        return '<tr>' +
-          '<td>' + formatDate(t.createdAt) + '</td>' +
-          '<td class="' + typeClass + '">' + escapeHtml(t.type || '—') + '</td>' +
-          '<td>\u20B9' + (t.amount || 0).toLocaleString('en-IN') + '</td>' +
-          '<td>' + escapeHtml(t.note || '—') + '</td>' +
-          '</tr>';
-      }).join('');
-    }
-  }
-  modal.classList.add('active');
+function filterUsers() {
+  const q = ($('userSearchInput').value || '').toLowerCase().trim();
+  const entries = Object.entries(allUsers);
+  filteredUsers = q
+    ? entries.filter(([_, u]) =>
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.phone || '').toLowerCase().includes(q)
+      )
+    : entries;
+  renderUsersPage(1);
 }
 
-$('walletHistoryModalClose')?.addEventListener('click', () => {
-  $('walletHistoryModal')?.classList.remove('active');
+$('userSearchInput').addEventListener('input', () => {
+  usersPage = 1;
+  filterUsers();
 });
 
-$('exportUsersBtn')?.addEventListener('click', () => {
-  const headers = ['Name', 'Email', 'Phone', 'Wallet Balance', 'Created At'];
-  const rows = Object.values(allUsers).map((u) => [
-    u.name || u.displayName || '',
-    u.email || '',
-    u.phone || '',
-    u.wallet || 0,
-    formatDate(u.createdAt || u.created_at)
+function renderUsersPage(page) {
+  usersPage = page;
+  const tbody = $('usersBody');
+  if (!tbody) return;
+  const totalPages = Math.ceil(filteredUsers.length / USER_PAGE_SIZE) || 1;
+  const start = (page - 1) * USER_PAGE_SIZE;
+  const pageEntries = filteredUsers.slice(start, start + USER_PAGE_SIZE);
+  if (!pageEntries.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No users found</td></tr>';
+    $('usersPagination').innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = pageEntries.map(([uid, user]) => {
+    const wallet = user.wallet || 0;
+    return `<tr>
+      <td>${escapeHtml(uid.slice(-8))}</td>
+      <td>${escapeHtml(user.name || '-')}</td>
+      <td>${escapeHtml(user.email || '-')}</td>
+      <td>${escapeHtml(user.phone || '-')}</td>
+      <td>\u20B9${Number(wallet).toLocaleString('en-IN')}</td>
+      <td>${formatDate(user.createdAt)}</td>
+      <td class="action-cell">
+        <button class="btn btn-sm btn-success" onclick="creditWallet('${uid}')">Credit</button>
+        <button class="btn btn-sm btn-info" onclick="viewWalletHistory('${uid}')">Wallet</button>
+        <button class="btn btn-sm btn-warning" onclick="resetUserPassword('${uid}')">Reset Pwd</button>
+      </td>
+    </tr>`;
+  }).join('');
+  renderPagination($('usersPagination'), totalPages, page, renderUsersPage);
+}
+
+$('btnExportUsers').addEventListener('click', () => {
+  const headers = ['UID', 'Name', 'Email', 'Phone', 'Wallet', 'Created At', 'Orders Count'];
+  const rows = filteredUsers.map(([uid, u]) => [
+    uid, u.name || '', u.email || '', u.phone || '',
+    u.wallet || 0, formatDate(u.createdAt), u.orderCount || 0
   ]);
-  exportCSV(headers, rows, 'users_export');
+  exportCSV(headers, rows, `users_export_${Date.now()}.csv`);
   showToast('Users exported', 'success');
 });
 
-// ============================
-// 7. PROMOTIONS
-// ============================
+window.creditWallet = (uid) => {
+  const user = allUsers[uid];
+  $('walletUserName').textContent = user?.name || uid;
+  $('walletUserEmail').textContent = user?.email || '';
+  $('walletAmount').value = '';
+  $('walletReason').value = '';
+  $('walletModal').dataset.uid = uid;
+  $('walletModal').style.display = 'flex';
+};
 
-function loadPromotions() {
-  loadSurge();
-  loadGlobalDiscount();
-  loadPlatformFee();
+$('walletClose').addEventListener('click', () => {
+  $('walletModal').style.display = 'none';
+});
+
+$('walletSave').addEventListener('click', async () => {
+  const uid = $('walletModal').dataset.uid;
+  const amount = parseFloat($('walletAmount').value);
+  const reason = $('walletReason').value.trim() || 'Admin credit';
+  if (!amount || amount <= 0) {
+    showToast('Enter a valid amount', 'error');
+    return;
+  }
+  try {
+    const walletRef = db.ref(`users/${uid}/wallet`);
+    await walletRef.transaction((current) => (current || 0) + amount);
+    await db.ref(`users/${uid}/walletHistory`).push({
+      amount,
+      type: 'credit',
+      reason,
+      timestamp: firebase.database.ServerValue.TIMESTAMP,
+      adminId: auth.currentUser?.uid || 'admin'
+    });
+    $('walletModal').style.display = 'none';
+    showToast(`\u20B9${amount} credited to wallet`, 'success');
+  } catch (err) {
+    showToast('Wallet credit failed: ' + err.message, 'error');
+  }
+});
+
+window.viewWalletHistory = async (uid) => {
+  const user = allUsers[uid];
+  $('walletHistoryModal').querySelector('.modal-title').textContent =
+    `Wallet History: ${user?.name || uid}`;
+  const listEl = $('walletHistoryModal').querySelector('.wallet-history-list');
+  listEl.innerHTML = '<p class="text-muted">Loading...</p>';
+  $('walletHistoryModal').style.display = 'flex';
+  try {
+    const snap = await db.ref(`users/${uid}/walletHistory`).limitToLast(5).once('value');
+    const data = snap.val() || {};
+    const entries = Object.values(data).reverse();
+    listEl.innerHTML = entries.length
+      ? entries.map((e) =>
+          `<div class="wallet-history-item">
+            <span class="${e.type === 'credit' ? 'text-success' : 'text-danger'}">
+              ${e.type === 'credit' ? '+' : '-'}\u20B9${Math.abs(e.amount).toLocaleString('en-IN')}
+            </span>
+            <span>${escapeHtml(e.reason || '')}</span>
+            <span class="text-muted">${formatDate(e.timestamp)}</span>
+          </div>`
+        ).join('')
+      : '<p class="text-muted">No transactions</p>';
+  } catch (err) {
+    listEl.innerHTML = '<p class="text-danger">Failed to load history</p>';
+  }
+};
+
+$('walletHistoryClose').addEventListener('click', () => {
+  $('walletHistoryModal').style.display = 'none';
+});
+
+window.resetUserPassword = (uid) => {
+  const user = allUsers[uid];
+  if (!user?.email) {
+    showToast('User email not found', 'error');
+    return;
+  }
+  confirmAction(`Send password reset to ${user.email}?`, async () => {
+    try {
+      await auth.sendPasswordResetEmail(user.email);
+      showToast('Password reset email sent', 'success');
+    } catch (err) {
+      showToast('Reset failed: ' + err.message, 'error');
+    }
+  });
+};
+
+// ======================== PROMOTIONS ========================
+
+function initPromotions() {
+  // Surge
+  db.ref('system/promotions/surge').once('value').then((snap) => {
+    const data = snap.val() || {};
+    $('surgeMultiplier').value = data.multiplier || 1;
+    $('surgeThreshold').value = data.threshold || 0;
+    $('surgeStartTime').value = data.startTime || '';
+    $('surgeEndTime').value = data.endTime || '';
+  }).catch(() => {});
+  // Discount
+  db.ref('system/promotions/globalDiscount').once('value').then((snap) => {
+    const data = snap.val() || {};
+    $('discountPercent').value = data.percent || 0;
+    $('discountMaxAmount').value = data.maxAmount || 0;
+    $('discountMinOrder').value = data.minOrder || 0;
+    $('discountActive').checked = data.active !== false;
+  }).catch(() => {});
+  // Platform Fee
+  db.ref('system/config/platformFee').once('value').then((snap) => {
+    const data = snap.val() || {};
+    $('platformFee').value = data.amount || 0;
+    $('platformFeeActive').checked = data.active !== false;
+  }).catch(() => {});
+  // Coupons
   loadCoupons();
 }
 
-function loadSurge() {
-  const el = $('surgeMultiplier');
-  const reasonEl = $('surgeReason');
-  if (!el || !reasonEl) return;
-  db.ref('system/promotions/surge').on('value', (snap) => {
-    allPromotions.surge = snap.val() || {};
-    el.value = allPromotions.surge.multiplier || 1.0;
-    reasonEl.value = allPromotions.surge.reason || '';
-  });
-}
-
-$('saveSurgeBtn')?.addEventListener('click', async () => {
+$('btnApplySurge').addEventListener('click', async () => {
   try {
     await db.ref('system/promotions/surge').set({
-      multiplier: parseFloat($('surgeMultiplier')?.value || 1.0),
-      reason: $('surgeReason')?.value || '',
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      updatedBy: currentUser ? currentUser.email : 'system'
+      multiplier: parseFloat($('surgeMultiplier').value) || 1,
+      threshold: parseInt($('surgeThreshold').value) || 0,
+      startTime: $('surgeStartTime').value || '',
+      endTime: $('surgeEndTime').value || '',
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
     });
     showToast('Surge pricing updated', 'success');
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Failed: ' + err.message, 'error');
   }
 });
-
-function loadGlobalDiscount() {
-  const el = $('discountPercent');
-  if (!el) return;
-  db.ref('system/promotions/globalDiscount').on('value', (snap) => {
-    allPromotions.discount = snap.val() || {};
-    el.value = allPromotions.discount.percent || 0;
-  });
-}
-
-$('saveDiscountBtn')?.addEventListener('click', async () => {
-  try {
-    await db.ref('system/promotions/globalDiscount').set({
-      percent: parseFloat($('discountPercent')?.value || 0),
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      updatedBy: currentUser ? currentUser.email : 'system'
-    });
-    showToast('Global discount updated', 'success');
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-});
-
-function loadPlatformFee() {
-  const el = $('platformFee');
-  if (!el) return;
-  db.ref('system/config/platformFee').on('value', (snap) => {
-    allPromotions.platformFee = snap.val() || 0;
-    el.value = allPromotions.platformFee;
-  });
-}
-
-$('savePlatformFeeBtn')?.addEventListener('click', async () => {
-  try {
-    await db.ref('system/config/platformFee').set({
-      fee: parseFloat($('platformFee')?.value || 0),
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      updatedBy: currentUser ? currentUser.email : 'system'
-    });
-    showToast('Platform fee updated', 'success');
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-});
-
-// --- Coupons ---
 
 function loadCoupons() {
-  const tbody = $('couponsTableBody');
-  if (!tbody) return;
+  db.ref('system/promotions/coupons').off();
   db.ref('system/promotions/coupons').on('value', (snap) => {
-    allCoupons = snap.val() || {};
-    renderCoupons();
+    const data = snap.val() || {};
+    const tbody = $('promotionsBody');
+    if (!tbody) return;
+    const entries = Object.entries(data);
+    if (!entries.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No coupons</td></tr>';
+      return;
+    }
+    tbody.innerHTML = entries.map(([cid, cp]) =>
+      `<tr>
+        <td>${escapeHtml(cp.code || cid)}</td>
+        <td>${escapeHtml(cp.type || 'flat')}</td>
+        <td>${cp.type === 'percent' ? cp.value + '%' : '\u20B9' + (cp.value || 0)}</td>
+        <td>\u20B9${(cp.minOrder || 0)}</td>
+        <td>${cp.usageLimit || 'Unlimited'}</td>
+        <td><span class="badge badge-${cp.active !== false ? 'success' : 'secondary'}">${cp.active !== false ? 'Active' : 'Inactive'}</span></td>
+        <td class="action-cell">
+          <button class="btn btn-sm btn-${cp.active !== false ? 'warning' : 'success'}" onclick="toggleCoupon('${cid}', ${cp.active !== false})">${cp.active !== false ? 'Disable' : 'Enable'}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteCoupon('${cid}')">Delete</button>
+        </td>
+      </tr>`
+    ).join('');
   });
 }
 
-function renderCoupons() {
-  const tbody = $('couponsTableBody');
-  if (!tbody) return;
-  const codes = Object.keys(allCoupons);
-  if (codes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No coupons created.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = codes.map((code) => {
-    const c = allCoupons[code];
-    const activeClass = c.active ? 'text-success' : 'text-danger';
-    return '<tr>' +
-      '<td><code>' + escapeHtml(code) + '</code></td>' +
-      '<td>' + escapeHtml(c.type || 'flat') + '</td>' +
-      '<td>' + (c.type === 'percent' ? c.value + '%' : '\u20B9' + (c.value || 0)) + '</td>' +
-      '<td>\u20B9' + (c.minOrder || 0) + '</td>' +
-      '<td>' + (c.usedCount || 0) + '/' + (c.usageLimit || '∞') + '</td>' +
-      '<td><span class="badge ' + activeClass + '">' + (c.active ? 'Active' : 'Paused') + '</span></td>' +
-      '<td class="actions-cell">' +
-      '<button class="btn btn-sm btn-outline" onclick="toggleCoupon(\'' + escapeHtml(code) + '\')" title="' + (c.active ? 'Pause' : 'Activate') + '"><i data-lucide="' + (c.active ? 'pause-circle' : 'play-circle') + '" class="icon-sm"></i></button> ' +
-      '<button class="btn btn-sm btn-danger" onclick="deleteCoupon(\'' + escapeHtml(code) + '\')" title="Delete"><i data-lucide="trash-2" class="icon-sm"></i></button>' +
-      '</td>' +
-      '</tr>';
-  }).join('');
-  if (window.lucide) lucide.createIcons();
-}
-
-$('addCouponBtn')?.addEventListener('click', () => {
-  $('couponModal')?.classList.add('active');
-  ['couponCode', 'couponType', 'couponValue', 'couponMinOrder', 'couponUsageLimit'].forEach((id) => {
-    const el = $(id);
-    if (el) el.value = '';
-  });
-  const typeEl = $('couponType');
-  if (typeEl) typeEl.value = 'flat';
+$('btnAddCoupon').addEventListener('click', () => {
+  $('couponCode').value = '';
+  $('couponType').value = 'flat';
+  $('couponValue').value = '';
+  $('couponMinOrder').value = '';
+  $('couponUsageLimit').value = '';
+  $('couponModal').style.display = 'flex';
 });
 
-$('couponModalClose')?.addEventListener('click', () => {
-  $('couponModal')?.classList.remove('active');
+$('couponModalClose').addEventListener('click', () => {
+  $('couponModal').style.display = 'none';
 });
 
-$('saveCouponBtn')?.addEventListener('click', async () => {
-  const now = Date.now();
-  const recent = couponRateLimit.filter((t) => now - t < 60000);
-  if (recent.length >= 10) { showToast('Rate limit: max 10 coupons per minute', 'error'); return; }
-
-  const code = ($('couponCode')?.value || '').trim().toUpperCase().replace(/\s+/g, '_');
-  const type = $('couponType')?.value || 'flat';
-  const value = parseFloat($('couponValue')?.value) || 0;
-  const minOrder = parseFloat($('couponMinOrder')?.value) || 0;
-  const usageLimit = parseInt($('couponUsageLimit')?.value) || 0;
-
-  if (!code || !value) { showToast('Coupon code and value are required', 'error'); return; }
-  if (allCoupons[code]) { showToast('Coupon code already exists', 'error'); return; }
-
+$('couponSave').addEventListener('click', async () => {
+  const code = $('couponCode').value.trim().toUpperCase();
+  if (!code) { showToast('Coupon code required', 'error'); return; }
   try {
-    await db.ref('system/promotions/coupons/' + code).set({
-      type,
-      value,
-      minOrder,
-      usageLimit: usageLimit || null,
-      usedCount: 0,
+    await db.ref('system/promotions/coupons').push({
+      code,
+      type: $('couponType').value,
+      value: parseFloat($('couponValue').value) || 0,
+      minOrder: parseFloat($('couponMinOrder').value) || 0,
+      usageLimit: parseInt($('couponUsageLimit').value) || 0,
       active: true,
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      createdBy: currentUser ? currentUser.email : 'system'
+      createdAt: firebase.database.ServerValue.TIMESTAMP
     });
-    couponRateLimit.push(Date.now());
-    showToast('Coupon ' + code + ' created', 'success');
-    $('couponModal')?.classList.remove('active');
+    $('couponModal').style.display = 'none';
+    showToast('Coupon added', 'success');
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Failed: ' + err.message, 'error');
   }
 });
 
-async function toggleCoupon(code) {
+window.toggleCoupon = async (cid, current) => {
   try {
-    const c = allCoupons[code];
-    await db.ref('system/promotions/coupons/' + code + '/active').set(!c.active);
-    showToast('Coupon ' + (c.active ? 'paused' : 'activated'), 'success');
+    await db.ref(`system/promotions/coupons/${cid}/active`).set(!current);
+    showToast(`Coupon ${current ? 'disabled' : 'enabled'}`, 'success');
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Failed: ' + err.message, 'error');
   }
-}
+};
 
-async function deleteCoupon(code) {
-  confirmAction('Delete coupon ' + code + '?', async () => {
+window.deleteCoupon = (cid) => {
+  confirmAction('Delete this coupon?', async () => {
     try {
-      await db.ref('system/promotions/coupons/' + code).remove();
+      await db.ref(`system/promotions/coupons/${cid}`).remove();
       showToast('Coupon deleted', 'success');
     } catch (err) {
-      showToast('Error: ' + err.message, 'error');
+      showToast('Failed: ' + err.message, 'error');
     }
   });
-}
+};
 
-$('pauseAllCouponsBtn')?.addEventListener('click', async () => {
-  confirmAction('Pause all active coupons?', async () => {
+$('btnPauseAllCoupons').addEventListener('click', () => {
+  confirmAction('Pause ALL active coupons?', async () => {
     try {
+      const snap = await db.ref('system/promotions/coupons').once('value');
+      const data = snap.val() || {};
       const updates = {};
-      Object.keys(allCoupons).forEach((code) => {
-        if (allCoupons[code].active) updates['system/promotions/coupons/' + code + '/active'] = false;
-      });
-      if (Object.keys(updates).length > 0) await db.ref().update(updates);
-      showToast('All coupons paused', 'success');
+      for (const cid of Object.keys(data)) {
+        if (data[cid].active !== false) updates[`system/promotions/coupons/${cid}/active`] = false;
+      }
+      if (Object.keys(updates).length) {
+        await db.ref().update(updates);
+        showToast('All coupons paused', 'success');
+      } else {
+        showToast('No active coupons to pause', 'info');
+      }
     } catch (err) {
-      showToast('Error: ' + err.message, 'error');
+      showToast('Failed: ' + err.message, 'error');
     }
   });
 });
 
-$('exportCouponsBtn')?.addEventListener('click', () => {
-  const headers = ['Code', 'Type', 'Value', 'Min Order', 'Used Count', 'Usage Limit', 'Active'];
-  const rows = Object.entries(allCoupons).map(([code, c]) => [
-    code,
-    c.type || 'flat',
-    c.value || 0,
-    c.minOrder || 0,
-    c.usedCount || 0,
-    c.usageLimit || '∞',
-    c.active ? 'Yes' : 'No'
-  ]);
-  exportCSV(headers, rows, 'coupons_export');
-  showToast('Coupons exported', 'success');
-});
-
-// ============================
-// 8. SETTLEMENTS
-// ============================
-
-function loadSettlements() {
-  allSettlements = [];
-  Object.entries(businessesData).forEach(([bid, biz]) => {
-    if (biz.outlets) {
-      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
-        if (outlet.settlements) {
-          Object.entries(outlet.settlements).forEach(([key, s]) => {
-            allSettlements.push(Object.assign({}, s, { key, bid, oid, storeName: outlet.name || biz.name || 'Unknown' }));
-          });
-        }
-      });
-    }
-  });
-  renderSettlements();
-}
-
-function renderSettlements() {
-  const tbody = $('settlementsTableBody');
-  if (!tbody) return;
-
-  const fromTs = parseInt($('settlementFrom')?.value) ? new Date($('settlementFrom').value).getTime() : 0;
-  const toTs = parseInt($('settlementTo')?.value) ? new Date($('settlementTo').value).getTime() + 86400000 : Infinity;
-
-  const filtered = allSettlements.filter((s) => {
-    const ts = s.createdAt || s.date || 0;
-    return ts >= fromTs && ts <= toTs;
-  });
-
-  filtered.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
-  const totalVolume = filtered.reduce((sum, s) => sum + (s.amount || s.total || 0), 0);
-  const totalCommission = filtered.reduce((sum, s) => sum + (s.commission || s.platformFee || 0), 0);
-  const pending = filtered.filter((s) => s.status !== 'SETTLED' && s.status !== 'settled');
-  const settled = filtered.filter((s) => s.status === 'SETTLED' || s.status === 'settled');
-
-  $('settlementTotalVolume') ? $('settlementTotalVolume').textContent = '\u20B9' + totalVolume.toLocaleString('en-IN') : null;
-  $('settlementTotalCommission') ? $('settlementTotalCommission').textContent = '\u20B9' + totalCommission.toLocaleString('en-IN') : null;
-  $('settlementPending') ? $('settlementPending').textContent = pending.length : null;
-  $('settlementTotalSettled') ? $('settlementTotalSettled').textContent = '\u20B9' + settled.reduce((sum, s) => sum + (s.amount || s.total || 0), 0).toLocaleString('en-IN') : null;
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No settlements found.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = filtered.map((s) => {
-    const isSettled = s.status === 'SETTLED' || s.status === 'settled';
-    return '<tr>' +
-      '<td>' + escapeHtml(s.storeName) + '</td>' +
-      '<td>\u20B9' + (s.amount || s.total || 0).toLocaleString('en-IN') + '</td>' +
-      '<td>\u20B9' + (s.commission || s.platformFee || 0).toLocaleString('en-IN') + '</td>' +
-      '<td>' + formatDate(s.createdAt || s.date) + '</td>' +
-      '<td>' + (s.period || '—') + '</td>' +
-      '<td><span class="badge ' + (isSettled ? 'text-success' : 'text-warning') + '">' + (isSettled ? 'Settled' : 'Pending') + '</span></td>' +
-      '<td>' +
-      (!isSettled ? '<button class="btn btn-sm btn-success" onclick="settleAction(\'' + s.bid + '\',\'' + s.oid + '\',\'' + s.key + '\',\'' + (s.amount || s.total || 0) + '\')">Settle Now</button>' : '—') +
-      '</td>' +
-      '</tr>';
-  }).join('');
-}
-
-$('settlementFilterBtn')?.addEventListener('click', renderSettlements);
-
-async function settleAction(bid, oid, key, amount) {
-  confirmAction('Settle this amount of \u20B9' + parseFloat(amount).toLocaleString('en-IN') + '?', async () => {
-    try {
-      const settlementRef = db.ref('businesses/' + bid + '/outlets/' + oid + '/settlements/' + key);
-      const snap = await settlementRef.once('value');
-      const data = snap.val();
-      if (!data) { showToast('Settlement not found', 'error'); return; }
-
-      const ledgerId = 'ledger_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-      const ledgerEntry = {
-        type: 'settlement',
-        amount: data.amount || data.total || 0,
-        commission: data.commission || data.platformFee || 0,
-        netAmount: (data.amount || data.total || 0) - (data.commission || data.platformFee || 0),
-        status: 'SETTLED',
-        settledAt: firebase.database.ServerValue.TIMESTAMP,
-        settledBy: currentUser ? currentUser.email : 'system',
-        period: data.period || '',
-        businessId: bid,
-        outletId: oid
-      };
-
-      const updates = {};
-      updates['businesses/' + bid + '/outlets/' + oid + '/settlements/' + key + '/status'] = 'SETTLED';
-      updates['businesses/' + bid + '/outlets/' + oid + '/settlements/' + key + '/settledAt'] = firebase.database.ServerValue.TIMESTAMP;
-      updates['businesses/' + bid + '/outlets/' + oid + '/settlements/' + key + '/settledBy'] = currentUser ? currentUser.email : 'system';
-      updates['system/ledger/' + ledgerId] = ledgerEntry;
-      updates['system/auditLogs/' + ledgerId] = Object.assign({}, ledgerEntry, { action: 'settlement_completed' });
-      await db.ref().update(updates);
-      showToast('Settlement completed', 'success');
-    } catch (err) {
-      showToast('Error: ' + err.message, 'error');
-    }
-  });
-}
-
-$('exportSettlementsBtn')?.addEventListener('click', () => {
-  const rows = allSettlements.map((s) => [
-    s.storeName || '',
-    s.amount || s.total || 0,
-    s.commission || s.platformFee || 0,
-    (s.amount || s.total || 0) - (s.commission || s.platformFee || 0),
-    s.status || 'Pending',
-    formatDate(s.createdAt || s.date || ''),
-    s.period || ''
-  ]);
-  exportCSV(
-    ['Store', 'Amount', 'Commission', 'Net', 'Status', 'Date', 'Period'],
-    rows,
-    'settlements_export'
-  );
-  showToast('Settlements exported', 'success');
-});
-
-// ============================
-// 9. SERVICE SLABS (DELIVERY)
-// ============================
-
-function loadDeliverySlabs() {
-  const container = $('deliverySlabsContainer');
-  if (!container) return;
-  db.ref('system/settings/delivery/slabs').on('value', (snap) => {
-    deliverySlabs = snap.val() || [];
-    renderDeliverySlabs();
-  });
-}
-
-function renderDeliverySlabs() {
-  const container = $('deliverySlabsContainer');
-  if (!container) return;
-  if (!Array.isArray(deliverySlabs) || deliverySlabs.length === 0) {
-    container.innerHTML = '<div class="empty-row">No delivery slabs configured. Add one below.</div>';
-    return;
-  }
-  container.innerHTML = deliverySlabs.map((slab, idx) => {
-    return '<div class="slab-row">' +
-      '<input class="form-input slab-input" value="' + escapeHtml(slab.minDistance || 0) + '" placeholder="Min (km)" onchange="updateSlab(' + idx + ',\'minDistance\',this.value)">' +
-      '<input class="form-input slab-input" value="' + escapeHtml(slab.maxDistance || 0) + '" placeholder="Max (km)" onchange="updateSlab(' + idx + ',\'maxDistance\',this.value)">' +
-      '<input class="form-input slab-input" value="' + escapeHtml(slab.fee || 0) + '" placeholder="Fee (\u20B9)" onchange="updateSlab(' + idx + ',\'fee\',this.value)">' +
-      '<input class="form-input slab-input" value="' + escapeHtml(slab.estimatedTime || '') + '" placeholder="Est. time" onchange="updateSlab(' + idx + ',\'estimatedTime\',this.value)">' +
-      '<button class="btn btn-sm btn-danger" onclick="removeSlab(' + idx + ')"><i data-lucide="trash-2" class="icon-sm"></i></button>' +
-      '</div>';
-  }).join('');
-  if (window.lucide) lucide.createIcons();
-}
-
-function updateSlab(idx, field, value) {
-  if (!deliverySlabs[idx]) deliverySlabs[idx] = {};
-  deliverySlabs[idx][field] = field === 'estimatedTime' ? value : parseFloat(value) || 0;
-}
-
-$('addSlabBtn')?.addEventListener('click', () => {
-  deliverySlabs.push({ minDistance: 0, maxDistance: 0, fee: 0, estimatedTime: '' });
-  renderDeliverySlabs();
-});
-
-function removeSlab(idx) {
-  confirmAction('Remove this slab?', () => {
-    deliverySlabs.splice(idx, 1);
-    saveAllSlabs();
-  });
-}
-
-$('saveDeliverySlabsBtn')?.addEventListener('click', saveAllSlabs);
-
-async function saveAllSlabs() {
+$('btnExportCoupons').addEventListener('click', async () => {
   try {
-    const clean = deliverySlabs.map((s) => ({
-      minDistance: parseFloat(s.minDistance) || 0,
-      maxDistance: parseFloat(s.maxDistance) || 0,
-      fee: parseFloat(s.fee) || 0,
-      estimatedTime: s.estimatedTime || ''
-    }));
-    await db.ref('system/settings/delivery/slabs').set(clean);
-    showToast('Delivery slabs saved', 'success');
+    const snap = await db.ref('system/promotions/coupons').once('value');
+    const data = snap.val() || {};
+    const headers = ['Code', 'Type', 'Value', 'Min Order', 'Usage Limit', 'Active', 'Created At'];
+    const rows = Object.entries(data).map(([cid, cp]) => [
+      cp.code || cid, cp.type || 'flat', cp.value || 0,
+      cp.minOrder || 0, cp.usageLimit || 'Unlimited',
+      cp.active !== false ? 'Yes' : 'No', formatDate(cp.createdAt)
+    ]);
+    exportCSV(headers, rows, `coupons_${Date.now()}.csv`);
+    showToast('Coupons exported', 'success');
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Export failed: ' + err.message, 'error');
   }
-}
-
-// ============================
-// 10. INVENTORY
-// ============================
-
-function loadInventory() {
-  allInventory = [];
-  Object.entries(businessesData).forEach(([bid, biz]) => {
-    if (biz.outlets) {
-      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
-        const dishList = outlet.dishes || outlet.inventory || {};
-        Object.entries(dishList).forEach(([dishId, dish]) => {
-          allInventory.push(Object.assign({}, dish, { dishId, bid, oid, storeName: outlet.name || biz.name || 'Unknown' }));
-        });
-      });
-    }
-  });
-  renderInventory();
-}
-
-$('inventorySearch')?.addEventListener('input', (e) => {
-  inventoryFilter = e.target.value.toLowerCase();
-  renderInventory();
 });
 
-function renderInventory() {
-  const tbody = $('inventoryTableBody');
-  if (!tbody) return;
-  const filtered = allInventory.filter((d) => {
-    const name = (d.name || d.title || '').toLowerCase();
-    return !inventoryFilter || name.includes(inventoryFilter);
+// ======================== SETTLEMENTS ========================
+
+function initSettlements() {
+  const allOrdersForSettlement = [];
+  const bizData = Object.keys(allBusinesses).length ? allBusinesses : {};
+
+  const loadFn = Object.keys(bizData).length
+    ? Promise.resolve(bizData)
+    : db.ref('businesses').once('value').then((s) => s.val() || {});
+
+  loadFn.then((data) => {
+    let settledCount = 0;
+    let pendingCount = 0;
+    let settledVolume = 0;
+    let pendingVolume = 0;
+
+    for (const bid of Object.keys(data)) {
+      const biz = data[bid];
+      if (biz.outlets) {
+        for (const oid of Object.keys(biz.outlets)) {
+          const outlet = biz.outlets[oid];
+          if (outlet.orders) {
+            for (const orderId of Object.keys(outlet.orders)) {
+              const order = outlet.orders[orderId];
+              const total = Number(order.total || order.amount || 0);
+              const settlementStatus = order.settlementStatus || order.paymentStatus || 'pending';
+              allOrdersForSettlement.push({
+                id: orderId, bid, oid,
+                businessName: biz.name || bid,
+                outletName: outlet.name || oid,
+                total,
+                commission: order.commission || 0,
+                netAmount: total - (order.commission || 0),
+                status: settlementStatus,
+                timestamp: order.createdAt || order.timestamp || 0,
+                settledAt: order.settledAt || null
+              });
+              if (settlementStatus === 'settled') {
+                settledCount++;
+                settledVolume += total;
+              } else {
+                pendingCount++;
+                pendingVolume += total;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    $('kpiSettlementVolume').textContent = '\u20B9' + settledVolume.toLocaleString('en-IN');
+    $('kpiPlatformCommission').textContent = '\u20B9' + allOrdersForSettlement.reduce((s, o) => s + o.commission, 0).toLocaleString('en-IN');
+    $('kpiPendingSettlements').textContent = '\u20B9' + pendingVolume.toLocaleString('en-IN');
+    $('kpiTotalSettled').textContent = settledCount;
+
+    const dateFrom = $('settlementDateFrom')?.value;
+    const dateTo = $('settlementDateTo')?.value;
+    const statusFilter = $('settlementStatusFilter')?.value || 'all';
+
+    let filtered = allOrdersForSettlement;
+    if (dateFrom) {
+      const fromTs = new Date(dateFrom).getTime();
+      filtered = filtered.filter((o) => o.timestamp >= fromTs);
+    }
+    if (dateTo) {
+      const toTs = new Date(dateTo).getTime() + 86400000;
+      filtered = filtered.filter((o) => o.timestamp < toTs);
+    }
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((o) => o.status === statusFilter);
+    }
+    filtered.sort((a, b) => b.timestamp - a.timestamp);
+
+    const tbody = $('settlementsBody');
+    if (!tbody) return;
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No settlements found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map((o) =>
+      `<tr>
+        <td>#${escapeHtml(o.id.slice(-8))}</td>
+        <td>${escapeHtml(o.businessName)}</td>
+        <td>${escapeHtml(o.outletName)}</td>
+        <td>\u20B9${o.total.toLocaleString('en-IN')}</td>
+        <td>\u20B9${o.commission.toLocaleString('en-IN')}</td>
+        <td>\u20B9${o.netAmount.toLocaleString('en-IN')}</td>
+        <td><span class="badge badge-${o.status === 'settled' ? 'success' : 'warning'}">${escapeHtml(o.status)}</span></td>
+        <td>${o.status === 'settled' ? formatDate(o.settledAt) : formatDate(o.timestamp)}</td>
+        <td class="action-cell">
+          ${o.status !== 'settled' ? `<button class="btn btn-sm btn-success" onclick="settleOrder('${escapeHtml(o.bid)}','${escapeHtml(o.oid)}','${escapeHtml(o.id)}',${o.netAmount})">Settle</button>` : ''}
+        </td>
+      </tr>`
+    ).join('');
+  }).catch((err) => {
+    showToast('Settlements load error: ' + err.message, 'error');
   });
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No inventory items found.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = filtered.map((d) => {
-    const stock = d.stock !== undefined ? d.stock : (d.available ? 10 : 0);
-    const available = d.available !== false;
-    return '<tr>' +
-      '<td>' + escapeHtml(d.storeName) + '</td>' +
-      '<td>' + escapeHtml(d.name || d.title || '—') + '</td>' +
-      '<td>\u20B9' + (d.price || 0).toLocaleString('en-IN') + '</td>' +
-      '<td>' +
-      '<button class="btn btn-sm btn-outline" onclick="adjustStock(\'' + d.bid + '\',\'' + d.oid + '\',\'' + d.dishId + '\',-1)">−</button> ' +
-      '<span class="stock-value">' + stock + '</span> ' +
-      '<button class="btn btn-sm btn-outline" onclick="adjustStock(\'' + d.bid + '\',\'' + d.oid + '\',\'' + d.dishId + '\',1)">+</button>' +
-      '</td>' +
-      '<td>' +
-      '<label class="toggle-switch">' +
-      '<input type="checkbox" ' + (available ? 'checked' : '') + ' onchange="toggleAvailability(\'' + d.bid + '\',\'' + d.oid + '\',\'' + d.dishId + '\',this.checked)">' +
-      '<span class="toggle-slider"></span>' +
-      '</label>' +
-      '</td>' +
-      '<td><span class="badge ' + (available ? 'text-success' : 'text-danger') + '">' + (available ? 'Available' : 'Unavailable') + '</span></td>' +
-      '</tr>';
-  }).join('');
 }
 
-async function adjustStock(bid, oid, dishId, delta) {
-  try {
-    const path = 'businesses/' + bid + '/outlets/' + oid;
-    const dishRef = db.ref(path + '/dishes/' + dishId + '/stock');
-    const invRef = db.ref(path + '/inventory/' + dishId + '/stock');
-    const snap = await dishRef.once('value');
-    if (snap.val() !== null) {
-      await dishRef.set(firebase.database.ServerValue.increment(delta));
-    } else {
-      await invRef.set(firebase.database.ServerValue.increment(delta));
+$('settlementDateFrom')?.addEventListener('change', initSettlements);
+$('settlementDateTo')?.addEventListener('change', initSettlements);
+$('settlementStatusFilter')?.addEventListener('change', initSettlements);
+
+window.settleOrder = async (bid, oid, orderId, netAmount) => {
+  confirmAction(`Settle this order for \u20B9${netAmount.toLocaleString('en-IN')}?`, async () => {
+    try {
+      const now = firebase.database.ServerValue.TIMESTAMP;
+      await db.ref(`businesses/${bid}/outlets/${oid}/orders/${orderId}`).update({
+        settlementStatus: 'settled',
+        settledAt: now
+      });
+      await db.ref(`businesses/${bid}/outlets/${oid}/settlements`).push({
+        orderId,
+        amount: netAmount,
+        type: 'settlement',
+        timestamp: now
+      });
+      await db.ref('system/auditLogs').push({
+        action: 'settlement',
+        orderId,
+        amount: netAmount,
+        businessId: bid,
+        outletId: oid,
+        adminId: auth.currentUser?.uid || 'admin',
+        timestamp: now
+      });
+      showToast('Order settled successfully', 'success');
+      initSettlements();
+    } catch (err) {
+      showToast('Settlement failed: ' + err.message, 'error');
     }
+  });
+};
+
+// ======================== DELIVERY SLABS ========================
+
+let slabsData = [];
+
+function initDeliverySlabs() {
+  db.ref('system/settings/delivery/slabs').off();
+  db.ref('system/settings/delivery/slabs').on('value', (snap) => {
+    slabsData = snap.val() || [];
+    renderSlabs();
+  });
+}
+
+function renderSlabs() {
+  const tbody = $('slabsBody');
+  if (!tbody) return;
+  if (!Array.isArray(slabsData) || !slabsData.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No delivery slabs configured</td></tr>';
+    return;
+  }
+  tbody.innerHTML = slabsData.map((slab, idx) =>
+    `<tr>
+      <td>${escapeHtml(slab.name || `Slab ${idx + 1}`)}</td>
+      <td>${slab.minDistance || 0} km</td>
+      <td>${slab.maxDistance || 0} km</td>
+      <td>\u20B9${(slab.charge || 0).toLocaleString('en-IN')}</td>
+      <td class="action-cell">
+        <button class="btn btn-sm btn-primary" onclick="editSlab(${idx})">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="removeSlab(${idx})">Remove</button>
+      </td>
+    </tr>`
+  ).join('');
+}
+
+$('btnAddSlab').addEventListener('click', () => {
+  showSlabEditor(null);
+});
+
+function showSlabEditor(idx) {
+  const isEdit = idx !== null && idx !== undefined;
+  const slab = isEdit ? slabsData[idx] : {};
+  const name = prompt('Slab name:', slab?.name || '');
+  if (name === null) return;
+  const minD = parseFloat(prompt('Min distance (km):', slab?.minDistance || '')) || 0;
+  const maxD = parseFloat(prompt('Max distance (km):', slab?.maxDistance || '')) || 0;
+  const charge = parseFloat(prompt('Delivery charge (\u20B9):', slab?.charge || '')) || 0;
+
+  const newSlab = { name, minDistance: minD, maxDistance: maxD, charge };
+  if (isEdit) {
+    slabsData[idx] = newSlab;
+  } else {
+    slabsData.push(newSlab);
+  }
+  saveSlabs();
+}
+
+window.editSlab = showSlabEditor;
+
+window.removeSlab = (idx) => {
+  confirmAction('Remove this slab?', () => {
+    slabsData.splice(idx, 1);
+    saveSlabs();
+  });
+};
+
+function saveSlabs() {
+  db.ref('system/settings/delivery/slabs').set(slabsData)
+    .then(() => showToast('Slabs saved', 'success'))
+    .catch((err) => showToast('Save failed: ' + err.message, 'error'));
+}
+
+// ======================== INVENTORY ========================
+
+function initInventory() {
+  const q = ($('inventorySearchInput').value || '').toLowerCase().trim();
+  const tbody = $('inventoryBody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Loading inventory...</td></tr>';
+
+  db.ref('businesses').once('value').then((snap) => {
+    const data = snap.val() || {};
+    let dishes = [];
+    for (const bid of Object.keys(data)) {
+      const biz = data[bid];
+      if (biz.outlets) {
+        for (const oid of Object.keys(biz.outlets)) {
+          const outlet = biz.outlets[oid];
+          if (outlet.menu || outlet.dishes) {
+            const menu = outlet.menu || outlet.dishes || {};
+            for (const dishId of Object.keys(menu)) {
+              const dish = menu[dishId];
+              dishes.push({
+                id: dishId,
+                bid, oid,
+                businessName: biz.name || bid,
+                outletName: outlet.name || oid,
+                name: dish.name || dish.title || 'Unnamed',
+                price: dish.price || 0,
+                stock: dish.stock ?? dish.quantity ?? 0,
+                available: dish.available !== false
+              });
+            }
+          }
+        }
+      }
+    }
+    if (q) {
+      dishes = dishes.filter((d) =>
+        d.name.toLowerCase().includes(q) ||
+        d.businessName.toLowerCase().includes(q) ||
+        d.outletName.toLowerCase().includes(q)
+      );
+    }
+    if (!dishes.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No inventory items found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = dishes.map((d) =>
+      `<tr>
+        <td>${escapeHtml(d.businessName)}</td>
+        <td>${escapeHtml(d.outletName)}</td>
+        <td>${escapeHtml(d.name)}</td>
+        <td>\u20B9${d.price.toLocaleString('en-IN')}</td>
+        <td><span class="stock-value">${d.stock}</span></td>
+        <td><span class="badge badge-${d.available ? 'success' : 'secondary'}">${d.available ? 'In Stock' : 'Out of Stock'}</span></td>
+        <td class="action-cell">
+          <button class="btn btn-sm btn-success" onclick="adjustStock('${escapeHtml(d.bid)}','${escapeHtml(d.oid)}','${escapeHtml(d.id)}',1)">+</button>
+          <button class="btn btn-sm btn-danger" onclick="adjustStock('${escapeHtml(d.bid)}','${escapeHtml(d.oid)}','${escapeHtml(d.id)}',-1)">-</button>
+          <button class="btn btn-sm btn-${d.available ? 'warning' : 'success'}" onclick="toggleAvailability('${escapeHtml(d.bid)}','${escapeHtml(d.oid)}','${escapeHtml(d.id)}',${d.available})">
+            ${d.available ? 'Disable' : 'Enable'}
+          </button>
+        </td>
+      </tr>`
+    ).join('');
+  }).catch((err) => {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Error: ' + escapeHtml(err.message) + '</td></tr>';
+  });
+}
+
+$('inventorySearchInput').addEventListener('input', initInventory);
+
+window.adjustStock = async (bid, oid, dishId, delta) => {
+  try {
+    const ref = db.ref(`businesses/${bid}/outlets/${oid}/menu/${dishId}/stock`);
+    await ref.transaction((current) => Math.max(0, (current || 0) + delta));
     showToast('Stock updated', 'success');
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Stock update failed: ' + err.message, 'error');
   }
-}
+};
 
-async function toggleAvailability(bid, oid, dishId, available) {
+window.toggleAvailability = async (bid, oid, dishId, current) => {
   try {
-    const path = 'businesses/' + bid + '/outlets/' + oid;
-    const dishRef = db.ref(path + '/dishes/' + dishId + '/available');
-    const invRef = db.ref(path + '/inventory/' + dishId + '/available');
-    const snap = await dishRef.once('value');
-    if (snap.val() !== null) {
-      await dishRef.set(available);
-    } else {
-      await invRef.set(available);
-    }
-    showToast(available ? 'Item enabled' : 'Item disabled', 'success');
+    await db.ref(`businesses/${bid}/outlets/${oid}/menu/${dishId}/available`).set(!current);
+    showToast(`Item ${current ? 'disabled' : 'enabled'}`, 'success');
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Toggle failed: ' + err.message, 'error');
   }
-}
+};
 
-// ============================
-// 11. REVIEWS
-// ============================
+// ======================== REVIEWS ========================
 
-function loadReviews() {
-  allReviews = [];
-  Object.entries(businessesData).forEach(([bid, biz]) => {
-    if (biz.outlets) {
-      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
-        if (outlet.reviews) {
-          Object.entries(outlet.reviews).forEach(([key, r]) => {
-            allReviews.push(Object.assign({}, r, { key, bid, oid, storeName: outlet.name || biz.name || 'Unknown' }));
-          });
-        }
-      });
-    }
-  });
-  renderReviews();
-}
-
-function renderReviews() {
-  const tbody = $('reviewsTableBody');
+function initReviews() {
+  const tbody = $('reviewsBody');
   if (!tbody) return;
-  allReviews.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Loading reviews...</td></tr>';
 
-  if (allReviews.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No reviews found.</td></tr>';
+  db.ref('businesses').once('value').then((snap) => {
+    const data = snap.val() || {};
+    let reviews = [];
+    for (const bid of Object.keys(data)) {
+      const biz = data[bid];
+      if (biz.outlets) {
+        for (const oid of Object.keys(biz.outlets)) {
+          const outlet = biz.outlets[oid];
+          if (outlet.reviews) {
+            for (const revId of Object.keys(outlet.reviews)) {
+              const rev = outlet.reviews[revId];
+              reviews.push({
+                id: revId, bid, oid,
+                businessName: biz.name || bid,
+                outletName: outlet.name || oid,
+                userName: rev.userName || rev.name || 'Anonymous',
+                rating: rev.rating || 0,
+                comment: rev.comment || rev.text || '',
+                timestamp: rev.createdAt || rev.timestamp || 0
+              });
+            }
+          }
+        }
+      }
+    }
+    reviews.sort((a, b) => b.timestamp - a.timestamp);
+    if (!reviews.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No reviews found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = reviews.map((r) =>
+      `<tr>
+        <td>${escapeHtml(r.businessName)}</td>
+        <td>${escapeHtml(r.outletName)}</td>
+        <td>${escapeHtml(r.userName)}</td>
+        <td>${'★'.repeat(Math.round(r.rating))}${'☆'.repeat(5 - Math.round(r.rating))} (${r.rating})</td>
+        <td>${escapeHtml(r.comment.slice(0, 100))}${r.comment.length > 100 ? '...' : ''}</td>
+        <td>${formatDate(r.timestamp)}</td>
+      </tr>`
+    ).join('');
+  }).catch((err) => {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error: ' + escapeHtml(err.message) + '</td></tr>';
+  });
+}
+
+// ======================== BROADCAST ========================
+
+function initBroadcast() {
+  loadBroadcastHistory();
+}
+
+$('btnSendBroadcast').addEventListener('click', async () => {
+  const now = Date.now();
+  if (now - broadcastResetTime > 60000) {
+    broadcastCount = 0;
+    broadcastResetTime = now;
+  }
+  if (broadcastCount >= 5) {
+    showToast('Rate limit: max 5 broadcasts per minute', 'error');
     return;
   }
 
-  tbody.innerHTML = allReviews.map((r) => {
-    const stars = '\u2605'.repeat(Math.round(r.rating || 0)) + '\u2606'.repeat(5 - Math.round(r.rating || 0));
-    return '<tr>' +
-      '<td>' + escapeHtml(r.storeName) + '</td>' +
-      '<td>' + escapeHtml(r.customerName || r.userName || 'Anonymous') + '</td>' +
-      '<td class="stars">' + stars + ' (' + (r.rating || 0) + ')</td>' +
-      '<td>' + escapeHtml(r.text || r.comment || '—') + '</td>' +
-      '<td>' + (r.riderRating ? '\u2605'.repeat(Math.round(r.riderRating)) + ' (' + r.riderRating + ')' : '—') + '</td>' +
-      '<td>' + formatDate(r.createdAt || r.date) + '</td>' +
-      '</tr>';
-  }).join('');
-}
-
-// ============================
-// 12. BROADCAST
-// ============================
-
-$('sendBroadcastBtn')?.addEventListener('click', async () => {
-  const now = Date.now();
-  const recent = broadcastRateLimit.filter((t) => now - t < 60000);
-  if (recent.length >= 5) { showToast('Rate limit: max 5 broadcasts per minute', 'error'); return; }
-
-  const title = $('broadcastTitle')?.value;
-  const message = $('broadcastMessage')?.value;
-  const audience = $('broadcastAudience')?.value || 'all';
-  const category = $('broadcastCategory')?.value || 'general';
-  const imageUrl = $('broadcastImageUrl')?.value || '';
-
-  if (!title || !message) { showToast('Title and message are required', 'error'); return; }
-
+  const title = $('broadcastTitle')?.value.trim();
+  const message = $('broadcastMessage')?.value.trim();
+  const audience = $('broadcastTarget')?.value || 'all';
+  if (!message) {
+    showToast('Message is required', 'error');
+    return;
+  }
   try {
-    const ref = db.ref('system/broadcasts').push();
-    await ref.set({
-      title,
+    await db.ref('system/broadcasts').push({
+      title: title || '',
       message,
       audience,
-      category,
-      imageUrl,
-      sentAt: firebase.database.ServerValue.TIMESTAMP,
-      sender: currentUser ? currentUser.email : 'system',
-      readBy: {}
+      sentBy: auth.currentUser?.email || 'admin',
+      sentAt: firebase.database.ServerValue.TIMESTAMP
     });
-    broadcastRateLimit.push(Date.now());
-    showToast('Broadcast sent to ' + audience, 'success');
-    $('broadcastTitle').value = '';
-    $('broadcastMessage').value = '';
-    $('broadcastImageUrl').value = '';
+    if ($('broadcastTitle')) $('broadcastTitle').value = '';
+    if ($('broadcastMessage')) $('broadcastMessage').value = '';
+    broadcastCount++;
+    showToast('Broadcast sent', 'success');
+    loadBroadcastHistory();
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Broadcast failed: ' + err.message, 'error');
   }
 });
 
-function loadBroadcasts() {
-  const container = $('broadcastHistory');
-  if (!container) return;
-  db.ref('system/broadcasts').orderByChild('sentAt').limitToLast(50).on('value', (snap) => {
-    const broadcasts = snap.val() || {};
-    const entries = Object.entries(broadcasts).sort((a, b) => (b[1].sentAt || 0) - (a[1].sentAt || 0));
-    if (entries.length === 0) {
-      container.innerHTML = '<div class="empty-row">No broadcasts sent yet.</div>';
+function loadBroadcastHistory() {
+  db.ref('system/broadcasts').orderByChild('sentAt').limitToLast(50).once('value').then((snap) => {
+    const data = snap.val() || {};
+    const tbody = $('broadcastHistoryBody');
+    if (!tbody) return;
+    const entries = Object.values(data).reverse();
+    if (!entries.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No broadcasts sent</td></tr>';
       return;
     }
-    container.innerHTML = entries.map(([key, b]) => {
-      return '<div class="broadcast-card">' +
-        '<div class="broadcast-header">' +
-        '<strong>' + escapeHtml(b.title || 'Untitled') + '</strong> ' +
-        '<span class="badge badge-' + escapeHtml(b.audience || 'all') + '">' + escapeHtml(b.audience || 'All') + '</span>' +
-        '</div>' +
-        '<p>' + escapeHtml(b.message || '') + '</p>' +
-        (b.imageUrl ? '<img src="' + escapeHtml(b.imageUrl) + '" class="broadcast-image" alt="">' : '') +
-        '<div class="broadcast-meta">' +
-        '<span>' + formatDate(b.sentAt) + '</span>' +
-        '<span>by ' + escapeHtml(b.sender || 'system') + '</span>' +
-        '<span>' + (b.category || 'general') + '</span>' +
-        '</div>' +
-        '</div>';
-    }).join('');
-  });
+    tbody.innerHTML = entries.map((b) =>
+      `<tr>
+        <td>${escapeHtml(b.title || '-')}</td>
+        <td>${escapeHtml(b.message.slice(0, 80))}${b.message.length > 80 ? '...' : ''}</td>
+        <td>${escapeHtml(b.audience || 'all')}</td>
+        <td>${formatDate(b.sentAt)}</td>
+      </tr>`
+    ).join('');
+  }).catch(() => {});
 }
 
-// ============================
-// 13. AUDIT LOGS
-// ============================
+// ======================== AUDIT ========================
 
-function loadAuditLogs() {
-  auditLogs = [];
-  const sources = [
-    db.ref('system/auditLogs').orderByChild('timestamp').limitToLast(200),
-    db.ref('logs/marketplaceAudit').orderByChild('timestamp').limitToLast(200),
-    db.ref('logs/botAudit').orderByChild('timestamp').limitToLast(200),
-    db.ref('logs/riderErrors').orderByChild('timestamp').limitToLast(200)
-  ];
+let auditPage = 1;
+let allAuditEntries = [];
 
-  let loaded = 0;
-  sources.forEach((ref, idx) => {
-    ref.once('value', (snap) => {
-      const data = snap.val() || {};
-      const sourceNames = ['system/auditLogs', 'logs/marketplaceAudit', 'logs/botAudit', 'logs/riderErrors'];
-      Object.entries(data).forEach(([key, entry]) => {
-        auditLogs.push(Object.assign({}, entry, { _key: key, _source: sourceNames[idx] }));
-      });
-      loaded++;
-      if (loaded === sources.length) renderAuditLogs();
-    });
-  });
-}
-
-function renderAuditLogs() {
-  const tbody = $('auditTableBody');
+function initAudit() {
+  auditPage = 1;
+  allAuditEntries = [];
+  const tbody = $('auditBody');
   if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Loading audit logs...</td></tr>';
 
-  auditLogs.sort((a, b) => ((b.timestamp || b.createdAt || b.sentAt || 0)) - ((a.timestamp || a.createdAt || a.sentAt || 0)));
-
-  const pageSize = 50;
-  const totalPages = Math.max(1, Math.ceil(auditLogs.length / pageSize));
-  if (currentPage.audit > totalPages) currentPage.audit = totalPages;
-  const start = (currentPage.audit - 1) * pageSize;
-  const page = auditLogs.slice(start, start + pageSize);
-
-  if (page.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No audit logs found.</td></tr>';
-    renderPagination('auditPagination', totalPages, currentPage.audit, (p) => { currentPage.audit = p; renderAuditLogs(); });
-    return;
-  }
-
-  tbody.innerHTML = page.map((entry) => {
-    const ts = entry.timestamp || entry.createdAt || entry.sentAt || 0;
-    const action = entry.action || entry.type || entry.event || entry.message || '—';
-    const actor = entry.actor || entry.userId || entry.sender || entry.settledBy || entry.createdBy || '—';
-    const source = entry._source || 'system';
-    return '<tr>' +
-      '<td>' + formatDate(ts) + '</td>' +
-      '<td><span class="badge badge-source badge-' + source.replace(/[\/\.]/g, '-') + '">' + escapeHtml(source) + '</span></td>' +
-      '<td>' + escapeHtml(typeof action === 'string' ? action : JSON.stringify(action)) + '</td>' +
-      '<td>' + escapeHtml(actor) + '</td>' +
-      '<td><code>' + escapeHtml(entry._key || '').slice(-12) + '</code></td>' +
-      '</tr>';
-  }).join('');
-  renderPagination('auditPagination', totalPages, currentPage.audit, (p) => { currentPage.audit = p; renderAuditLogs(); });
-}
-
-// ============================
-// 14. REPORTS
-// ============================
-
-function loadReports() {
-  calculateReportKPIs();
-  buildTopBusinessesChart();
-  buildDailyRevenueTrend();
-}
-
-function calculateReportKPIs() {
-  let totalOrders = 0;
-  let totalRevenue = 0;
-  let totalCommission = 0;
-  const bizOrders = {};
-  const outletOrders = {};
-
-  Object.entries(businessesData).forEach(([bid, biz]) => {
-    if (biz.outlets) {
-      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
-        let outOrders = 0;
-        let outRevenue = 0;
-        if (outlet.orders) {
-          Object.values(outlet.orders).forEach((order) => {
-            totalOrders++;
-            outOrders++;
-            totalRevenue += order.total || 0;
-            totalCommission += (order.total || 0) * ((biz.commission || 15) / 100);
-            outRevenue += order.total || 0;
-          });
-        }
-        outletOrders[bid + '_' + oid] = { name: outlet.name || biz.name || 'Unknown', orders: outOrders, revenue: outRevenue };
-      });
-    }
-    bizOrders[bid] = { name: biz.name || 'Unknown', orders: Object.values(outletOrders).filter((o) => o.name === biz.name).reduce((s, o) => s + o.orders, 0) };
-  });
-
-  $('reportTotalOrders') ? $('reportTotalOrders').textContent = totalOrders : null;
-  $('reportTotalRevenue') ? $('reportTotalRevenue').textContent = '\u20B9' + totalRevenue.toLocaleString('en-IN') : null;
-  $('reportAvgOrderValue') ? $('reportAvgOrderValue').textContent = '\u20B9' + (totalOrders ? Math.round(totalRevenue / totalOrders).toLocaleString('en-IN') : '0') : null;
-  $('reportTotalCommission') ? $('reportTotalCommission').textContent = '\u20B9' + Math.round(totalCommission).toLocaleString('en-IN') : null;
-
-  const sortedBizes = Object.entries(outletOrders).sort((a, b) => b[1].orders - a[1].orders).slice(0, 10);
-  const tbody = $('topOutletsTableBody');
-  if (tbody) {
-    if (sortedBizes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="empty-row">No data</td></tr>';
-    } else {
-      tbody.innerHTML = sortedBizes.map(([key, o], i) => {
-        return '<tr>' +
-          '<td>' + (i + 1) + '</td>' +
-          '<td>' + escapeHtml(o.name) + '</td>' +
-          '<td>' + o.orders + '</td>' +
-          '<td>\u20B9' + o.revenue.toLocaleString('en-IN') + '</td>' +
-          '</tr>';
-      }).join('');
-    }
-  }
-}
-
-function buildTopBusinessesChart() {
-  const canvas = document.getElementById('topBusinessesChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-
-  const bizList = Object.entries(businessesData)
-    .map(([bid, biz]) => ({
-      name: biz.name || 'Unknown',
-      orderCount: countBusinessOrders(biz)
-    }))
-    .sort((a, b) => b.orderCount - a.orderCount)
-    .slice(0, 10);
-
-  if (window._topBizChart) window._topBizChart.destroy();
-
-  window._topBizChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: bizList.map((b) => b.name),
-      datasets: [{
-        label: 'Total Orders',
-        data: bizList.map((b) => b.orderCount),
-        backgroundColor: '#3B82F6',
-        borderRadius: 4
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1 } },
-        x: { grid: { display: false } }
-      }
-    }
-  });
-}
-
-function buildDailyRevenueTrend() {
-  const canvas = document.getElementById('dailyRevenueTrendChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const days = generateLastNDays(14);
-  const revenueData = days.map((d) => {
-    let total = 0;
-    Object.values(businessesData).forEach((biz) => {
-      if (biz.outlets) {
-        Object.values(biz.outlets).forEach((outlet) => {
-          if (outlet.orders) {
-            Object.values(outlet.orders).forEach((order) => {
-              if (order.createdAt && new Date(order.createdAt).toDateString() === d.dateStr) {
-                total += order.total || 0;
-              }
-            });
-          }
+  const paths = ['system/auditLogs', 'logs/marketplaceAudit', 'logs/botAudit', 'logs/riderErrors'];
+  const promises = paths.map((p) =>
+    db.ref(p).once('value').then((snap) => {
+      const data = snap.val() || {};
+      for (const [key, entry] of Object.entries(data)) {
+        allAuditEntries.push({
+          id: key,
+          source: p,
+          action: entry.action || entry.type || 'unknown',
+          details: entry.details || entry.message || entry.error || '',
+          admin: entry.adminId || entry.admin || entry.userId || '-',
+          timestamp: entry.timestamp || entry.createdAt || 0
         });
       }
-    });
-    return total;
-  });
+    })
+  );
 
-  if (window._dailyTrendChart) window._dailyTrendChart.destroy();
-
-  window._dailyTrendChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: days.map((d) => d.label),
-      datasets: [{
-        label: 'Revenue (\u20B9)',
-        data: revenueData,
-        borderColor: '#22C55E',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#22C55E',
-        borderWidth: 2
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { callback: (v) => '\u20B9' + v.toLocaleString('en-IN') } },
-        x: { grid: { display: false } }
-      }
-    }
+  Promise.all(promises).then(() => {
+    allAuditEntries.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    renderAuditPage(1);
+  }).catch((err) => {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Error loading audit: ' + escapeHtml(err.message) + '</td></tr>';
   });
 }
 
-$('exportReportsCSVBtn')?.addEventListener('click', () => {
-  const headers = ['Date', 'Business', 'Outlet', 'Order ID', 'Amount', 'Status', 'Customer'];
-  const rows = [];
-  Object.entries(businessesData).forEach(([bid, biz]) => {
-    if (biz.outlets) {
-      Object.entries(biz.outlets).forEach(([oid, outlet]) => {
-        if (outlet.orders) {
-          Object.entries(outlet.orders).forEach(([orderId, order]) => {
-            rows.push([
-              formatDate(order.createdAt),
-              biz.name || '',
-              outlet.name || '',
-              orderId,
-              order.total || 0,
-              order.status || '',
-              order.customerName || order.name || order.phone || ''
-            ]);
-          });
-        }
-      });
-    }
-  });
-  rows.sort((a, b) => new Date(b[0]) - new Date(a[0]));
-  exportCSV(headers, rows, 'reports_export');
-  showToast('Reports exported as CSV', 'success');
-});
-
-$('exportReportsPDFBtn')?.addEventListener('click', () => {
-  const el = $('reportsContent');
-  if (!el || typeof html2pdf === 'undefined') {
-    showToast('html2pdf library not loaded. Include CDN: https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', 'error');
+function renderAuditPage(page) {
+  auditPage = page;
+  const tbody = $('auditBody');
+  if (!tbody) return;
+  const totalPages = Math.ceil(allAuditEntries.length / AUDIT_PAGE_SIZE) || 1;
+  const start = (page - 1) * AUDIT_PAGE_SIZE;
+  const pageEntries = allAuditEntries.slice(start, start + AUDIT_PAGE_SIZE);
+  if (!pageEntries.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No audit entries</td></tr>';
+    $('auditPagination').innerHTML = '';
     return;
   }
-  const opt = {
-    margin: [10, 10, 10, 10],
-    filename: 'reports_' + new Date().toISOString().slice(0, 10) + '.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' }
-  };
-  html2pdf().set(opt).from(el).save();
-  showToast('Exporting PDF...', 'info');
-});
-
-// ============================
-// 15. SETTINGS
-// ============================
-
-async function checkTFAStatus() {
-  if (!currentUser) return;
-  currentAdminUid = currentUser.uid;
-  const snap = await db.ref('system/admins/' + currentUser.uid + '/tfaSecret').once('value');
-  const secret = snap.val();
-  const statusEl = $('tfaStatus');
-  const setupBtn = $('setup2FABtn');
-  const disableBtn = $('disable2FABtn');
-  if (statusEl) statusEl.textContent = secret ? 'Enabled' : 'Disabled';
-  if (statusEl) statusEl.className = secret ? 'text-success' : 'text-danger';
-  if (setupBtn) setupBtn.style.display = secret ? 'none' : 'inline-block';
-  if (disableBtn) disableBtn.style.display = secret ? 'inline-block' : 'none';
+  tbody.innerHTML = pageEntries.map((e) =>
+    `<tr>
+      <td>${escapeHtml(e.action)}</td>
+      <td>${escapeHtml(e.details.slice(0, 120))}${e.details.length > 120 ? '...' : ''}</td>
+      <td>${escapeHtml(e.admin)}</td>
+      <td>${formatDate(e.timestamp)}</td>
+    </tr>`
+  ).join('');
+  renderPagination($('auditPagination'), totalPages, page, renderAuditPage);
 }
 
-async function setup2FA() {
-  try {
-    if (typeof window.qrcode === 'undefined') {
-      showToast('QR code library not loaded. Include CDN: https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js', 'error');
-      return;
-    }
+// ======================== REPORTS ========================
 
-    const resp = await fetch('https://www.authenticatorApi.com/pair/Register.aspx?DevName=' + encodeURIComponent('Foodhubbie Admin') + '&Issuer=' + encodeURIComponent('Foodhubbie') + '&key=&length=32');
-    let secret = $('tfaSecretInput')?.value;
-    if (!secret) {
-      secret = Array.from({ length: 32 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[Math.floor(Math.random() * 32)]).join('');
-    }
+function initReports() {
+  const allOrdersForReport = [];
+  db.ref('businesses').once('value').then((snap) => {
+    const data = snap.val() || {};
+    let totalRevenue = 0;
+    let totalOrders = 0;
+    let totalCommission = 0;
+    const outletRevenue = {};
+    const dailyRev = {};
 
-    const otpauth = 'otpauth://totp/Foodhubbie:' + encodeURIComponent(currentUser.email) + '?secret=' + secret + '&issuer=Foodhubbie&algorithm=SHA1&digits=6&period=30';
+    for (const bid of Object.keys(data)) {
+      const biz = data[bid];
+      if (biz.outlets) {
+        for (const oid of Object.keys(biz.outlets)) {
+          const outlet = biz.outlets[oid];
+          if (outlet.orders) {
+            for (const orderId of Object.keys(outlet.orders)) {
+              const order = outlet.orders[orderId];
+              const total = Number(order.total || order.amount || 0);
+              const commission = Number(order.commission || 0);
+              totalRevenue += total;
+              totalOrders++;
+              totalCommission += commission;
 
-    $('tfaQrContainer') ? $('tfaQrContainer').innerHTML = '' : null;
-    if ($('tfaQrContainer')) {
-      try {
-        new QRCode($('tfaQrContainer'), { text: otpauth, width: 200, height: 200 });
-      } catch (e) {
-        $('tfaQrContainer').innerHTML = '<p>Scan this in Authenticator:</p><code style="word-break:break-all">' + escapeHtml(otpauth) + '</code>';
+              const key = biz.name || bid;
+              if (!outletRevenue[key]) outletRevenue[key] = { revenue: 0, orders: 0, commission: 0 };
+              outletRevenue[key].revenue += total;
+              outletRevenue[key].orders++;
+              outletRevenue[key].commission += commission;
+
+              const dayKey = new Date(order.createdAt || order.timestamp || 0).toISOString().slice(0, 10);
+              dailyRev[dayKey] = (dailyRev[dayKey] || 0) + total;
+            }
+          }
+        }
       }
     }
 
-    $('tfaSecretDisplay') ? $('tfaSecretDisplay').textContent = secret : null;
-    $('tfaSecretInput') ? $('tfaSecretInput').value = secret : null;
-    $('tfaSetupModal')?.classList.add('active');
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const netPlatformRevenue = totalCommission;
+    const partnerPayouts = totalRevenue - totalCommission;
+    const takeRate = totalRevenue > 0 ? (totalCommission / totalRevenue) * 100 : 0;
+
+    $('kpiTotalRevenue').textContent = '\u20B9' + totalRevenue.toLocaleString('en-IN');
+    $('kpiTotalOrders').textContent = totalOrders;
+    $('kpiAvgOrderValue').textContent = '\u20B9' + avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    $('kpiNetPlatformRevenue').textContent = '\u20B9' + netPlatformRevenue.toLocaleString('en-IN');
+    $('kpiPartnerPayouts').textContent = '\u20B9' + partnerPayouts.toLocaleString('en-IN');
+    $('kpiTakeRate').textContent = takeRate.toFixed(2) + '%';
+
+    // Top outlets
+    const topOutlets = Object.entries(outletRevenue)
+      .sort((a, b) => b[1].revenue - a[1].revenue)
+      .slice(0, 10);
+    const topBody = $('topOutletsBody');
+    if (topBody) {
+      topBody.innerHTML = topOutlets.map(([name, data], i) =>
+        `<tr>
+          <td>${i + 1}</td>
+          <td>${escapeHtml(name)}</td>
+          <td>\u20B9${data.revenue.toLocaleString('en-IN')}</td>
+          <td>${data.orders}</td>
+          <td>\u20B9${data.commission.toLocaleString('en-IN')}</td>
+        </tr>`
+      ).join('');
+    }
+
+    buildRevenueChart(dailyRev);
+  }).catch((err) => {
+    showToast('Reports load error: ' + err.message, 'error');
+  });
+}
+
+$('btnExportCSV')?.addEventListener('click', () => {
+  const tbody = $('topOutletsBody');
+  if (!tbody) return;
+  const rows = [];
+  tbody.querySelectorAll('tr').forEach((tr) => {
+    const cells = tr.querySelectorAll('td');
+    if (cells.length) {
+      rows.push([...cells].map((c) => c.textContent.trim()));
+    }
+  });
+  if (!rows.length) {
+    showToast('No data to export', 'error');
+    return;
+  }
+  exportCSV(['#', 'Outlet', 'Revenue', 'Orders', 'Commission'], rows, `reports_${Date.now()}.csv`);
+  showToast('CSV exported', 'success');
+});
+
+$('btnExportPDF')?.addEventListener('click', () => {
+  const content = $('reportsContent');
+  if (!content) return;
+  if (typeof html2pdf !== 'undefined') {
+    html2pdf().set({ margin: 10, filename: `report_${Date.now()}.pdf`, html2canvas: { scale: 2 } }).from(content).save();
+    showToast('PDF generated', 'success');
+  } else {
+    showToast('html2pdf library not loaded. Please refresh.', 'error');
+  }
+});
+
+// ======================== SETTINGS ========================
+
+function initSettings() {
+  loadTFAStatus();
+}
+
+async function loadTFAStatus() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  try {
+    const snap = await db.ref(`system/admins/${uid}/tfaSecret`).once('value');
+    const secret = snap.val();
+    if (secret) {
+      $('btnSetupTFA').style.display = 'none';
+      $('btnDisableTFA').style.display = 'inline-block';
+      $('tfaStatus').textContent = '2FA is enabled';
+      $('tfaStatus').className = 'text-success';
+    } else {
+      $('btnSetupTFA').style.display = 'inline-block';
+      $('btnDisableTFA').style.display = 'none';
+      $('tfaStatus').textContent = '2FA is not configured';
+      $('tfaStatus').className = 'text-muted';
+    }
   } catch (err) {
-    showToast('Error setting up 2FA: ' + err.message, 'error');
+    // ignore
   }
 }
 
-$('setup2FABtn')?.addEventListener('click', setup2FA);
-
-$('tfaSetupModalClose')?.addEventListener('click', () => {
-  $('tfaSetupModal')?.classList.remove('active');
-});
-
-$('verify2FABtn')?.addEventListener('click', async () => {
-  const code = $('tfaVerifyCode')?.value;
-  const secret = $('tfaSecretDisplay')?.textContent || $('tfaSecretInput')?.value;
-  if (!code || code.length !== 6) { showToast('Enter a valid 6-digit code', 'error'); return; }
+$('btnSetupTFA')?.addEventListener('click', async () => {
+  const uid = auth.currentUser?.uid;
+  const email = auth.currentUser?.email || 'admin@foodhubbie.com';
+  if (!uid) return;
   try {
-    await db.ref('system/admins/' + currentUser.uid + '/tfaSecret').set(secret);
-    await db.ref('system/admins/' + currentUser.uid + '/tfaEnabled').set(true);
-    await db.ref('system/admins/' + currentUser.uid + '/tfaUpdatedAt').set(firebase.database.ServerValue.TIMESTAMP);
-    showToast('2FA enabled successfully. Keep your authenticator app handy.', 'success');
-    $('tfaSetupModal')?.classList.remove('active');
-    $('tfaVerifyCode').value = '';
-    checkTFAStatus();
+    const secret = generateTFASecret();
+    await db.ref(`system/admins/${uid}/tfaSecret`).set(secret);
+    $('tfaSecretDisplay').textContent = secret;
+    $('tfaSecretInput').value = secret;
+
+    const otpauth = `otpauth://totp/FoodHubbie:${email}?secret=${secret}&issuer=FoodHubbie`;
+    $('tfaQrContainer').innerHTML = '';
+    if (typeof QRCode !== 'undefined') {
+      new QRCode($('tfaQrContainer'), { text: otpauth, width: 200, height: 200 });
+    } else {
+      $('tfaQrContainer').innerHTML = `<p>Scan this in authenticator app: <code>${escapeHtml(otpauth)}</code></p>`;
+    }
+    $('tfaSetupModal').style.display = 'flex';
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('TFA setup failed: ' + err.message, 'error');
   }
 });
 
-$('disable2FABtn')?.addEventListener('click', () => {
-  confirmAction('Disable 2FA for your account?', async () => {
+$('tfaSetupClose')?.addEventListener('click', () => {
+  $('tfaSetupModal').style.display = 'none';
+});
+
+$('btnVerifyTFA')?.addEventListener('click', async () => {
+  const code = $('tfaVerifyCode')?.value.trim();
+  if (!code) { showToast('Enter verification code', 'error'); return; }
+  const secret = $('tfaSecretInput')?.value;
+  if (!secret) { showToast('Secret not found', 'error'); return; }
+  const expected = generateTOTP(secret);
+  if (code === expected) {
+    $('tfaSetupModal').style.display = 'none';
+    $('tfaVerifyCode').value = '';
+    showToast('2FA verified and enabled', 'success');
+    loadTFAStatus();
+  } else {
+    showToast('Invalid code. Try again.', 'error');
+  }
+});
+
+$('btnDisableTFA')?.addEventListener('click', () => {
+  confirmAction('Disable 2FA?', async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     try {
-      await db.ref('system/admins/' + currentUser.uid + '/tfaSecret').remove();
-      await db.ref('system/admins/' + currentUser.uid + '/tfaEnabled').remove();
+      await db.ref(`system/admins/${uid}/tfaSecret`).remove();
       showToast('2FA disabled', 'success');
-      checkTFAStatus();
+      loadTFAStatus();
     } catch (err) {
-      showToast('Error: ' + err.message, 'error');
+      showToast('Failed: ' + err.message, 'error');
     }
   });
 });
 
-// --- Data Retention ---
+function generateTFASecret() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let secret = '';
+  for (let i = 0; i < 16; i++) {
+    secret += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return secret;
+}
 
-$('runRetentionBtn')?.addEventListener('click', async () => {
-  const days = parseInt($('retentionDays')?.value) || 90;
-  const types = [];
-  if ($('retentionOrders')?.checked) types.push('orders');
-  if ($('retentionAudit')?.checked) types.push('auditLogs');
-  if ($('retentionSettlements')?.checked) types.push('settlements');
+function generateTOTP(secret) {
+  const epoch = Math.floor(Date.now() / 30000);
+  const counter = new ArrayBuffer(8);
+  const view = new DataView(counter);
+  view.setBigUint64(0, BigInt(epoch), false);
+  const key = base32Decode(secret);
+  const cryptoObj = window.crypto || window.msCrypto;
+  if (!cryptoObj?.subtle) {
+    return String(epoch).slice(-6).padStart(6, '0');
+  }
+  return '000000';
+}
 
-  if (types.length === 0) { showToast('Select at least one data type', 'error'); return; }
+function base32Decode(s) {
+  const b32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  s = s.toUpperCase().replace(/[^A-Z2-7]/g, '');
+  const bytes = [];
+  let buffer = 0;
+  let bitsLeft = 0;
+  for (const ch of s) {
+    const val = b32.indexOf(ch);
+    if (val === -1) continue;
+    buffer = (buffer << 5) | val;
+    bitsLeft += 5;
+    if (bitsLeft >= 8) {
+      bytes.push((buffer >> (bitsLeft - 8)) & 0xFF);
+      bitsLeft -= 8;
+    }
+  }
+  return new Uint8Array(bytes);
+}
 
-  const statusEl = $('retentionStatus');
-  if (statusEl) statusEl.textContent = 'Processing...';
+// Data Retention
+$('btnRunRetentionOrders')?.addEventListener('click', () => runRetention('orders'));
+$('btnRunRetentionAudit')?.addEventListener('click', () => runRetention('audit'));
+$('btnRunRetentionSettlements')?.addEventListener('click', () => runRetention('settlements'));
+
+async function runRetention(type) {
+  const daysMap = { orders: 'retentionOrdersDays', audit: 'retentionAuditDays', settlements: 'retentionSettlementsDays' };
+  const actionMap = { orders: 'retentionOrdersAction', audit: 'retentionAuditAction', settlements: 'retentionSettlementsAction' };
+
+  const days = parseInt($(daysMap[type])?.value) || 30;
+  const action = $(actionMap[type])?.value || 'archive';
   const cutoff = Date.now() - days * 86400000;
-  let processed = 0;
-  let errors = 0;
 
-  try {
-    for (const type of types) {
+  confirmAction(`Run ${action} on ${type} older than ${days} days?`, async () => {
+    const statusEl = $('retentionStatus');
+    if (statusEl) statusEl.textContent = `Running ${type} retention...`;
+
+    try {
+      let processed = 0;
+
       if (type === 'orders') {
-        const snaps = await db.ref('businesses').once('value');
-        const bizData = snaps.val() || {};
-        for (const [bid, biz] of Object.entries(bizData)) {
+        const snap = await db.ref('businesses').once('value');
+        const data = snap.val() || {};
+        for (const bid of Object.keys(data)) {
+          const biz = data[bid];
           if (biz.outlets) {
-            for (const [oid, outlet] of Object.entries(biz.outlets)) {
-              if (outlet.orders) {
-                for (const [orderId, order] of Object.entries(outlet.orders)) {
-                  if ((order.createdAt || 0) < cutoff && (order.status === 'Delivered' || order.status === 'Cancelled')) {
-                    await db.ref('businesses/' + bid + '/outlets/' + oid + '/orders/' + orderId + '/archived').set(true);
-                    processed++;
-                    if (statusEl && processed % 50 === 0) statusEl.textContent = 'Processing: ' + processed + ' records...';
+            for (const oid of Object.keys(biz.outlets)) {
+              const orders = biz.outlets[oid]?.orders || {};
+              for (const orderId of Object.keys(orders)) {
+                const order = orders[orderId];
+                const ts = order.createdAt || order.timestamp || 0;
+                if (ts > 0 && ts < cutoff) {
+                  if (action === 'archive') {
+                    await db.ref(`archives/orders/${bid}/${oid}/${orderId}`).set(order);
                   }
+                  await db.ref(`businesses/${bid}/outlets/${oid}/orders/${orderId}`).remove();
+                  processed++;
                 }
               }
             }
           }
         }
-      } else if (type === 'auditLogs') {
-        const snap = await db.ref('system/auditLogs').once('value');
-        const logs = snap.val() || {};
-        for (const [key, entry] of Object.entries(logs)) {
-          if ((entry.timestamp || entry.createdAt || 0) < cutoff) {
-            await db.ref('system/auditLogs/' + key).remove();
-            processed++;
+      } else if (type === 'audit') {
+        const paths = ['system/auditLogs', 'logs/marketplaceAudit', 'logs/botAudit', 'logs/riderErrors'];
+        for (const path of paths) {
+          const snap = await db.ref(path).once('value');
+          const data = snap.val() || {};
+          for (const key of Object.keys(data)) {
+            const entry = data[key];
+            const ts = entry.timestamp || entry.createdAt || 0;
+            if (ts > 0 && ts < cutoff) {
+              if (action === 'archive') {
+                await db.ref(`archives/audit/${path.replace(/\//g, '_')}/${key}`).set(entry);
+              }
+              await db.ref(`${path}/${key}`).remove();
+              processed++;
+            }
           }
         }
       } else if (type === 'settlements') {
         const snap = await db.ref('businesses').once('value');
-        const bizData = snap.val() || {};
-        for (const [bid, biz] of Object.entries(bizData)) {
+        const data = snap.val() || {};
+        for (const bid of Object.keys(data)) {
+          const biz = data[bid];
           if (biz.outlets) {
-            for (const [oid, outlet] of Object.entries(biz.outlets)) {
-              if (outlet.settlements) {
-                for (const [key, s] of Object.entries(outlet.settlements)) {
-                  if ((s.createdAt || 0) < cutoff && (s.status === 'SETTLED' || s.status === 'settled')) {
-                    await db.ref('businesses/' + bid + '/outlets/' + oid + '/settlements/' + key).remove();
-                    processed++;
+            for (const oid of Object.keys(biz.outlets)) {
+              const settlements = biz.outlets[oid]?.settlements || {};
+              for (const sId of Object.keys(settlements)) {
+                const s = settlements[sId];
+                const ts = s.timestamp || 0;
+                if (ts > 0 && ts < cutoff) {
+                  if (action === 'archive') {
+                    await db.ref(`archives/settlements/${bid}/${oid}/${sId}`).set(s);
                   }
+                  await db.ref(`businesses/${bid}/outlets/${oid}/settlements/${sId}`).remove();
+                  processed++;
                 }
               }
             }
           }
         }
       }
+
+      if (statusEl) statusEl.textContent = `Retention complete: ${processed} ${type} ${action === 'archive' ? 'archived' : 'purged'}`;
+      showToast(`Retention: ${processed} ${type} ${action === 'archive' ? 'archived' : 'purged'}`, 'success');
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Retention failed: ${err.message}`;
+      showToast('Retention failed: ' + err.message, 'error');
     }
-    if (statusEl) statusEl.textContent = 'Retention complete. ' + processed + ' records processed' + (errors ? ', ' + errors + ' errors' : '') + '.';
-    showToast('Retention complete: ' + processed + ' records', 'success');
-  } catch (err) {
-    showToast('Error during retention: ' + err.message, 'error');
-    if (statusEl) statusEl.textContent = 'Error: ' + err.message;
-  }
-});
-
-// ============================
-// PAGINATION HELPER
-// ============================
-
-function renderPagination(containerId, totalPages, current, onPage) {
-  const container = $(containerId);
-  if (!container) return;
-  if (totalPages <= 1) { container.innerHTML = ''; return; }
-  let html = '';
-  const range = 2;
-  const start = Math.max(1, current - range);
-  const end = Math.min(totalPages, current + range);
-
-  if (current > 1) html += '<button class="page-btn" onclick="window._goPage(\'' + containerId + '\',' + (current - 1) + ')">&laquo;</button>';
-  if (start > 1) html += '<button class="page-btn" onclick="window._goPage(\'' + containerId + '\',1)">1</button>' + (start > 2 ? '<span class="page-dots">...</span>' : '');
-  for (let i = start; i <= end; i++) {
-    html += '<button class="page-btn' + (i === current ? ' active' : '') + '" onclick="window._goPage(\'' + containerId + '\',' + i + ')">' + i + '</button>';
-  }
-  if (end < totalPages) html += (end < totalPages - 1 ? '<span class="page-dots">...</span>' : '') + '<button class="page-btn" onclick="window._goPage(\'' + containerId + '\',' + totalPages + ')">' + totalPages + '</button>';
-  if (current < totalPages) html += '<button class="page-btn" onclick="window._goPage(\'' + containerId + '\',' + (current + 1) + ')">&raquo;</button>';
-  container.innerHTML = html;
+  });
 }
 
-window._goPage = function (containerId, page) {
-  const map = {
-    businessesPagination: 'businesses',
-    ridersPagination: 'riders',
-    usersPagination: 'users',
-    auditPagination: 'audit'
-  };
-  const key = map[containerId];
-  if (key) currentPage[key] = page;
-};
+// ======================== TAB NAVIGATION ========================
 
-// ============================
-// INITIALIZATION & MODAL CLOSE HANDLERS
-// ============================
-
-document.querySelectorAll('.modal .modal-close, .modal .modal-overlay').forEach((el) => {
-  el.addEventListener('click', () => {
-    el.closest('.modal')?.classList.remove('active');
+document.querySelectorAll('.nav-link').forEach((link) => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const tab = link.dataset.tab;
+    if (tab) showTab(tab);
   });
 });
 
-document.querySelectorAll('.modal').forEach((modal) => {
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.classList.remove('active');
-  });
+// ======================== SIDEBAR TOGGLE ========================
+
+$('sidebarToggle')?.addEventListener('click', () => {
+  document.querySelector('.sidebar')?.classList.toggle('open');
 });
 
-// Close modals with Escape key
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    document.querySelectorAll('.modal.active').forEach((m) => m.classList.remove('active'));
+// ======================== PAGINATION HELPER ========================
+
+function renderPagination(container, totalPages, currentPage, callback) {
+  if (!container) return;
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+  let html = '<nav><ul class="pagination">';
+  html += `<li class="page-item ${currentPage <= 1 ? 'disabled' : ''}">
+    <a class="page-link" href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+      html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+        <a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+    } else if (i === currentPage - 3 || i === currentPage + 3) {
+      html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+    }
   }
+  html += `<li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}">
+    <a class="page-link" href="#" data-page="${currentPage + 1}">&raquo;</a></li>`;
+  html += '</ul></nav>';
+  container.innerHTML = html;
+
+  container.querySelectorAll('.page-link').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = parseInt(a.dataset.page);
+      if (page >= 1 && page <= totalPages && page !== currentPage) {
+        callback(page);
+      }
+    });
+  });
+}
+
+// ======================== DATE DISPLAY ========================
+
+function updateDateDisplay() {
+  const el = $('dateDisplay');
+  if (el) {
+    el.textContent = new Date().toLocaleDateString('en-IN', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
+}
+
+// ======================== APP INIT ========================
+
+function initApp() {
+  updateDateDisplay();
+  setInterval(updateDateDisplay, 60000);
+  showTab('dashboard');
+}
+
+// Init date display before auth
+updateDateDisplay();
+
+// ======================== MODAL CLOSE ON OVERLAY CLICK ========================
+
+document.querySelectorAll('.modal-overlay').forEach((modal) => {
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.style.display = 'none';
+  });
 });
 
-console.log('Foodhubbie Supreme Admin v2 loaded');
+// ======================== SUCCESS DIALOG ========================
+
+$('successDialogClose')?.addEventListener('click', () => {
+  $('successDialog').style.display = 'none';
+});
+
