@@ -270,7 +270,7 @@ function initDashboard() {
       $('kpiRiders').textContent = rSnap.numChildren() || 0;
     }).catch(() => {});
 
-    buildRevenueChart(dailyRevenue);
+    buildRevenueChart(dailyRevenue, 'revenueChart');
     buildOrdersChart(statusCounts);
   }, (err) => {
     showToast('Dashboard load error: ' + err.message, 'error');
@@ -278,8 +278,8 @@ function initDashboard() {
 }
 
 let revenueChartInstance = null;
-function buildRevenueChart(dailyRevenue) {
-  const canvas = $('reportsChart');
+function buildRevenueChart(dailyRevenue, canvasId) {
+  const canvas = $(canvasId || 'revenueChart');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const sortedDays = Object.keys(dailyRevenue).sort().slice(-14);
@@ -316,7 +316,7 @@ function buildRevenueChart(dailyRevenue) {
 
 let ordersChartInstance = null;
 function buildOrdersChart(statusCounts) {
-  const canvas = document.querySelector('#dashboard canvas.chart-doughnut');
+  const canvas = $('ordersChart');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const labels = Object.keys(statusCounts);
@@ -1826,7 +1826,7 @@ function initReports() {
       ).join('');
     }
 
-    buildRevenueChart(dailyRev);
+    buildRevenueChart(dailyRev, 'reportsChart');
   }).catch((err) => {
     showToast('Reports load error: ' + err.message, 'error');
   });

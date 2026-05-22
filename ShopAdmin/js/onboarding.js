@@ -1,4 +1,4 @@
-import { auth, db, storage, ServerValue } from './firebase.js';
+import { auth, db, uploadImage, ServerValue } from './firebase.js';
 import { showToast } from './utils.js';
 
 let currentStep = 1;
@@ -86,12 +86,7 @@ window.handleKYCUpload = async function(type, input) {
     statusEl.className = "text-xs text-accent mt-4 animate-pulse";
 
     try {
-        const path = `onboarding/kyc/${Date.now()}_${file.name}`;
-        const ref = storage.ref(path);
-        await ref.put(file);
-        const url = await ref.getDownloadURL();
-        
-        onboardingData.kyc[type] = url;
+        onboardingData.kyc[type] = await uploadImage(file, `onboarding/kyc/${type}`);
         statusEl.innerText = "Verified Γ£ï";
         statusEl.className = "text-xs text-success mt-4";
         showToast(`${type.toUpperCase()} Uploaded`, "success");

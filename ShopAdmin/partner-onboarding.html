@@ -604,7 +604,7 @@
     </div>
 
     <script type="module">
-        import { auth, db, storage, ServerValue } from './js/firebase.js';
+        import { auth, db, uploadImage, ServerValue } from './js/firebase.js';
 
         let onboardingData = {
             kyc: {}
@@ -689,11 +689,7 @@
                 preview.innerText = "Uploading...";
                 
                 try {
-                    const path = `onboarding/kyc/${Date.now()}_${file.name}`;
-                    const ref = storage.ref(path);
-                    await ref.put(file);
-                    const url = await ref.getDownloadURL();
-                    onboardingData.kyc[type] = url;
+                    onboardingData.kyc[type] = await uploadImage(file, `onboarding/kyc/${type}`);
                     preview.innerText = "Verified Γ£ï";
                     preview.classList.add('text-green-500');
                     Swal.fire("Success", `${type.toUpperCase()} uploaded successfully`, "success");
