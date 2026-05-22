@@ -29,7 +29,6 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       
       const success = async (position: GeolocationPosition) => {
         const { latitude, longitude } = position.coords;
-        console.log(`Location success: ${latitude}, ${longitude}`);
         
         setState((prev) => ({
           ...prev,
@@ -48,7 +47,6 @@ export function LocationProvider({ children }: { children: ReactNode }) {
           
           setState((prev) => ({ ...prev, address }));
         } catch (e) {
-          console.warn("Reverse geocoding failed, using coords");
           setState((prev) => ({ 
             ...prev, 
             address: `Area: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`
@@ -57,12 +55,9 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       };
 
       const error = (err: GeolocationPositionError) => {
-        console.warn(`Location error (code ${err.code}): ${err.message}`);
-        
         if (err.code === 3) { // Timeout - try low accuracy
           navigator.geolocation.getCurrentPosition(success, (finalErr) => {
-            console.error("Final location fallback failed:", finalErr.message);
-            setState((prev) => ({ ...prev, permissionStatus: "denied", address: "Location Timeout" }));
+            setState((prev) => ({ ...prev, permissionStatus: "denied" }));
           }, lowAccuracyOptions);
         } else {
           setState((prev) => ({ ...prev, permissionStatus: "denied" }));

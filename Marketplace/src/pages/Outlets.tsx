@@ -36,6 +36,41 @@ export default function Outlets() {
 
   const displayed = filterOutlets(outlets, searchQuery, activeFilter);
 
+  if (locationState.permissionStatus !== "granted") {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <div className="bg-primary/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <MapPin className="h-10 w-10 text-primary" />
+          </div>
+          <h2 className="text-2xl font-heading font-bold mb-3">
+            {locationState.permissionStatus === "denied"
+              ? "Location Access Blocked"
+              : "Share Your Location"}
+          </h2>
+          <p className="text-muted-foreground mb-8 leading-relaxed">
+            {locationState.permissionStatus === "denied"
+              ? "Please enable location access in your browser settings, then refresh the page."
+              : "We need your location to show restaurants near you and provide accurate delivery estimates."}
+          </p>
+          {locationState.permissionStatus === "prompt" && (
+            <button
+              onClick={requestLocation}
+              className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-lg hover:bg-primary/90 transition-colors"
+            >
+              Allow Location Access
+            </button>
+          )}
+          {locationState.permissionStatus === "denied" && (
+            <p className="text-sm text-muted-foreground">
+              Open your browser settings → Site permissions → Location → select "Allow"
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Location banner */}
