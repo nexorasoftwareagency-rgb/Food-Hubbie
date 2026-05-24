@@ -1,22 +1,17 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   LayoutDashboard, ShoppingBag, Zap, ChefHat, Monitor, UtensilsCrossed,
   Tag, Package, Users, Bike, Handshake, BarChart3, TrendingDown,
   CreditCard, Bell, MessageSquare, MapPin, Settings, LogOut,
-  Sun, Moon, Search, ChevronDown, Plus, Download,
-  Eye, Edit2, Trash2, CheckCircle, XCircle, Clock, Truck,
-  AlertTriangle, Star, ArrowUp, ArrowDown, ArrowRight,
-  RefreshCw, X, Menu, ChevronRight, ChevronLeft,
-  ShoppingCart, TrendingUp, Activity, Wallet, Store,
-  Send, Target, Layers, Map, Navigation, UserCheck,
-  Flame, Coffee, Check, Minus, Receipt, Filter
+  Sun, Moon, Search, Download, Eye, CheckCircle, Clock,
+  AlertTriangle, Star, ArrowUp, ArrowDown, X, Menu,
+  ChevronRight, ChevronLeft, ShoppingCart, TrendingUp, Wallet, Store
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 
-import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref, Outlet } from "./firebase";
+import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref } from "./firebase";
 import "./App.css";
 
 // ─── THEME ──────────────────────────────────────────────────────────────────
@@ -29,7 +24,6 @@ const COLORS = {
   error: "#ef4444",
   muted: "#64748b",
 };
-const PIE_COLORS = ["#f36b21", "#3b82f6", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899"];
 
 const ORDER_STATUSES = {
   pending:          { label: "Pending",         color: "#f59e0b", bg: "#fef3c7" },
@@ -71,33 +65,7 @@ const MOCK_RIDERS = [
   { id:"r4", name:"Ramesh Thakur", phone:"+91 9654321098", vehicle:"cycle",  status:"online",  earn:1560, deliv:11, rating:4.8, order:null },
 ];
 
-const MOCK_CUSTOMERS = [
-  { id:"c1", name:"Rahul Sharma",  phone:"+91 9876543210", orders:24, spent:8640,  last:"2 hours ago", addr:"14 MG Road",  city:"Ranchi" },
-  { id:"c2", name:"Priya Singh",   phone:"+91 9845671230", orders:18, spent:6120,  last:"Yesterday",   addr:"Kokar Colony", city:"Ranchi" },
-  { id:"c3", name:"Amit Kumar",    phone:"+91 9123456789", orders:31, spent:11280, last:"Today",        addr:"Ashok Nagar", city:"Ranchi" },
-  { id:"c4", name:"Sunita Verma",  phone:"+91 9988776655", orders:9,  spent:2430,  last:"3 days ago",  addr:"Harmu",       city:"Ranchi" },
-  { id:"c5", name:"Deepak Jha",    phone:"+91 9012345678", orders:42, spent:15960, last:"1 hour ago",  addr:"Lalpur",      city:"Ranchi" },
-  { id:"c6", name:"Neha Gupta",    phone:"+91 9678901234", orders:14, spent:4780,  last:"Today",       addr:"Ratu Road",   city:"Ranchi" },
-];
-
-const MOCK_INVENTORY = [
-  { id:1, name:"Chicken (kg)",   stock:12, threshold:5,  unit:"kg" },
-  { id:2, name:"Paneer (kg)",    stock:3,  threshold:4,  unit:"kg" },
-  { id:3, name:"Rice (kg)",      stock:25, threshold:10, unit:"kg" },
-  { id:4, name:"Tomatoes (kg)",  stock:2,  threshold:5,  unit:"kg" },
-  { id:5, name:"Onions (kg)",    stock:18, threshold:8,  unit:"kg" },
-  { id:6, name:"Cream (L)",      stock:4,  threshold:3,  unit:"L"  },
-  { id:7, name:"Butter (kg)",    stock:1,  threshold:2,  unit:"kg" },
-  { id:8, name:"Maida (kg)",     stock:30, threshold:10, unit:"kg" },
-];
-
-const MOCK_FEEDBACK = [
-  { id:1, customer:"Rahul S.", rating:5, comment:"Amazing food and super fast delivery! The butter chicken was exceptional.", dish:"Butter Chicken", time:"1 hr ago" },
-  { id:2, customer:"Priya S.", rating:4, comment:"Really good paneer tikka. Could be a bit more spicy but overall great.", dish:"Paneer Tikka", time:"3 hrs ago" },
-  { id:3, customer:"Amit K.", rating:5, comment:"Best biryani in Ranchi! Will definitely order again.", dish:"Biryani", time:"5 hrs ago" },
-  { id:4, customer:"Neha G.", rating:3, comment:"Food was good but delivery took longer than expected.", dish:"Dal Makhani", time:"Yesterday" },
-  { id:5, customer:"Deepak J.", rating:5, comment:"Excellent quality and packaging. Rider was very polite.", dish:"Tandoori Chicken", time:"2 days ago" },
-];
+// (MOCK_CUSTOMERS, MOCK_INVENTORY, MOCK_FEEDBACK reserved for future pages)
 
 const REVENUE_DATA = [
   { t:"8am", rev:1200, ord:4 }, { t:"9am", rev:2800, ord:9 },
@@ -117,56 +85,12 @@ const WEEK_DATA = [
   { d:"Sun", rev:74000, ord:121 },
 ];
 
-const CAT_DATA = [
-  { name:"Main Course", value:38 }, { name:"Starters", value:22 },
-  { name:"Rice", value:18 }, { name:"Desserts", value:12 }, { name:"Breads", value:10 },
-];
+// (CAT_DATA reserved for analytics)
 
-const MOCK_TRANSACTIONS = [
-  { id:"TXN-001", date:"May 23", type:"Order Sales",    amount:8450,  method:"UPI",  status:"settled" },
-  { id:"TXN-002", date:"May 23", type:"Commission",     amount:-845,  method:"Auto", status:"settled" },
-  { id:"TXN-003", date:"May 22", type:"Order Sales",    amount:11200, method:"UPI",  status:"settled" },
-  { id:"TXN-004", date:"May 22", type:"Rider Payout",   amount:-1840, method:"NEFT", status:"pending" },
-  { id:"TXN-005", date:"May 21", type:"Order Sales",    amount:9600,  method:"UPI",  status:"settled" },
-  { id:"TXN-006", date:"May 21", type:"Refund Issued",  amount:-320,  method:"UPI",  status:"settled" },
-];
-
-const MOCK_LOST = [
-  { id:"ORD-0985", customer:"Arun Tiwari",   reason:"Customer cancelled", time:"Yesterday", total:480 },
-  { id:"ORD-0971", customer:"Suman Devi",    reason:"Item unavailable",   time:"2 days ago", total:320 },
-  { id:"ORD-0954", customer:"Manish Roy",    reason:"No rider available",  time:"3 days ago", total:890 },
-  { id:"ORD-0940", customer:"Kavita Sinha",  reason:"Customer cancelled", time:"4 days ago", total:225 },
-  { id:"ORD-0921", customer:"Pankaj Gupta",  reason:"Store closed",       time:"5 days ago", total:650 },
-];
-
-const MOCK_PARTNERS = [
-  { id:"p1", name:"Ravi Supplies Co.",    type:"Raw Materials", status:"pending",  since:"May 20", contact:"9876001234" },
-  { id:"p2", name:"Freshmart Veggies",    type:"Vegetables",    status:"approved", since:"Apr 12", contact:"9812345678" },
-  { id:"p3", name:"SpiceBox India",       type:"Spices",        status:"pending",  since:"May 22", contact:"9901234567" },
-  { id:"p4", name:"Dairy Fresh Pvt Ltd",  type:"Dairy",         status:"rejected", since:"May 10", contact:"9845611234" },
-];
-
-const MOCK_CATS = [
-  { id:"cat1", name:"Starters",    icon:"🥗", items:8,  sort:1, active:true },
-  { id:"cat2", name:"Main Course", icon:"🍛", items:12, sort:2, active:true },
-  { id:"cat3", name:"Rice & Biryani", icon:"🍚", items:5, sort:3, active:true },
-  { id:"cat4", name:"Breads",      icon:"🫓", items:6,  sort:4, active:true },
-  { id:"cat5", name:"Desserts",    icon:"🍮", items:4,  sort:5, active:true },
-  { id:"cat6", name:"Drinks",      icon:"🥤", items:7,  sort:6, active:false },
-];
+// (MOCK_TRANSACTIONS, MOCK_LOST, MOCK_PARTNERS, MOCK_CATS reserved for future pages)
 
 // ─── UTILS ─────────────────────────────────────────────────────────────────
 const fmt = (v) => `₹${v.toLocaleString("en-IN")}`;
-const cn = (...c) => c.filter(Boolean).join(" ");
-
-const stockStatus = (stock, thr) =>
-  stock === 0 ? "critical" : stock <= thr ? "low" : "ok";
-
-const statusColors = {
-  ok:       { color: COLORS.success, bg: "#dcfce7" },
-  low:      { color: COLORS.warning, bg: "#fef3c7" },
-  critical: { color: COLORS.error,   bg: "#fee2e2" },
-};
 
 // ─── SHARED COMPONENTS ─────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
@@ -599,31 +523,25 @@ const OrdersPage = ({ showToast }) => {
   );
 };
 
-// Placeholder pages (same structure as v2.jsx but abbreviated for space)
-const LiveOpsPage = ({ showToast }) => {
-  const [orders, setOrders] = useState(MOCK_ORDERS.filter(o => !["delivered","cancelled"].includes(o.status)));
-  return <div className="text-slate-400">Live Ops page - coming soon</div>;
-};
+// Live Ops page placeholder
+const LiveOpsPage = () => <div className="text-slate-500 text-center py-12">Live Operations — coming soon</div>;
 
-const KitchenPage = ({ showToast }) => {
-  const [orders, setOrders] = useState(MOCK_ORDERS.filter(o => !["delivered","cancelled"].includes(o.status)));
-  return <div className="text-slate-400">Kitchen page - coming soon</div>;
-};
+const KitchenPage = () => <div className="text-slate-500 text-center py-12">Kitchen Display — coming soon</div>;
 
-const POSPage = ({ showToast }) => <div className="text-slate-400">POS page - coming soon</div>;
-const MenuPage = ({ showToast }) => <div className="text-slate-400">Menu page - coming soon</div>;
-const CategoriesPage = ({ showToast }) => <div className="text-slate-400">Categories page - coming soon</div>;
-const InventoryPage = ({ showToast }) => <div className="text-slate-400">Inventory page - coming soon</div>;
-const CustomersPage = ({ showToast }) => <div className="text-slate-400">Customers page - coming soon</div>;
-const RidersPage = ({ showToast }) => <div className="text-slate-400">Riders page - coming soon</div>;
-const PartnersPage = ({ showToast }) => <div className="text-slate-400">Partners page - coming soon</div>;
-const AnalyticsPage = ({ showToast }) => <div className="text-slate-400">Analytics page - coming soon</div>;
-const LostSalesPage = ({ showToast }) => <div className="text-slate-400">Lost Sales page - coming soon</div>;
-const SettlementsPage = ({ showToast }) => <div className="text-slate-400">Settlements page - coming soon</div>;
-const NotificationsPage = ({ showToast }) => <div className="text-slate-400">Notifications page - coming soon</div>;
-const FeedbackPage = ({ showToast }) => <div className="text-slate-400">Feedback page - coming soon</div>;
-const LiveTrackerPage = ({ showToast }) => <div className="text-slate-400">Live Tracker page - coming soon</div>;
-const SettingsPage = ({ showToast }) => <div className="text-slate-400">Settings page - coming soon</div>;
+const POSPage = () => <div className="text-slate-500 text-center py-12">POS / Walk-in — coming soon</div>;
+const MenuPage = () => <div className="text-slate-500 text-center py-12">Menu Management — coming soon</div>;
+const CategoriesPage = () => <div className="text-slate-500 text-center py-12">Categories — coming soon</div>;
+const InventoryPage = () => <div className="text-slate-500 text-center py-12">Inventory — coming soon</div>;
+const CustomersPage = () => <div className="text-slate-500 text-center py-12">Customers — coming soon</div>;
+const RidersPage = () => <div className="text-slate-500 text-center py-12">Riders — coming soon</div>;
+const PartnersPage = () => <div className="text-slate-500 text-center py-12">Partners — coming soon</div>;
+const AnalyticsPage = () => <div className="text-slate-500 text-center py-12">Analytics — coming soon</div>;
+const LostSalesPage = () => <div className="text-slate-500 text-center py-12">Lost Sales — coming soon</div>;
+const SettlementsPage = () => <div className="text-slate-500 text-center py-12">Settlements — coming soon</div>;
+const NotificationsPage = () => <div className="text-slate-500 text-center py-12">Push Notifications — coming soon</div>;
+const FeedbackPage = () => <div className="text-slate-500 text-center py-12">Customer Feedback — coming soon</div>;
+const LiveTrackerPage = () => <div className="text-slate-500 text-center py-12">Live Tracker — coming soon</div>;
+const SettingsPage = () => <div className="text-slate-500 text-center py-12">Settings — coming soon</div>;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE REGISTRY
