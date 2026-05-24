@@ -39,7 +39,7 @@ export default function ReviewModal({ isOpen, onClose, order, onSuccess }: Revie
     try {
       await submitReview(order.businessId, order.outletId, order.id, {
         userId: user?.id || "anonymous",
-        userName: user?.name || "Customer",
+        userName: user?.name || "",
         userAvatar: user?.avatar || "",
         outletId: order.outletId,
         outletName: order.outletName,

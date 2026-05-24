@@ -1,6 +1,5 @@
 // ─── Menu Service ─────────────────────────────────────────────────────────────
 // Backed by Firebase Realtime Database.
-// Automatically maps legacy Roshani dishes to SaaS MenuItem structure.
 
 import { db, ref, get } from "@/lib/firebase";
 import type { MenuItem, MenuItemSize, MenuItemAddon } from "@/types";
@@ -39,14 +38,14 @@ function mapLegacyDish(id: string, dish: any, outletId: string, businessId: stri
     outletId: outletId,
     businessId: businessId,
     outletName: outletName,
-    name: dish.name || "Unknown Dish",
+    name: dish.name || "",
     description: dish.description || dish.name || "",
-    image: dish.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591",
-    category: dish.category || "General",
+    image: dish.image || "",
+    category: dish.category || "",
     isVeg: dish.isVeg !== undefined ? dish.isVeg : true,
     price: dish.price || (sizes.length > 0 ? sizes[0].price : 0),
-    rating: dish.rating || 4.5,
-    ratingCount: dish.ratingCount || 10,
+    rating: dish.rating || 0,
+    ratingCount: dish.ratingCount || 0,
     isBestSeller: dish.isBestSeller || false,
     isRecommended: dish.isRecommended || false,
     isSpicy: dish.isSpicy || false,
@@ -65,7 +64,7 @@ function mapLegacyDish(id: string, dish: any, outletId: string, businessId: stri
 }
 
 /** Fetch all menu items for a given outlet */
-export async function fetchMenuByOutlet(outletId: string, businessId: string = "business_roshani"): Promise<MenuItem[]> {
+export async function fetchMenuByOutlet(outletId: string, businessId: string = ""): Promise<MenuItem[]> {
   try {
     const isLegacy = outletId === "outlet_pizza" || outletId === "outlet_cake" || outletId === "Pizza-Shop" || outletId === "Cake-Shop";
 
@@ -75,7 +74,7 @@ export async function fetchMenuByOutlet(outletId: string, businessId: string = "
       `outlets/${outletId}`
     ];
 
-    let outletName = "Restaurant";
+    let outletName = "";
     for (const path of primaryPaths) {
       const snap = await get(ref(db, path));
       if (snap.exists()) {
@@ -94,12 +93,10 @@ export async function fetchMenuByOutlet(outletId: string, businessId: string = "
           }
           if (result.length > 0) return result;
         }
-        // Return early if the SaaS outlet exists but is empty to prevent fallback leakage
-        return [];
       }
     }
 
-    // 2. Only check legacy fallback paths if outletId is a known legacy identifier
+    // 2. Fallback: Check legacy paths for known legacy outlets
     if (isLegacy) {
       const legacyPaths = [
         `Pizza-Shop`,
@@ -129,21 +126,21 @@ export async function fetchMenuByOutlet(outletId: string, businessId: string = "
           }
         }
       }
+    }
 
-      // Final legacy fallback: Check root dishes
-      const rootSnap = await get(ref(db, "dishes"));
-      if (rootSnap.exists()) {
-        const allDishes = rootSnap.val();
-        const result: MenuItem[] = [];
-        for (const id in allDishes) {
-          const dish = allDishes[id];
-          if (!dish.outlet || dish.outlet.toLowerCase() === outletId.toLowerCase() ||
-              dish.outlet.toLowerCase().includes(outletId.toLowerCase())) {
-            result.push(mapLegacyDish(id, dish, outletId, businessId, "Restaurant"));
-          }
+    // 3. Universal fallback: Check root dishes for any outlet
+    const rootSnap = await get(ref(db, "dishes"));
+    if (rootSnap.exists()) {
+      const allDishes = rootSnap.val();
+      const result: MenuItem[] = [];
+      for (const id in allDishes) {
+        const dish = allDishes[id];
+        if (!dish.outlet || dish.outlet.toLowerCase() === outletId.toLowerCase() ||
+            dish.outlet.toLowerCase().includes(outletId.toLowerCase())) {
+          result.push(mapLegacyDish(id, dish, outletId, businessId, ""));
         }
-        return result;
       }
+      if (result.length > 0) return result;
     }
 
     return [];
@@ -279,11 +276,11 @@ export async function fetchAllMenuItems(): Promise<MenuItem[]> {
       for (const dId in allDishes) {
         if (!processedIds.has(dId)) {
           const dish = allDishes[dId];
-          const oId = dish.outlet || "Pizza-Shop";
-          const mapped = mapLegacyDish(dId, dish, oId, "business_roshani", "Restaurant");
+          const oId = dish.outlet || "";
+          const mapped = mapLegacyDish(dId, dish, oId, "", "");
           result.push({
             ...mapped,
-            outletName: "Roshani Restaurant"
+            outletName: ""
           });
           processedIds.add(dId);
         }

@@ -178,7 +178,6 @@ export default function Tracking() {
                 <div
                   key={stage}
                   className="flex items-start gap-4 mb-8 last:mb-0 relative"
-                  data-testid={`stage-${stage.toLowerCase().replace(/\s/g, "-")}`}
                 >
                   {!isLast && (
                     <motion.div
@@ -270,7 +269,6 @@ export default function Tracking() {
               <a
                 href={`tel:${order.riderPhone}`}
                 className="bg-primary text-primary-foreground h-12 w-12 rounded-full flex items-center justify-center shadow-md"
-                data-testid="btn-call-rider"
                 title="Call Rider"
               >
                 <Phone className="h-5 w-5" />
@@ -285,20 +283,20 @@ export default function Tracking() {
             className="w-full h-full"
             style={{
               background:
-                "linear-gradient(135deg, hsl(160 30% 90%) 0%, hsl(160 40% 85%) 50%, hsl(48 60% 90%) 100%)",
+                "linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, hsl(var(--secondary) / 0.12) 50%, hsl(var(--primary) / 0.05) 100%)",
             }}
           />
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <motion.div
-                animate={{ scale: [1, 1.15, 1] }}
-                transition={{ repeat: Infinity, duration: 1.8 }}
-                className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg"
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                className="w-14 h-14 bg-primary rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary/20"
               >
-                <Bike className="h-6 w-6 text-primary-foreground" />
+                <MapPinCheck className="h-7 w-7 text-primary-foreground" />
               </motion.div>
               <p className="text-xs font-semibold text-muted-foreground">
-                Live tracking coming soon
+                Rider location will appear here
               </p>
             </div>
           </div>

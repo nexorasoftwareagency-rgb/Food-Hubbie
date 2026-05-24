@@ -124,8 +124,8 @@
         </div>
         <div class="pro-card">
           <div class="table-header"><h3>All Businesses</h3></div>
-          <table class="pro-table">
-            <thead><tr><th>Name</th><th>Owner</th><th>Email</th><th>Outlets</th><th>Status</th><th>Actions</th></tr></thead>
+      <table class="pro-table">
+            <thead><tr><th>ID</th><th>Name</th><th>Owner</th><th>Admin Email</th><th>Phone</th><th>Outlets</th><th>Actions</th></tr></thead>
             <tbody id="businessesBody"></tbody>
           </table>
         </div>
@@ -532,6 +532,14 @@
       <div class="form-group"><label>Address</label><textarea id="editOutletAddress" rows="2"></textarea></div>
       <div class="form-group"><label>Phone</label><input type="tel" id="editOutletPhone"></div>
       <div class="form-row"><div class="form-group"><label>Latitude</label><input type="text" id="editOutletLat"></div><div class="form-group"><label>Longitude</label><input type="text" id="editOutletLng"></div></div>
+      <div class="form-group" style="margin-top:12px;padding-top:12px;border-top:1px solid #2d3748">
+        <label style="color:#38BDF8;font-weight:700">Admin Email (Username)</label>
+        <input type="email" id="editAdminEmail" readonly style="background:#1a2332;color:#38BDF8;font-weight:700">
+      </div>
+      <div class="form-group">
+        <label style="color:#F59E0B;font-weight:700">Admin Password</label>
+        <input type="text" id="editAdminPassDisplay" readonly style="background:#1a2332;color:#F59E0B;font-weight:700">
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-pro-outline" id="outletEditClose">Cancel</button>

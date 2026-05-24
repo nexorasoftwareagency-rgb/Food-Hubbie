@@ -324,7 +324,7 @@ function buildOrdersChart(statusCounts) {
   const colors = {
     Pending: '#f59e0b',
     Confirmed: '#3b82f6',
-    Preparing: '#8b5cf6',
+    Preparing: '#f36b21',
     'Out for Delivery': '#06b6d4',
     Delivered: '#10b981',
     Cancelled: '#ef4444'
@@ -491,12 +491,27 @@ $('onboardingSave').addEventListener('click', async () => {
 let businessesPage = 1;
 let filteredBusinesses = [];
 
+let adminByBusiness = {};
+
 function initBusinesses() {
   businessesPage = 1;
   db.ref('businesses').off();
   db.ref('businesses').on('value', (snap) => {
     allBusinesses = snap.val() || {};
-    filterBusinesses();
+    // Also load admin data for email/password display
+    db.ref('system/admins').once('value', (adminsSnap) => {
+      adminByBusiness = {};
+      if (adminsSnap.exists()) {
+        const admins = adminsSnap.val();
+        for (const uid in admins) {
+          const a = admins[uid];
+          if (a.businessId) {
+            adminByBusiness[a.businessId] = a;
+          }
+        }
+      }
+      filterBusinesses();
+    });
   });
 }
 
@@ -532,12 +547,15 @@ function renderBusinessesPage(page) {
   }
   tbody.innerHTML = pageEntries.map(([bid, biz]) => {
     const outlets = biz.outlets ? Object.keys(biz.outlets).length : 0;
+    const admin = adminByBusiness[bid];
+    const adminEmail = admin ? admin.email : (biz.email || '-');
+    const adminPhone = admin ? admin.phone : (biz.phone || '-');
     return `<tr>
       <td>${escapeHtml(bid)}</td>
       <td>${escapeHtml(biz.name || '-')}</td>
       <td>${escapeHtml(biz.ownerName || '-')}</td>
-      <td>${escapeHtml(biz.email || '-')}</td>
-      <td>${escapeHtml(biz.phone || '-')}</td>
+      <td style="color:#38BDF8;font-weight:700">${escapeHtml(adminEmail)}</td>
+      <td>${escapeHtml(adminPhone)}</td>
       <td>${outlets}</td>
       <td class="action-cell">
         <button class="btn btn-sm btn-primary" onclick="editOutlet('${bid}')">Edit Outlet</button>
@@ -564,6 +582,25 @@ window.editOutlet = async (bid) => {
   $('editOutletPhone').value = outlet.phone || '';
   $('editOutletLat').value = outlet.lat || '';
   $('editOutletLng').value = outlet.lng || '';
+
+  // Load admin credentials
+  try {
+    const snap = await db.ref('system/admins').orderByChild('businessId').equalTo(bid).once('value');
+    if (snap.exists()) {
+      const admins = snap.val();
+      for (const uid in admins) {
+        const a = admins[uid];
+        if (a.outletId === oid || !oid) {
+          $('editAdminEmail').value = a.email || '';
+          $('editAdminPassDisplay').value = a.password || '';
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load admin credentials:', e);
+  }
+
   $('outletEditModal').dataset.bid = bid;
   $('outletEditModal').dataset.oid = oid;
   $('outletEditModal').style.display = 'flex';

@@ -1,39 +1,36 @@
 import { ref, get } from "firebase/database";
 import { db } from "@/lib/firebase";
-import { calcDeliveryFee } from "@/lib/deliveryFee";
-import type { DeliveryFeeSlot } from "@/types";
+import { calcDeliveryFee, defaultDeliveryFeeConfig } from "@/lib/deliveryFee";
+import type { DeliveryFeeConfig } from "@/types";
 
 /**
- * Fetches the applicable delivery fee structure for an outlet.
- * 1. Checks outlet-specific settings: businesses/business_roshani/outlets/{oid}/settings/Delivery/slabs
- * 2. If empty, checks platform-wide settings: system/settings/delivery/slabs
- * 3. Fallback to hardcoded defaults if both are missing.
+ * Fetches the applicable delivery fee config from SuperAdmin system settings.
+ * Supports both modes: per_100m (rate per 100 metres) and slabs (km-based tiers).
+ * Falls back to hardcoded defaults if missing.
  */
-export async function getApplicableDeliverySlabs(outletId: string): Promise<DeliveryFeeSlot[]> {
+export async function getApplicableDeliveryConfig(): Promise<DeliveryFeeConfig> {
   try {
-    // 1. Fetch System Global Slabs (Controlled by Super Admin)
-    const systemRef = ref(db, `system/settings/delivery/slabs`);
-    const systemSnap = await get(systemRef);
-    
-    if (systemSnap.exists()) {
-      return systemSnap.val();
+    const snap = await get(ref(db, `system/settings/delivery`));
+
+    if (snap.exists()) {
+      const val = snap.val();
+      return {
+        mode: val.mode || "slabs",
+        per100mRate: val.per100mRate || 0,
+        slabs: val.slabs || defaultDeliveryFeeConfig.slabs,
+      };
     }
   } catch (error) {
-    console.warn("[DeliveryService] Error fetching slabs:", error);
+    console.warn("[DeliveryService] Error fetching config:", error);
   }
 
-  // 2. Fallback Defaults if system settings are missing
-  return [
-    { upToKm: 2, fee: 20 },
-    { upToKm: 5, fee: 40 },
-    { upToKm: 10, fee: 60 }
-  ];
+  return defaultDeliveryFeeConfig;
 }
 
 /**
- * Calculates delivery fee for a specific outlet and distance.
+ * Calculates delivery fee for a specific distance using the system delivery config.
  */
-export async function calculateDynamicDeliveryFee(outletId: string, distanceKm: number): Promise<number> {
-  const slabs = await getApplicableDeliverySlabs(outletId);
-  return calcDeliveryFee(distanceKm, slabs);
+export async function calculateDynamicDeliveryFee(distanceKm: number): Promise<number> {
+  const config = await getApplicableDeliveryConfig();
+  return calcDeliveryFee(distanceKm, config);
 }

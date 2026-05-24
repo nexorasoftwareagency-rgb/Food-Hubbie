@@ -89,7 +89,7 @@ async function seed() {
   }
 
   console.log("\n✅ Success! 10 Test Orders generated (5 per outlet).");
-  console.log("Check your ShopAdmin and RiderApp dashboards now!");
+  console.log("Check your admin-dashboard and RiderApp dashboards now!");
   process.exit(0);
 }
 

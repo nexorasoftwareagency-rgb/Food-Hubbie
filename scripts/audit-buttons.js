@@ -1,57 +1,47 @@
 const fs = require('fs');
 const path = require('path');
 
-const buttonIds = [
-    "btnAddAddonField", "btnAddCatAddonField", "btnAddCategory", "btnAddFeeSlab", "btnAddSizeField",
-    "btnChangeCatPhoto", "btnChangeGreetingImg", "btnChangeMenuImg", "btnChangeQR", "btnClearAllNotif",
-    "btnClearLostSales", "btnClearNotificationsBottom", "btnClearWalkinCart", "btnConfirmReauth",
-    "btnDownloadExcel", "btnDownloadPDF", "btnEnableNotif", "btnGenerateReport", "btnGenerateRiderReport",
-    "btnMigrateAddons", "btnMigrateDishAddons", "btnNewTabOutlet", "btnPosQtyDec", "btnPosQtyInc",
-    "btnQuickToggleOutlet", "btnRiderExportExcel", "btnRiderExportPDF", "btnRunImageMigration",
-    "btnSaveInventory", "btnSaveSettings", "btnSettleRiderAnalytics", "btnShowAddInventory",
-    "btnSidebarClose", "btnTestNotif", "btnToggleRiderPass", "btnToggleWifiPass", "btnUpdateDishPhoto",
-    "btnUploadAadhar", "btnUploadRiderPhoto", "btnWhatsappReport"
+const patterns = [
+  { name: "BtnPrimary (Primary buttons)", regex: /<BtnPrimary/g },
+  { name: "<button> elements",           regex: /<button/g },
+  { name: "onClick handlers",            regex: /onClick=\{/g },
+  { name: "onChange handlers",           regex: /onChange=\{/g },
+  { name: "onSubmit handlers",           regex: /onSubmit=\{/g },
 ];
 
-const jsDir = path.join(__dirname, '../ShopAdmin/js');
+const srcDir = path.join(__dirname, '..', 'admin-dashboard', 'src');
+const sectionDir = path.join(srcDir, 'sections');
+const componentDir = path.join(srcDir, 'components');
 
-function getAllFiles(dirPath, arrayOfFiles) {
-    const files = fs.readdirSync(dirPath);
-    arrayOfFiles = arrayOfFiles || [];
-    files.forEach(file => {
-        if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-            arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
-        } else {
-            arrayOfFiles.push(path.join(dirPath, "/", file));
-        }
-    });
-    return arrayOfFiles;
-}
-
-const jsFiles = getAllFiles(jsDir);
 const results = {};
 
-buttonIds.forEach(id => {
-    results[id] = { found: false, files: [] };
-    jsFiles.forEach(file => {
-        const content = fs.readFileSync(file, 'utf8');
-        if (content.includes(id)) {
-            results[id].found = true;
-            results[id].files.push(path.basename(file));
-        }
+function scanFiles(dir, label) {
+  if (!fs.existsSync(dir)) { console.log(`Skipping ${dir} (not found)`); return; }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsx') || f.endsWith('.js') || f.endsWith('.tsx'));
+  files.forEach(file => {
+    const content = fs.readFileSync(path.join(dir, file), 'utf8');
+    patterns.forEach(p => {
+      const matches = content.match(p.regex);
+      if (matches) {
+        const key = `${label}/${file}`;
+        if (!results[key]) results[key] = {};
+        results[key][p.name] = matches.length;
+      }
     });
+  });
+}
+
+scanFiles(sectionDir, 'sections');
+scanFiles(componentDir, 'components');
+
+console.log("ADMIN-DASHBOARD INTERACTIVITY AUDIT\n");
+console.log(`${"File".padEnd(40)} ${patterns.map(p => p.name.split(' ')[0].padEnd(10)).join(' ')}`);
+console.log("-".repeat(40 + patterns.length * 11));
+Object.entries(results).sort().forEach(([file, data]) => {
+  const counts = patterns.map(p => (String(data[p.name] || '')).padEnd(10));
+  console.log(`${file.padEnd(40)} ${counts.join(' ')}`);
 });
 
-console.log("🔍 SHOP ADMIN BUTTON AUDIT\n");
-let missingCount = 0;
-buttonIds.forEach(id => {
-    if (results[id].found) {
-        console.log(`✅ ${id.padEnd(30)} in [${results[id].files.join(', ')}]`);
-    } else {
-        console.log(`❌ ${id.padEnd(30)} MISSING!`);
-        missingCount++;
-    }
-});
-
-console.log(`\n📊 SUMMARY: ${buttonIds.length - missingCount}/${buttonIds.length} Buttons Linked`);
-process.exit(missingCount > 0 ? 1 : 0);
+const totalBtn = Object.values(results).reduce((a, r) => a + (r['<button> elements'] || 0), 0);
+const totalClick = Object.values(results).reduce((a, r) => a + (r['onClick handlers'] || 0), 0);
+console.log(`\nSummary: ${Object.keys(results).length} files, ${totalBtn} <button> elements, ${totalClick} onClick handlers`);

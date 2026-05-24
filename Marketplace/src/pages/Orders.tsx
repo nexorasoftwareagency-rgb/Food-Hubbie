@@ -57,8 +57,14 @@ export default function Orders() {
       <h1 className="text-3xl font-heading font-black mb-8">My Orders</h1>
 
       {(orders || []).length === 0 ? (
-        <div className="text-center py-20 bg-card rounded-3xl border border-border shadow-sm">
-          <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-20 bg-card rounded-3xl border border-border shadow-sm"
+        >
+          <div className="bg-muted w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Receipt className="h-8 w-8 text-muted-foreground" />
+          </div>
           <p className="text-lg font-bold text-foreground mb-2">
             No orders yet
           </p>
@@ -72,7 +78,7 @@ export default function Orders() {
           >
             Order Now
           </Link>
-        </div>
+        </motion.div>
       ) : (
         <div className="space-y-4">
           {(orders || []).map((order, i) => (

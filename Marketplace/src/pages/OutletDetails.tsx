@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
-import { Star, Clock, MapPin, Info, ArrowLeft, Search, Zap } from "lucide-react";
-import { motion } from "framer-motion";
+import { Star, Clock, MapPin, Info, ArrowLeft, Search, Zap, Soup, Flame, Carrot, Medal, Utensils } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   fetchOutletById,
   fetchOutletBySlug,
@@ -9,6 +9,7 @@ import {
   availabilityClasses,
   canOrder,
   deliveryTimeString,
+  calculateDistance,
 } from "@/services/outletService";
 import {
   fetchMenuByOutlet,
@@ -20,6 +21,7 @@ import { calcDeliveryFee, deliveryFeeLabel } from "@/lib/deliveryFee";
 import type { Outlet, MenuItem } from "@/types";
 import { FoodCard } from "@/components/cards/FoodCard";
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader";
+import { useLocationContext } from "@/context/LocationContext";
 
 export default function OutletDetails() {
   const params = useParams<{ id?: string; slug?: string }>();
@@ -28,9 +30,11 @@ export default function OutletDetails() {
 
   const [loading, setLoading] = useState(true);
   const [outlet, setOutlet] = useState<Outlet | null>(null);
+  const { state: locationState } = useLocationContext();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dietFilters, setDietFilters] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setLoading(true);
@@ -63,16 +67,53 @@ export default function OutletDetails() {
     ? searchMenu(menuItems, searchQuery)
     : filterByCategory(menuItems, activeCategory);
 
+  // Apply dietary filters
+  if (!searchQuery && Object.keys(dietFilters).length > 0) {
+    displayItems = displayItems.filter(item => {
+      if (dietFilters.veg && !item.isVeg) return false;
+      if (dietFilters.nonveg && item.isVeg) return false;
+      if (dietFilters.spicy && !item.isSpicy) return false;
+      if (dietFilters.bestseller && !item.isBestSeller) return false;
+      return true;
+    });
+  }
+
+  const totalItems = menuItems.length;
+  const totalCategories = useMemo(() => getCategories(menuItems).length, [menuItems]);
+  const vegCount = menuItems.filter(i => i.isVeg).length;
+  const bestsellerCount = menuItems.filter(i => i.isBestSeller).length;
+
   if (!loading && !outlet) {
     return (
-      <div className="p-8 text-center text-muted-foreground">
-        Restaurant not found
+      <div className="min-h-[60vh] flex items-center justify-center p-8">
+        <div className="text-center max-w-sm">
+          <div className="bg-muted w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Utensils className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-2xl font-heading font-bold mb-2">Restaurant not found</h2>
+          <p className="text-muted-foreground text-sm mb-8">
+            This restaurant may have been removed or the link is incorrect.
+          </p>
+          <Link
+            href="/outlets"
+            className="inline-flex bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors"
+          >
+            Browse Restaurants
+          </Link>
+        </div>
       </div>
     );
   }
 
+  const realDistanceKm = outlet && locationState.coords
+    ? parseFloat(calculateDistance(
+        locationState.coords.lat, locationState.coords.lng,
+        outlet.location.lat, outlet.location.lng
+      ).toFixed(1))
+    : outlet?.distanceKm || 0;
+
   const deliveryFee = outlet
-    ? calcDeliveryFee(outlet.distanceKm, outlet.deliveryFeeStructure)
+    ? calcDeliveryFee(realDistanceKm, outlet.deliveryFeeConfig)
     : 0;
 
   return (
@@ -125,7 +166,7 @@ export default function OutletDetails() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <MapPin className="h-4 w-4" />
-                  <span>{outlet.distanceKm} km away</span>
+                  <span>{realDistanceKm} km away</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Zap className="h-4 w-4 text-secondary" />
@@ -168,6 +209,54 @@ export default function OutletDetails() {
             className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm shadow-sm"
           />
         </div>
+
+        {/* Dietary filter pills */}
+        {!searchQuery && !loading && (
+          <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
+            {[
+              { key: "veg", label: "Veg", icon: Carrot },
+              { key: "nonveg", label: "Non-Veg", icon: Soup },
+              { key: "spicy", label: "Spicy", icon: Flame },
+              { key: "bestseller", label: "Bestseller", icon: Medal },
+            ].map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setDietFilters(prev => {
+                  const next = { ...prev };
+                  if (next[key]) delete next[key];
+                  else next[key] = true;
+                  return next;
+                })}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
+                  dietFilters[key]
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* KPI strip */}
+        {!loading && outlet && !searchQuery && (
+          <div className="flex gap-4 mb-4 text-xs font-medium text-muted-foreground overflow-x-auto scrollbar-hide">
+            <span className="flex items-center gap-1 bg-muted/50 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              <Utensils className="h-3 w-3" /> {totalItems} items
+            </span>
+            <span className="flex items-center gap-1 bg-muted/50 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              <Carrot className="h-3 w-3 text-green-600" /> {vegCount} veg
+            </span>
+            <span className="flex items-center gap-1 bg-muted/50 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              <Medal className="h-3 w-3 text-secondary" /> {bestsellerCount} bestsellers
+            </span>
+            <span className="flex items-center gap-1 bg-muted/50 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              <Info className="h-3 w-3" /> {totalCategories} categories
+            </span>
+          </div>
+        )}
 
         {/* Category tabs */}
         {!searchQuery && !loading && (
@@ -217,9 +306,31 @@ export default function OutletDetails() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No items found.</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-16"
+            >
+              <div className="bg-muted w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Search className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-heading font-bold mb-2">
+                {searchQuery ? "No matching items" : "Menu is empty"}
+              </h3>
+              <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+                {searchQuery
+                  ? `We couldn't find "${searchQuery}" in this restaurant's menu. Try a different search.`
+                  : "This restaurant hasn't added any items in this category yet."}
+              </p>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="mt-4 text-primary font-bold text-sm hover:underline"
+                >
+                  Clear search
+                </button>
+              )}
+            </motion.div>
           )}
         </div>
       </div>

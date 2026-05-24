@@ -387,7 +387,7 @@ export default function Profile() {
                 ) : (
                   <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditingProfile(true)}>
                     <h1 className="text-2xl font-heading font-black text-foreground">
-                      {user?.name ?? "Guest User"}
+                      {user?.name || "You"}
                     </h1>
                     <Edit3 className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>

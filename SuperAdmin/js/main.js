@@ -143,7 +143,11 @@ function checkAuth() {
  */
 const RBAC_PERMISSIONS = {
     superadmin: {
-        tabs: ['dashboard', 'liveorders', 'riders', 'reconciliation', 'users', 'businesses', 'audit', 'settings', 'promotions', 'inventory', 'delivery', 'reviews', 'broadcast', 'reports', 'analytics', 'onboarding'],
+        tabs: ['dashboard', 'liveorders', 'riders', 'reconciliation', 'users', 'businesses', 'outlets', 'audit', 'settings', 'promotions', 'inventory', 'delivery', 'reviews', 'broadcast', 'reports', 'analytics', 'onboarding'],
+        operations: ['all']
+    },
+    admin: {
+        tabs: ['dashboard', 'liveorders', 'riders', 'reconciliation', 'users', 'businesses', 'outlets', 'audit', 'settings', 'promotions', 'inventory', 'delivery', 'reviews', 'broadcast', 'reports', 'analytics', 'onboarding'],
         operations: ['all']
     },
     business: {
@@ -347,6 +351,7 @@ const tabMap = {
     'promotions': 'Platform-wide economic controls',
     'users': 'Global customer registry & credit ledger',
     'riders': 'Fleet logistics & operational partners',
+    'outlets': 'All outlet profiles and analytics',
     'delivery': 'Infrastructure Flow Slabs',
     'reports': 'Enterprise growth & financial audit',
     'audit': 'Ecosystem security & operational telemetry',
@@ -396,6 +401,7 @@ tabs.forEach(tab => {
         if (target === 'reviews') loadReviews();
         if (target === 'broadcast') loadBroadcastHistory();
         if (target === 'reconciliation') loadReconciliations();
+        if (target === 'outlets') loadOutletsTab();
         if (target === 'analytics') showToast('Click "Refresh Data" to load analytics', 'info');
     });
 });
@@ -897,8 +903,8 @@ function renderBusinessList(list) {
                 <div class="text-xs text-muted font-mono opacity-60">${safeText(b.id)}</div>
             </td>
             <td>
-                <div class="font-semibold" style="color:var(--pro-text)">${safeText(b.owner)}</div>
-                <div class="text-xs text-muted uppercase" style="letter-spacing:0.5px">Authority</div>
+                <div class="font-semibold" style="color:var(--accent)">${safeText(b.adminEmail)}</div>
+                <div class="text-xs text-muted">${b.adminPhone ? safeText(b.adminPhone) : 'Authority'}</div>
             </td>
             <td>
                 <div class="font-black" style="color:#F97316">${b.outlets} Clusters</div>
@@ -933,12 +939,26 @@ function renderBusinessList(list) {
 
 async function loadBusinessesTab() {
     try {
-        const snap = await db.ref('businesses').once('value');
-        const businesses = snap.val() || {};
+        const [bizSnap, adminsSnap] = await Promise.all([
+            db.ref('businesses').once('value'),
+            db.ref('system/admins').once('value')
+        ]);
+        const businesses = bizSnap.val() || {};
+        const admins = adminsSnap.val() || {};
+
+        // Build admin lookup by businessId
+        const adminByBiz = {};
+        for (const uid in admins) {
+            const a = admins[uid];
+            if (a.businessId) {
+                adminByBiz[a.businessId] = a;
+            }
+        }
+
         const list = [];
-        
         Object.entries(businesses).forEach(([id, biz]) => {
             const outlets = biz.outlets || {};
+            const admin = adminByBiz[id];
             list.push({
                 id,
                 name: biz.name || id,
@@ -946,7 +966,9 @@ async function loadBusinessesTab() {
                 outlets: Object.keys(outlets).length,
                 status: biz.status || 'Active',
                 commission: biz.commission || { percentage: 0, fixed: 0 },
-                firstOutlet: Object.keys(outlets)[0] || null
+                firstOutlet: Object.keys(outlets)[0] || null,
+                adminEmail: admin ? (admin.email || 'N/A') : 'N/A',
+                adminPhone: admin ? (admin.phone || '') : ''
             });
         });
         
@@ -983,8 +1005,8 @@ function renderBusinessesAlt(list) {
                 <div class="text-xs text-muted font-mono opacity-60">${safeText(b.id)}</div>
             </td>
             <td>
-                <div class="font-semibold" style="color:var(--pro-text)">${safeText(b.owner)}</div>
-                <div class="text-xs text-muted uppercase" style="letter-spacing:0.5px">Authority</div>
+                <div class="font-semibold" style="color:var(--accent)">${safeText(b.adminEmail)}</div>
+                <div class="text-xs text-muted">${b.adminPhone ? safeText(b.adminPhone) : 'Authority'}</div>
             </td>
             <td>
                 <div class="font-black" style="color:#F97316">${b.outlets} Clusters</div>
@@ -1010,6 +1032,273 @@ function renderBusinessesAlt(list) {
     renderPagination('businessesPagination', PAGINATION.businesses.page, PAGINATION.businesses.pageSize, PAGINATION.businesses.total, 'goToBusinessesPage');
     lucide.createIcons();
 }
+
+// --- Outlet Profiles ---
+let allOutletsList = [];
+let filteredOutletsList = [];
+const OUTLETS_PAGE_SIZE = 15;
+let outletsPage = 1;
+
+async function loadOutletsTab() {
+    try {
+        const [bizSnap, adminsSnap] = await Promise.all([
+            db.ref('businesses').once('value'),
+            db.ref('system/admins').once('value')
+        ]);
+        
+        const businesses = bizSnap.val() || {};
+        const admins = adminsSnap.val() || {};
+
+        const adminByBiz = {};
+        for (const uid in admins) {
+            const a = admins[uid];
+            if (a.businessId) {
+                if (!adminByBiz[a.businessId]) adminByBiz[a.businessId] = [];
+                adminByBiz[a.businessId].push(a);
+            }
+        }
+
+        allOutletsList = [];
+        for (const bid in businesses) {
+            const biz = businesses[bid];
+            const outlets = biz.outlets || {};
+            const bizAdmins = adminByBiz[bid] || [];
+            
+            for (const oid in outlets) {
+                const o = outlets[oid];
+                const admin = bizAdmins.find(a => a.outletId === oid) || bizAdmins[0] || {};
+                allOutletsList.push({
+                    bizId: bid,
+                    bizName: biz.name || bid,
+                    outletId: oid,
+                    name: o.name || o.meta?.name || oid,
+                    slug: o.meta?.slug || o.slug || oid,
+                    status: o.status || (o.settings?.shopOpen ? 'OPEN' : 'CLOSED'),
+                    address: o.meta?.address || o.settings?.Store?.address || '',
+                    lat: o.meta?.lat || o.settings?.Store?.lat || '',
+                    lng: o.meta?.lng || o.settings?.Store?.lng || '',
+                    cuisine: o.meta?.cuisine || o.cuisine || '',
+                    phone: o.meta?.adminPhone || o.phone || '',
+                    adminEmail: admin.email || '',
+                    adminPassword: admin.password || '',
+                    adminPhone: admin.phone || '',
+                    createdAt: o.meta?.createdAt || o.createdAt || biz.createdAt || '',
+                    settings: o.settings || {}
+                });
+            }
+        }
+
+        document.getElementById('outletCount').innerText = allOutletsList.length + ' outlets';
+        filterOutletList();
+    } catch (err) {
+        console.error("Failed to load outlets tab:", err);
+    }
+}
+
+window.filterOutletList = function() {
+    const q = (document.getElementById('outletSearchInput').value || '').toLowerCase().trim();
+    filteredOutletsList = q
+        ? allOutletsList.filter(o => 
+            o.name.toLowerCase().includes(q) ||
+            o.slug.toLowerCase().includes(q) ||
+            o.bizName.toLowerCase().includes(q) ||
+            o.adminEmail.toLowerCase().includes(q) ||
+            o.address.toLowerCase().includes(q))
+        : [...allOutletsList];
+    outletsPage = 1;
+    renderOutletList();
+};
+
+function renderOutletList() {
+    const tbody = document.getElementById('outletListBody');
+    if (!tbody) return;
+
+    const totalPages = Math.ceil(filteredOutletsList.length / OUTLETS_PAGE_SIZE) || 1;
+    const start = (outletsPage - 1) * OUTLETS_PAGE_SIZE;
+    const pageEntries = filteredOutletsList.slice(start, start + OUTLETS_PAGE_SIZE);
+
+    if (pageEntries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center p-12 text-muted">No outlets found</td></tr>';
+        document.getElementById('outletsPagination').innerHTML = '';
+        return;
+    }
+
+    tbody.innerHTML = pageEntries.map(o => {
+        const regDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        const statusColor = o.status === 'OPEN' || o.status === 'Active' ? 'badge-success' : 'badge-warning';
+        return `<tr>
+            <td>
+                <div class="font-black" style="color:var(--pro-text)">${safeText(o.name)}</div>
+                <div class="text-xs text-muted font-mono">${safeText(o.bizName)}</div>
+            </td>
+            <td>
+                <div class="font-semibold" style="color:var(--pro-text)">${safeText(o.bizName)}</div>
+                <div class="text-xs text-muted font-mono opacity-60">${safeText(o.bizId)}</div>
+            </td>
+            <td><span class="font-mono text-xs" style="color:var(--accent)">${safeText(o.slug)}</span></td>
+            <td><span class="pro-badge ${statusColor}">${safeText(o.status)}</span></td>
+            <td><span style="color:#38BDF8;font-weight:600;font-size:13px">${safeText(o.adminEmail || '-')}</span></td>
+            <td><span class="text-xs text-muted">${regDate}</span></td>
+            <td>
+                <button class="btn-pro-icon" title="View Full Profile" onclick="showOutletProfile('${safeText(o.bizId)}', '${safeText(o.outletId)}')">
+                    <i data-lucide="eye" size="16" color="#38BDF8"></i>
+                </button>
+                <button class="btn-pro-icon" title="Edit Outlet" onclick="showOutletModal('${safeText(o.bizId)}', '${safeText(o.outletId)}')">
+                    <i data-lucide="settings" size="16" color="#F97316"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    renderPagination('outletsPagination', totalPages, outletsPage, (p) => { outletsPage = p; renderOutletList(); });
+    lucide.createIcons();
+}
+
+window.goToOutletsPage = function(page) {
+    outletsPage = page;
+    renderOutletList();
+};
+
+window.showOutletProfile = async function(bid, oid) {
+    try {
+        const [outletSnap, adminsSnap] = await Promise.all([
+            db.ref(`businesses/${bid}/outlets/${oid}`).once('value'),
+            db.ref('system/admins').orderByChild('businessId').equalTo(bid).once('value')
+        ]);
+
+        const o = outletSnap.val();
+        if (!o) return alert("Outlet not found!");
+
+        const meta = o.meta || {};
+        const settings = o.settings || {};
+        const store = settings.Store || {};
+
+        // Find admin for this outlet
+        let adminEmail = '', adminPassword = '', adminPhone = '';
+        if (adminsSnap.exists()) {
+            const admins = adminsSnap.val();
+            for (const uid in admins) {
+                const a = admins[uid];
+                if (a.outletId === oid) {
+                    adminEmail = a.email || '';
+                    adminPassword = a.password || '';
+                    adminPhone = a.phone || '';
+                    break;
+                }
+            }
+        }
+
+        // Parse orders for analytics (non-fatal if permission denied)
+        let totalOrders = 0, totalRevenue = 0, avgOrderValue = 0;
+        try {
+            const ordersSnap = await db.ref('orders').orderByChild('outletId').equalTo(oid).once('value');
+            const rawOrders = ordersSnap.val() || {};
+            for (const ordId in rawOrders) {
+                const ord = rawOrders[ordId];
+                if (ord.outletId === oid) {
+                    totalOrders++;
+                    totalRevenue += Number(ord.total) || 0;
+                }
+            }
+            avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+        } catch (_) {
+            // orders access denied - show analytics as N/A
+        }
+        const regDate = meta.createdAt ? new Date(meta.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+        const locStr = (meta.lat || store.lat) ? `${meta.lat || store.lat}, ${meta.lng || store.lng}` : 'Not set';
+
+        document.getElementById('profileModalTitle').innerText = o.name || meta.name || 'Outlet Profile';
+        document.getElementById('outletProfileBody').innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Left Column: Basic Info -->
+                <div class="md:col-span-2">
+                    <div class="pro-card p-4 mb-4">
+                        <h4 class="text-sm font-bold text-muted uppercase tracking-wide mb-3">Outlet Information</h4>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div><span class="text-muted">Name</span><div class="font-bold" style="color:#000">${safeText(o.name || meta.name || 'N/A')}</div></div>
+                            <div><span class="text-muted">Slug</span><div class="font-bold" style="color:#000">${safeText(meta.slug || o.slug || 'N/A')}</div></div>
+                            <div class="col-span-2"><span class="text-muted">Address</span><div class="font-bold" style="color:#000">${safeText(meta.address || store.address || 'N/A')}</div></div>
+                            <div><span class="text-muted">Coordinates</span><div class="font-mono text-xs" style="color:#000">${safeText(locStr)}</div></div>
+                            <div><span class="text-muted">Status</span><div><span class="pro-badge ${settings.shopOpen ? 'badge-success' : 'badge-warning'}">${settings.shopOpen ? 'OPEN' : 'CLOSED'}</span></div></div>
+                            <div class="col-span-2"><span class="text-muted">Registered On</span><div class="font-bold" style="color:#000">${regDate}</div></div>
+                            <div><span class="text-muted">Cuisine</span><div style="color:#000">${safeText(meta.cuisine || o.cuisine || 'N/A')}</div></div>
+                            <div><span class="text-muted">Business</span><div style="color:#000">${safeText(o.name || 'N/A')}</div></div>
+                            <div class="col-span-2"><span class="text-muted">Business ID</span><div class="font-mono text-xs" style="color:#000">${safeText(bid)}</div></div>
+                            <div class="col-span-2"><span class="text-muted">Outlet ID</span><div class="font-mono text-xs" style="color:#000">${safeText(oid)}</div></div>
+                        </div>
+                    </div>
+
+                    <div class="pro-card p-4 mb-4">
+                        <h4 class="text-sm font-bold text-muted uppercase tracking-wide mb-3">Contact Details</h4>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div><span class="text-muted">Phone</span><div class="font-bold" style="color:#000">${safeText(meta.adminPhone || o.phone || adminPhone || 'N/A')}</div></div>
+                            <div><span class="text-muted">Address</span><div style="color:#000">${safeText(meta.address || store.address || 'N/A')}</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Credentials & Analytics -->
+                <div>
+                    <div class="pro-card p-4 mb-4" style="border-color:rgba(56,189,248,0.3)">
+                        <h4 class="text-sm font-bold text-muted uppercase tracking-wide mb-3" style="color:#38BDF8">Admin Credentials</h4>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <span class="text-muted text-xs">Username (Email)</span>
+                                <div class="font-bold text-lg" style="color:#000">${safeText(adminEmail || 'N/A')}</div>
+                            </div>
+                            <div>
+                                <span class="text-muted text-xs">Password</span>
+                                <div class="font-bold text-lg" style="color:#000;font-family:monospace">${safeText(adminPassword || 'N/A')}</div>
+                            </div>
+                            <div>
+                                <span class="text-muted text-xs">Admin Phone</span>
+                                <div class="font-bold" style="color:#000">${safeText(adminPhone || meta.adminPhone || 'N/A')}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pro-card p-4" style="border-color:rgba(16,185,129,0.3)">
+                        <h4 class="text-sm font-bold text-muted uppercase tracking-wide mb-3" style="color:#10B981">Analytics</h4>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between items-center p-2 rounded" style="background:rgba(16,185,129,0.1)">
+                                <span class="text-muted">Total Orders</span>
+                                <span class="font-black text-lg" style="color:#000">${totalOrders || 'N/A'}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded" style="background:rgba(99,102,241,0.1)">
+                                <span class="text-muted">Total Revenue</span>
+                                <span class="font-black text-lg" style="color:#000">${totalRevenue ? '₹' + totalRevenue.toLocaleString('en-IN') : 'N/A'}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded" style="background:rgba(251,191,36,0.1)">
+                                <span class="text-muted">Avg Order Value</span>
+                                <span class="font-black text-lg" style="color:#000">${avgOrderValue ? '₹' + avgOrderValue.toLocaleString('en-IN') : 'N/A'}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded" style="background:rgba(248,113,113,0.1)">
+                                <span class="text-muted">Rating</span>
+                                <span class="font-black text-lg" style="color:#000">${meta.rating || o.rating || 'N/A'} ⭐</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button class="btn-pro flex-1" onclick="hideOutletProfile(); showOutletModal('${safeText(bid)}', '${safeText(oid)}');">
+                    <i data-lucide="settings" size="16"></i> Edit Outlet
+                </button>
+                <button class="btn-pro btn-muted flex-1" onclick="hideOutletProfile()">Close</button>
+            </div>
+        `;
+
+        document.getElementById('outletProfileModal').classList.remove('hidden');
+        lucide.createIcons();
+    } catch (err) {
+        alert("Error loading profile: " + err.message);
+    }
+};
+
+window.hideOutletProfile = function() {
+    document.getElementById('outletProfileModal').classList.add('hidden');
+};
 
 // --- Onboarding Flow ---
 const onboardingForm = document.getElementById('onboardingForm');
@@ -1086,6 +1375,7 @@ if (onboardingForm) {
                 name: `${bizName} Admin`,
                 email: adminEmail,
                 phone: adminPhone,
+                password: adminPass,
                 businessId: bizId,
                 outletId: outletId,
                 role: 'Admin',
@@ -1123,16 +1413,46 @@ if (onboardingForm) {
 
 // --- Delivery Flow Management ---
 let globalDeliverySlabs = [];
+let deliveryMode = 'slabs'; // 'per_100m' or 'slabs'
+let per100mRate = 2;
 
 async function loadGlobalDelivery() {
-    const snap = await db.ref('system/settings/delivery/slabs').get();
-    globalDeliverySlabs = snap.val() || [
+    const snap = await db.ref('system/settings/delivery').get();
+    const data = snap.val() || {};
+
+    deliveryMode = data.mode || 'slabs';
+    per100mRate = data.per100mRate || 2;
+    globalDeliverySlabs = data.slabs || [
         { upToKm: 2, fee: 20 },
         { upToKm: 5, fee: 40 },
         { upToKm: 10, fee: 60 }
     ];
+
+    // Set radio button state
+    const per100mRadio = document.querySelector('input[name="deliveryMode"][value="per_100m"]');
+    const slabsRadio = document.querySelector('input[name="deliveryMode"][value="slabs"]');
+    if (per100mRadio) per100mRadio.checked = (deliveryMode === 'per_100m');
+    if (slabsRadio) slabsRadio.checked = (deliveryMode === 'slabs');
+
+    // Set per-100m input
+    const rateInput = document.getElementById('per100mRate');
+    if (rateInput) rateInput.value = per100mRate;
+
+    toggleDeliverySections(deliveryMode);
     renderDeliverySlabs();
 }
+
+function toggleDeliverySections(mode) {
+    const per100mSection = document.getElementById('per100mSection');
+    const slabsSection = document.getElementById('slabsSection');
+    if (per100mSection) per100mSection.style.display = (mode === 'per_100m') ? 'block' : 'none';
+    if (slabsSection) slabsSection.style.display = (mode === 'slabs') ? 'block' : 'none';
+}
+
+window.setDeliveryMode = function(mode) {
+    deliveryMode = mode;
+    toggleDeliverySections(mode);
+};
 
 function renderDeliverySlabs() {
     const list = document.getElementById('deliverySlabsList');
@@ -1176,9 +1496,23 @@ window.removeSlab = function(idx) {
 
 window.saveGlobalDelivery = async function() {
     if (!hasPermission('all')) return showToast("Access denied", "error");
+
+    const rateInput = document.getElementById('per100mRate');
+    const rate = rateInput ? parseFloat(rateInput.value) || 0 : 0;
+
+    const payload = {
+        mode: deliveryMode,
+        per100mRate: rate,
+        slabs: globalDeliverySlabs,
+        updatedAt: Date.now(),
+        updatedBy: auth.currentUser ? auth.currentUser.email : 'system'
+    };
+
     try {
-        await db.ref('system/settings/delivery/slabs').set(globalDeliverySlabs);
-        alert("✅ Global Delivery Flow updated successfully!");
+        const updates = {};
+        updates['system/settings/delivery'] = payload;
+        await atomicAdminAction(updates, 'DELIVERY_FEE_UPDATE', { mode: deliveryMode, per100mRate: rate, slabCount: globalDeliverySlabs.length });
+        alert("✅ Delivery Fee Configuration deployed successfully!");
     } catch (err) {
         alert("❌ Error saving flow: " + err.message);
     }
@@ -1195,17 +1529,39 @@ window.showOutletModal = async function(bid, oid) {
     if (!oid) return alert("No outlet nodes found for this business!");
     
     try {
-        const snap = await db.ref(`businesses/${bid}/outlets/${oid}`).get();
-        const o = snap.val();
+        const [outletSnap, adminsSnap] = await Promise.all([
+            db.ref(`businesses/${bid}/outlets/${oid}`).get(),
+            db.ref('system/admins').orderByChild('businessId').equalTo(bid).once('value')
+        ]);
+        const o = outletSnap.val();
         if (!o) return alert("Node not found!");
+
+        // Find the admin for this outlet
+        let adminEmail = '';
+        let adminPassword = '';
+        let adminPhone = o.meta?.adminPhone || '';
+        if (adminsSnap.exists()) {
+            const admins = adminsSnap.val();
+            for (const uid in admins) {
+                const a = admins[uid];
+                if (a.outletId === oid || !oid) {
+                    adminEmail = a.email || '';
+                    adminPassword = a.password || '';
+                    adminPhone = adminPhone || a.phone || '';
+                    break;
+                }
+            }
+        }
 
         document.getElementById('editOutletName').value = o.name || '';
         document.getElementById('editOutletSlug').value = o.meta?.slug || '';
         document.getElementById('editOutletAddress').value = o.meta?.address || o.settings?.Store?.address || '';
         document.getElementById('editOutletLat').value = o.meta?.lat || o.settings?.Store?.lat || '';
         document.getElementById('editOutletLng').value = o.meta?.lng || o.settings?.Store?.lng || '';
-        document.getElementById('editAdminPhone').value = o.meta?.adminPhone || '';
+        document.getElementById('editAdminEmail').value = adminEmail;
+        document.getElementById('editAdminPhone').value = adminPhone;
         document.getElementById('editAdminPass').value = '';
+        document.getElementById('editAdminPassDisplay').value = adminPassword;
 
         document.getElementById('outletModal').classList.remove('hidden');
         lucide.createIcons();
@@ -1253,8 +1609,21 @@ window.updateOutlet = async function() {
             updatedAt: new Date().toISOString()
         };
 
+        // Update admin password if a new one was provided
         if (newPass && newPass.length >= 6) {
-            console.log("[SuperAdmin] Password change requested. This requires Cloud Function execution.");
+            // Find the admin UID for this business/outlet
+            const adminsSnap = await db.ref('system/admins').orderByChild('businessId').equalTo(editingBizId).once('value');
+            if (adminsSnap.exists()) {
+                const admins = adminsSnap.val();
+                for (const uid in admins) {
+                    const a = admins[uid];
+                    if (a.outletId === editingOutletId) {
+                        updates[`system/admins/${uid}/password`] = newPass;
+                        console.log("[SuperAdmin] Password updated in admin node.");
+                        break;
+                    }
+                }
+            }
         }
 
         updates[`slugs/outlets/${slug}`] = {
@@ -3607,6 +3976,7 @@ window.approvePartner = async function(uid) {
         updates[`system/admins/${adminUid}`] = {
             id: adminUid,
             email: adminEmail,
+            password: tempPassword,
             role: 'Partner Admin',
             outletId: oid,
             businessId: bid,
@@ -3630,7 +4000,7 @@ window.approvePartner = async function(uid) {
 
         Swal.fire({
             title: 'Node Provisioned!',
-            html: `Infrastructure for <b>${safeText(req.bizName)}</b> is now live.<br><br>Admin email: <b>${safeText(adminEmail)}</b><br>Temp password: <b>${safeText(tempPassword)}</b><br><br>Partner must change password on first login to ShopAdmin.`,
+            html: `Infrastructure for <b>${safeText(req.bizName)}</b> is now live.<br><br>Admin email: <b>${safeText(adminEmail)}</b><br>Temp password: <b>${safeText(tempPassword)}</b><br><br>Partner must change password on first login to admin-dashboard.`,
             icon: 'success',
             background: '#1e293b',
             color: '#fff'

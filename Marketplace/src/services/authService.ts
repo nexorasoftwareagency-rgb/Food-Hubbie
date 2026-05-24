@@ -11,7 +11,7 @@ import type { User } from "@/types";
 function mapFirebaseUser(fbUser: any): User {
   return {
     id: fbUser.uid,
-    name: fbUser.displayName || "Customer",
+    name: fbUser.displayName || "",
     email: fbUser.email || "",
     avatar: fbUser.photoURL || "",
     phone: fbUser.phoneNumber || "",

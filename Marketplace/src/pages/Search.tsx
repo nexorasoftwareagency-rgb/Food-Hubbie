@@ -275,15 +275,29 @@ export default function Search() {
 
             {/* Empty State */}
             {query && filteredOutlets.length === 0 && filteredDishes.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center py-20 text-center"
+              >
                 <div className="bg-muted p-6 rounded-full mb-6">
                   <SearchIcon className="h-12 w-12 text-muted-foreground" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">No results found for "{query}"</h3>
-                <p className="text-muted-foreground max-w-xs">
+                <p className="text-muted-foreground max-w-xs mb-6">
                   We couldn't find any restaurants or dishes matching your search. Try something else!
                 </p>
-              </div>
+                <button
+                  onClick={() => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.delete('q');
+                    setLocation(`/search?${params.toString()}`, { replace: true });
+                  }}
+                  className="text-primary font-bold text-sm hover:underline"
+                >
+                  Clear search
+                </button>
+              </motion.div>
             )}
           </div>
         )}

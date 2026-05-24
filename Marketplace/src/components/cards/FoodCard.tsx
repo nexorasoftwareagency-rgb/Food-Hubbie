@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Plus, Minus, Star, Store } from "lucide-react";
+import { Plus, Minus, Star, Store, Clock, Flame } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { ProductCustomizationModal } from "../modals/ProductCustomizationModal";
 import type { MenuItem } from "@/types";
@@ -134,7 +134,19 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
                 </span>
               )}
             </div>
-            <p className="text-muted-foreground text-xs mt-2.5 line-clamp-2 leading-relaxed font-medium">
+            <div className="flex items-center gap-2 mt-1.5">
+              {item.isSpicy && (
+                <span className="flex items-center gap-0.5 text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-md">
+                  <Flame className="h-2.5 w-2.5" /> Spicy
+                </span>
+              )}
+              {item.preparationTimeMin > 0 && (
+                <span className="flex items-center gap-0.5 text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                  <Clock className="h-2.5 w-2.5" /> {item.preparationTimeMin} min
+                </span>
+              )}
+            </div>
+            <p className="text-muted-foreground text-xs mt-2 line-clamp-2 leading-relaxed font-medium">
               {item.description}
             </p>
             

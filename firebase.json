@@ -31,7 +31,7 @@
     },
     {
       "target": "admin",
-      "public": "ShopAdmin",
+      "public": "admin-dashboard/dist",
       "ignore": [
         "firebase.json",
         "**/.*",

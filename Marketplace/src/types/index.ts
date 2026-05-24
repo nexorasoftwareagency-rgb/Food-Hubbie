@@ -33,7 +33,7 @@ export type Outlet = {
   openingTime: string;
   closingTime: string;
   minOrderAmount: number;
-  deliveryFeeStructure: DeliveryFeeSlot[];
+  deliveryFeeConfig: DeliveryFeeConfig;
   offers: Offer[];
   tags: string[];
   address: string;
@@ -46,6 +46,14 @@ export type Outlet = {
 export type DeliveryFeeSlot = {
   upToKm: number;
   fee: number;
+};
+
+export type DeliveryFeeMode = "per_100m" | "slabs";
+
+export type DeliveryFeeConfig = {
+  mode: DeliveryFeeMode;
+  per100mRate: number;
+  slabs: DeliveryFeeSlot[];
 };
 
 export type MenuItemAddon = {

@@ -1,19 +1,20 @@
 {
   "rules": {
-    /* 
-     * ============================================================
-     * FOODHUBBIE SAAS — ENTERPRISE SECURITY POLICY v2.1 (HARDENED)
-     * ============================================================
-     */
-
     "admins": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
         ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
-      }
+      },
+      ".indexOn": ["businessId", "outletId", "email", "isSuper"]
     },
-
+    "onboarding_requests": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+      "$uid": {
+        ".write": "auth != null && (!data.exists() || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+      },
+      ".indexOn": ["status", "createdAt", "email"]
+    },
     "riders": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
       "$uid": {
@@ -26,46 +27,159 @@
           ".write": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)"
         }
       },
-      ".indexOn": ["email", "phone", "businessId"]
+      ".indexOn": ["email", "phone", "businessId", "status"]
     },
-
     "businesses": {
       ".read": true,
       ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
-
       "$bid": {
         ".read": true,
         ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('businessId').val() == $bid)",
-
         "outlets": {
           "$oid": {
             ".read": true,
             ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)",
-
             "orders": {
               ".read": true,
               ".write": "(!data.exists() && newData.exists()) || (auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid || (root.child('riders').child(auth.uid).exists() && newData.child('riderId').val() == auth.uid)))",
-              ".indexOn": ["createdAt", "status", "riderId", "phone"]
+              ".indexOn": ["createdAt", "status", "riderId", "phone", "type", "orderId"]
             },
-            
-            "inventory": {
+            "dishes": {
+              ".read": true,
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".indexOn": ["category", "name", "order"]
+            },
+            "categories": {
+              ".read": true,
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".indexOn": ["order", "name"]
+            },
+            "settings": {
               ".read": true,
               ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+            },
+            "inventory": {
+              ".read": true,
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".indexOn": ["category", "item"]
+            },
+            "reviews": {
+              ".read": true,
+              ".write": "auth != null",
+              ".indexOn": ["createdAt", "rating"]
+            },
+            "settlements": {
+              ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".indexOn": ["settledStatus", "createdAt"]
+            },
+            "wallet": {
+              ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+            },
+            "meta": {
+              ".read": true,
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+            },
+            "feedbacks": {
+              ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".write": "auth != null",
+              ".indexOn": ["createdAt", "rating"]
+            },
+            "botCommands": {
+              ".read": true,
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('riders').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".indexOn": ["command", "createdAt"]
+            },
+            "botStatus": {
+              ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".write": "auth != null"
+            },
+            "botUsers": {
+              "$jid": {
+                ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+                ".write": "auth != null"
+              }
+            },
+            "otpAttempts": {
+              "$orderId": {
+                ".read": "auth != null && (root.child('riders').child(auth.uid).exists() || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+                ".write": "auth != null && (root.child('riders').child(auth.uid).exists() || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+              }
+            },
+            "ledger": {
+              "$txId": {
+                ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+                ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+              }
+            },
+            "riderStats": {
+              ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+              ".write": "auth != null && root.child('riders').child(auth.uid).exists()"
             }
           }
         }
       }
     },
-
     "system": {
-      ".read": true,
+      ".read": "auth != null",
       ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
-      
+      "settings": {
+        ".read": true,
+        "delivery": {
+          ".read": true,
+          ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+        }
+      },
+      "promotions": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+        "coupons": {
+          ".indexOn": ["code", "isActive", "expiresAt"]
+        },
+        "surge": {
+          ".indexOn": ["active", "startTime", "endTime"]
+        }
+      },
+      "config": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+        "platformFee": {
+          ".indexOn": ["active"]
+        }
+      },
+      "broadcasts": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["sentAt", "target"]
+      },
+      "admins": {
+        ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+        "$uid": {
+          ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+          "tfaSecret": {
+            ".read": "auth.uid == $uid",
+            ".write": "auth.uid == $uid"
+          },
+          "password": {
+            ".write": "false"
+          }
+        },
+        ".indexOn": ["businessId", "outletId", "email"]
+      },
+      "auditLogs": {
+        ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+        ".indexOn": ["timestamp", "action", "adminId"]
+      },
+      "settlements": {
+        ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+      },
       "botSessions": {
         "$bid": {
           "$oid": {
             "$jid": {
-              // Bot sessions are private to the bot process and superadmins
               ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
               ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
             }
@@ -73,93 +187,113 @@
         }
       }
     },
-
     "slugs": {
       "outlets": {
         ".read": true,
-        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+        ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+        ".indexOn": ["businessId", "outletId"]
       }
     },
-
     "dishes": {
       ".read": true,
       ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
       ".indexOn": ["category", "outlet"]
     },
-
     "outlets": {
       ".read": true,
       ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
       ".indexOn": ["businessId", "name"]
     },
-
     "bot": {
       "$oid": {
         ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)",
         ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true || root.child('admins').child(auth.uid).child('outletId').val() == $oid)"
       }
     },
-    
     "customers": {
       "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || auth.token.superadmin === true)",
-        ".write": "auth != null && (auth.uid == $uid || auth.token.superadmin === true)"
-      }
+        ".read": "auth != null && (auth.uid == $uid || auth.token.superadmin === true || root.child('admins').child(auth.uid).exists())",
+        ".write": "auth != null && (auth.uid == $uid || auth.token.superadmin === true || root.child('admins').child(auth.uid).exists())"
+      },
+      ".indexOn": ["phone", "email"]
     },
-
     "users": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
-        ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)"
+        ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
+        "wallet": {
+          ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+        },
+        "walletHistory": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+          ".write": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+        },
+        "cart": {
+          ".read": "auth.uid == $uid",
+          ".write": "auth.uid == $uid"
+        },
+        "fcmToken": {
+          ".write": "auth.uid == $uid"
+        }
       },
       ".indexOn": ["email", "phone", "name"]
     },
-
     "logs": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
       "marketplaceAudit": {
         ".write": "auth != null",
-        ".indexOn": ["userId", "timestamp"]
+        ".indexOn": ["userId", "timestamp", "action"]
       },
       "botAudit": {
         ".write": "auth != null",
-        ".indexOn": ["whatsappJid", "timestamp"]
+        ".indexOn": ["whatsappJid", "timestamp", "action"]
       },
       "audit": {
-        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)"
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+        ".indexOn": ["timestamp", "action", "adminId"]
+      },
+      "lostSales": {
+        ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+        ".indexOn": ["cancelledAt", "phone", "outletId"]
       },
       "riderErrors": {
         ".write": "auth != null",
-        ".indexOn": ["riderId", "timestamp"]
+        ".indexOn": ["riderId", "timestamp", "code"]
       }
     },
-
     "Pizza-Shop": {
       ".read": true,
       ".write": false
     },
-
     "Cake-Shop": {
       ".read": true,
       ".write": false
     },
-
     "platformConfig": {
       ".read": true,
       ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
     },
-
     "riderStats": {
       "$riderId": {
         ".read": true,
         ".write": "auth != null && auth.uid == $riderId"
       }
     },
-
+    "orders": {
+      ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+      ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
+      ".indexOn": ["outletId", "createdAt", "status", "businessId"]
+    },
     "superAdmin": {
       ".read": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)",
       ".write": "auth != null && (auth.token.superadmin === true || root.child('admins').child(auth.uid).child('isSuper').val() == true)"
+    },
+    "errorLogs": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
+      ".write": "auth != null",
+      ".indexOn": ["riderId", "timestamp", "type"]
     }
   }
 }

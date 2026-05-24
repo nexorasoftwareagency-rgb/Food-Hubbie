@@ -44,7 +44,7 @@ export default function Cart() {
   // Projected Cashback (2% of net food value)
   const projectedBonus = Math.round((summary.subtotal - couponDiscount) * 0.02);
 
-  const outletName = outlet?.name || "Restaurant";
+  const outletName = outlet?.name || "";
 
   const applyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
@@ -274,7 +274,7 @@ export default function Cart() {
                   type="text"
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value)}
-                  placeholder="Enter coupon code (try FIRST50)"
+                  placeholder="Enter coupon code"
                   data-testid="input-coupon"
                   className="flex-1 bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
@@ -288,7 +288,7 @@ export default function Cart() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Try: FIRST50 · FREESHIP
+              Enter a valid coupon code to get discounts
             </p>
           </div>
 

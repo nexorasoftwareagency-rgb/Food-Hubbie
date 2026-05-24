@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Star, Clock, MapPin, Tag } from "lucide-react";
+import { Star, Clock, MapPin, Tag, Zap, Bike } from "lucide-react";
 import type { Outlet } from "@/types";
 import {
   availabilityLabel,
@@ -8,6 +8,7 @@ import {
   canOrder,
   deliveryTimeString,
 } from "@/services/outletService";
+import { calcDeliveryFee, deliveryFeeLabel } from "@/lib/deliveryFee";
 
 interface OutletCardProps {
   outlet: Outlet;
@@ -17,6 +18,8 @@ interface OutletCardProps {
 export function OutletCard({ outlet, delay = 0 }: OutletCardProps) {
   const href = `/store/${outlet.slug}`;
   const closed = !canOrder(outlet.availability);
+  const fee = calcDeliveryFee(outlet.distanceKm, outlet.deliveryFeeConfig);
+  const isFreeDelivery = fee === 0;
 
   return (
     <motion.div
@@ -102,8 +105,18 @@ export function OutletCard({ outlet, delay = 0 }: OutletCardProps) {
               <MapPin className="h-3.5 w-3.5 text-primary" />
               <span>{outlet.distanceKm} km</span>
             </div>
-            <div className="flex items-center gap-1 ml-auto text-foreground font-semibold">
-              <span>₹{outlet.minOrderAmount} min</span>
+            <div className="flex items-center gap-1">
+              <Zap className="h-3.5 w-3.5 text-primary" />
+              <span>{deliveryFeeLabel(fee)}</span>
+            </div>
+            <div className="flex items-center gap-1 ml-auto">
+              {isFreeDelivery ? (
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Free
+                </span>
+              ) : (
+                <span className="text-foreground font-semibold">₹{outlet.minOrderAmount} min</span>
+              )}
             </div>
           </div>
         </div>

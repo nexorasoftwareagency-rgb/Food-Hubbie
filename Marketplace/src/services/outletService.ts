@@ -2,41 +2,47 @@
 // Backed by Firebase Realtime Database.
 
 import { db, ref, get } from "@/lib/firebase";
-import type { Outlet, AvailabilityStatus } from "@/types";
-import { defaultDeliveryFeeStructure } from "@/lib/deliveryFee";
+import type { Outlet, AvailabilityStatus, DeliveryFeeConfig } from "@/types";
+import { defaultDeliveryFeeConfig } from "@/lib/deliveryFee";
 
 /** 
  * Map Firebase outlet data to SaaS Outlet type
  */
-function mapFirebaseOutlet(id: string, data: any, businessId: string): Outlet {
+function mapFirebaseOutlet(id: string, data: any, businessId: string, globalConfig: DeliveryFeeConfig): Outlet {
   const meta = data.meta || {};
   const settings = data.settings || {};
+  const store = settings.Store || {};
+
+  const outletSlabs = settings.deliveryFees;
+  const deliveryFeeConfig: DeliveryFeeConfig = outletSlabs && outletSlabs.length > 0
+    ? { mode: "slabs", per100mRate: 0, slabs: outletSlabs }
+    : globalConfig;
+
+  const locLat = settings.location?.lat ?? store.lat ?? meta?.lat ?? 0;
+  const locLng = settings.location?.lng ?? store.lng ?? meta?.lng ?? 0;
 
   return {
     id: id,
     businessId: businessId,
-    name: settings.Store?.storeName || meta.name || "Roshani Restaurant",
+    name: store.storeName || meta.name || data.name || "",
     slug: meta.slug || id,
-    cuisine: meta.cuisine || "Indian, Fast Food",
-    logo: meta.logo || "https://picsum.photos/id/102/100/100",
-    coverImage: meta.coverImage || "https://picsum.photos/id/102/800/400",
-    rating: meta.rating || 4.5,
-    ratingCount: meta.ratingCount || 10,
-    deliveryTimeMin: settings.deliveryTimeMin || 30,
-    deliveryTimeMax: settings.deliveryTimeMax || 45,
-    distanceKm: 0, // Dynamic calculation based on user location
+    cuisine: meta.cuisine || "",
+    logo: meta.logo || "",
+    coverImage: meta.coverImage || "",
+    rating: meta.rating || 0,
+    ratingCount: meta.ratingCount || 0,
+    deliveryTimeMin: settings.deliveryTimeMin || 0,
+    deliveryTimeMax: settings.deliveryTimeMax || 0,
+    distanceKm: 0,
     availability: (settings.shopOpen ? "open" : "closed") as AvailabilityStatus,
-    openingTime: settings.openingTime || "10:00",
-    closingTime: settings.closingTime || "22:00",
+    openingTime: settings.openingTime || "",
+    closingTime: settings.closingTime || "",
     minOrderAmount: settings.minOrderAmount || 0,
-    deliveryFeeStructure: settings.deliveryFees || defaultDeliveryFeeStructure,
+    deliveryFeeConfig,
     offers: meta.offers || [],
     tags: meta.tags || [],
-    address: settings.address || "Main Road, Bihar",
-    location: { 
-      lat: settings.location?.lat || 25.0, 
-      lng: settings.location?.lng || 85.0 
-    },
+    address: settings.address || store.address || meta.address || "",
+    location: { lat: locLat, lng: locLng },
     isVegOnly: meta.isVegOnly || false,
     featured: meta.featured || false,
     createdAt: meta.createdAt || new Date().toISOString(),
@@ -46,18 +52,28 @@ function mapFirebaseOutlet(id: string, data: any, businessId: string): Outlet {
 /** Fetch all outlets globally */
 export async function fetchOutlets(): Promise<Outlet[]> {
   try {
-    const path = `businesses`;
-    const snapshot = await get(ref(db, path));
+    const [bizSnap, configSnap] = await Promise.all([
+      get(ref(db, 'businesses')),
+      get(ref(db, 'system/settings/delivery')),
+    ]);
+
+    const globalConfig: DeliveryFeeConfig = configSnap.exists()
+      ? {
+          mode: configSnap.val().mode || "slabs",
+          per100mRate: configSnap.val().per100mRate || 0,
+          slabs: configSnap.val().slabs || defaultDeliveryFeeConfig.slabs,
+        }
+      : defaultDeliveryFeeConfig;
     
-    if (snapshot.exists()) {
-      const businesses = snapshot.val();
+    if (bizSnap.exists()) {
+      const businesses = bizSnap.val();
       const allOutlets: Outlet[] = [];
       
       for (const bid in businesses) {
         const bData = businesses[bid];
         if (bData.outlets) {
           for (const oid in bData.outlets) {
-            allOutlets.push(mapFirebaseOutlet(oid, bData.outlets[oid], bid));
+            allOutlets.push(mapFirebaseOutlet(oid, bData.outlets[oid], bid, globalConfig));
           }
         }
       }
@@ -71,13 +87,23 @@ export async function fetchOutlets(): Promise<Outlet[]> {
 }
 
 /** Fetch a single outlet by id */
-export async function fetchOutletById(id: string, businessId: string = "business_roshani"): Promise<Outlet | null> {
+export async function fetchOutletById(id: string, businessId: string = ""): Promise<Outlet | null> {
   try {
-    const path = `businesses/${businessId}/outlets/${id}`;
-    const snapshot = await get(ref(db, path));
+    const [snapshot, configSnap] = await Promise.all([
+      get(ref(db, `businesses/${businessId}/outlets/${id}`)),
+      get(ref(db, 'system/settings/delivery')),
+    ]);
+
+    const globalConfig: DeliveryFeeConfig = configSnap.exists()
+      ? {
+          mode: configSnap.val().mode || "slabs",
+          per100mRate: configSnap.val().per100mRate || 0,
+          slabs: configSnap.val().slabs || defaultDeliveryFeeConfig.slabs,
+        }
+      : defaultDeliveryFeeConfig;
     
     if (snapshot.exists()) {
-      return mapFirebaseOutlet(id, snapshot.val(), businessId);
+      return mapFirebaseOutlet(id, snapshot.val(), businessId, globalConfig);
     }
     return null;
   } catch (err) {
@@ -94,11 +120,21 @@ export async function fetchOutletBySlug(slug: string): Promise<Outlet | null> {
     
     if (slugSnap.exists()) {
       const { businessId, outletId } = slugSnap.val();
-      const outletRef = ref(db, `businesses/${businessId}/outlets/${outletId}`);
-      const outletSnap = await get(outletRef);
+      const [outletSnap, configSnap] = await Promise.all([
+        get(ref(db, `businesses/${businessId}/outlets/${outletId}`)),
+        get(ref(db, 'system/settings/delivery')),
+      ]);
+
+      const globalConfig: DeliveryFeeConfig = configSnap.exists()
+        ? {
+            mode: configSnap.val().mode || "slabs",
+            per100mRate: configSnap.val().per100mRate || 0,
+            slabs: configSnap.val().slabs || defaultDeliveryFeeConfig.slabs,
+          }
+        : defaultDeliveryFeeConfig;
       
       if (outletSnap.exists()) {
-        return mapFirebaseOutlet(outletId, outletSnap.val(), businessId);
+        return mapFirebaseOutlet(outletId, outletSnap.val(), businessId, globalConfig);
       }
     }
     return null;
@@ -127,20 +163,24 @@ export function filterOutlets(outlets: Outlet[], query: string, filter: string):
   return result;
 }
 
-/** Get outlets sorted by distance (nearest first) using user coordinates */
+/** Get outlets within 10km radius, sorted by distance (nearest first) */
 export function sortByDistance(outlets: Outlet[], userCoords: { lat: number, lng: number } | null): Outlet[] {
   if (!userCoords) return outlets;
+
+  const MAX_RADIUS_KM = 10;
 
   const withDistance = outlets.map(o => {
     const d = calculateDistance(userCoords.lat, userCoords.lng, o.location.lat, o.location.lng);
     return { ...o, distanceKm: parseFloat(d.toFixed(1)) };
   });
 
-  return [...withDistance].sort((a, b) => a.distanceKm - b.distanceKm);
+  return withDistance
+    .filter(o => o.distanceKm <= MAX_RADIUS_KM)
+    .sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
 /** Haversine formula for distance in KM */
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -154,7 +194,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 /** Get outlet name by id (requires sync fallback or state) */
 export function getOutletName(id: string, outlets: Outlet[]): string {
-  return outlets.find(o => o.id === id)?.name ?? "Restaurant";
+  return outlets.find(o => o.id === id)?.name ?? "";
 }
 
 export function availabilityLabel(status: AvailabilityStatus): string {

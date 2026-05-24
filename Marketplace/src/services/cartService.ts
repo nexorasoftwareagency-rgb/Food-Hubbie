@@ -50,7 +50,7 @@ export function calcCartSummary(
   if (outlet && fulfillmentMethod === "delivery") {
     deliveryFee = calcDeliveryFee(
       outlet.distanceKm,
-      outlet.deliveryFeeStructure
+      outlet.deliveryFeeConfig
     );
   }
 

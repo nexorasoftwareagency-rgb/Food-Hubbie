@@ -1,14 +1,24 @@
-import type { DeliveryFeeSlot } from "@/types";
+import type { DeliveryFeeConfig, DeliveryFeeSlot } from "@/types";
 
 /**
- * Calculate delivery fee based on distance and the outlet's fee structure.
- * Slots are checked in order; the first slot whose upToKm >= distanceKm wins.
- * Falls back to the last slot's fee for distances beyond all defined slots.
+ * Calculate delivery fee based on distance and the delivery fee config.
+ * Supports two mutually exclusive modes:
+ *   - "per_100m": Flat rate per 100 metres (e.g. ₹2 per 100m → ₹20/km)
+ *   - "slabs":    Progressive slabs (e.g. ₹20 for up to 2 km, ₹40 for up to 5 km)
  */
 export function calcDeliveryFee(
   distanceKm: number,
-  slots: DeliveryFeeSlot[]
+  config: DeliveryFeeConfig
 ): number {
+  if (config.mode === "per_100m") {
+    const units = Math.ceil(distanceKm * 10);
+    return units * config.per100mRate;
+  }
+
+  return calcSlabFee(distanceKm, config.slabs);
+}
+
+function calcSlabFee(distanceKm: number, slots: DeliveryFeeSlot[]): number {
   if (!slots || slots.length === 0) return 0;
   const sorted = [...slots].sort((a, b) => a.upToKm - b.upToKm);
   for (const slot of sorted) {
@@ -17,18 +27,17 @@ export function calcDeliveryFee(
   return sorted[sorted.length - 1].fee;
 }
 
-/** Standard delivery fee structure used by most outlets */
-export const defaultDeliveryFeeStructure: DeliveryFeeSlot[] = [
-  { upToKm: 2, fee: 20 },
-  { upToKm: 5, fee: 40 },
-  { upToKm: 8, fee: 60 },
-  { upToKm: 12, fee: 80 },
-];
-
-/** Free delivery (used for premium / subscription flow) */
-export const freeDeliveryStructure: DeliveryFeeSlot[] = [
-  { upToKm: 99, fee: 0 },
-];
+/** Default delivery config (slab mode) used when Firebase config is missing */
+export const defaultDeliveryFeeConfig: DeliveryFeeConfig = {
+  mode: "slabs",
+  per100mRate: 0,
+  slabs: [
+    { upToKm: 2, fee: 20 },
+    { upToKm: 5, fee: 40 },
+    { upToKm: 8, fee: 60 },
+    { upToKm: 12, fee: 80 },
+  ],
+};
 
 /** Format delivery fee label for display */
 export function deliveryFeeLabel(fee: number): string {

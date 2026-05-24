@@ -24,7 +24,7 @@ export async function fetchGlobalReviews(limit = 6): Promise<Review[]> {
                 allReviews.push({
                   id: rid,
                   userId: rData.userId || "anonymous",
-                  userName: rData.userName || "Customer",
+                  userName: rData.userName || "",
                   userAvatar: rData.userAvatar || `https://ui-avatars.com/api/?name=${rData.userName || 'C'}`,
                   outletId: oid,
                   outletName: oData.settings?.Store?.storeName || "Restaurant",

@@ -1,6 +1,6 @@
 // ─── Order Service ─────────────────────────────────────────────────────────────
 // Foodhubbie SaaS — Central Order Management
-// Synchronized with Firebase Realtime Database and ShopAdmin ERP.
+// Synchronized with Firebase Realtime Database and admin-dashboard.
 
 import { db, ref, get, push, set, auth } from "@/lib/firebase";
 import { update } from "firebase/database";
@@ -16,7 +16,7 @@ export function statusIndex(status: string): number {
 }
 
 /** 
- * Submit order to Firebase and sync with ShopAdmin
+ * Submit order to Firebase and sync with admin-dashboard
  */
 export async function submitOrder(input: PlaceOrderInput): Promise<string> {
   const now = new Date().toISOString();
@@ -114,8 +114,9 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
       id: newOrderRef.key || "unknown",
       userId: auth.currentUser?.uid || "anonymous",
       outletId: input.outletId,
-      outletName: input.outletName || "Restaurant",
+      outletName: input.outletName || "",
       businessId: bid,
+      type: input.type || "delivery",
       items: input.items,
       subtotal: input.subtotal,
       deliveryFee: input.deliveryFee,
@@ -303,8 +304,9 @@ export async function fetchOrdersFromFirebase(userId: string): Promise<Order[]> 
                   id: orderId,
                   userId: o.userId,
                   outletId: oid,
-                  outletName: outletData.settings?.Store?.storeName || outletData.meta?.name || "Restaurant",
+                  outletName: outletData.settings?.Store?.storeName || outletData.meta?.name || "",
                   businessId: bid,
+                  type: o.type || "delivery",
                   items: o.cart ? o.cart.map((c: any) => ({
                     menuItemId: c.id,
                     name: c.name,

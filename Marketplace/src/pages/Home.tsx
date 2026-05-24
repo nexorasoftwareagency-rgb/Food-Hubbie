@@ -16,7 +16,12 @@ import {
   Star,
   Quote,
   Store,
+  ShoppingBag,
+  Bike,
+  Clock,
+  Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { fetchOutlets, sortByDistance } from "@/services/outletService";
 import { 
   getGlobalBestSellers, 
@@ -31,7 +36,6 @@ import { FoodCard } from "@/components/cards/FoodCard";
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader";
 import { useLocationContext } from "@/context/LocationContext";
 import { fetchCuisines, type Cuisine } from "@/services/configService";
-import { heroBanner } from "@/data/mockData";
 
 
 
@@ -112,12 +116,9 @@ export default function Home() {
             <SkeletonLoader type="banner" count={1} />
           ) : (
             <>
-              <img
-                src={heroBanner}
-                alt="Delicious Food"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/10 flex flex-col justify-center p-6 md:p-14">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/90 via-primary/60 to-secondary/40" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent" />
+              <div className="absolute inset-0 flex flex-col justify-center p-6 md:p-14">
                 <motion.h1
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -170,6 +171,50 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {/* KPI Metrics Strip */}
+      {!loading && (
+        <section className="container mx-auto px-4 pb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+              <div className="bg-primary/10 p-2.5 rounded-xl text-primary">
+                <Store className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-heading font-black">{outlets.length}</p>
+                <p className="text-xs text-muted-foreground font-medium">Restaurants</p>
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+              <div className="bg-secondary/10 p-2.5 rounded-xl text-secondary">
+                <ShoppingBag className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-heading font-black">{openOutlets.length}</p>
+                <p className="text-xs text-muted-foreground font-medium">Open Now</p>
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+              <div className="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-600">
+                <Bike className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-heading font-black">{fastDelivery[0]?.deliveryTimeMin || 15}-{fastDelivery[0]?.deliveryTimeMax || 30}</p>
+                <p className="text-xs text-muted-foreground font-medium">Fastest Delivery</p>
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+              <div className="bg-amber-500/10 p-2.5 rounded-xl text-amber-600">
+                <Star className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-heading font-black">{topRated.filter(o => o.rating >= 4.5).length}</p>
+                <p className="text-xs text-muted-foreground font-medium">Top Rated</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Food categories */}
       <section className="container mx-auto px-4 pb-10">
@@ -319,7 +364,11 @@ export default function Home() {
             ))}
           </div>
         ) : (
-          <div className="bg-muted/30 rounded-3xl p-12 text-center border-2 border-dashed border-border">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-muted/30 rounded-3xl p-12 text-center border-2 border-dashed border-border"
+          >
             <div className="bg-muted h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="h-10 w-10 text-muted-foreground" />
             </div>
@@ -327,7 +376,7 @@ export default function Home() {
             <p className="text-muted-foreground max-w-sm mx-auto">
               We couldn't find any menu items in your area. Try refreshing or changing your location.
             </p>
-          </div>
+          </motion.div>
         )}
       </section>
 
@@ -413,6 +462,7 @@ export default function Home() {
           </div>
 
           <button
+            onClick={() => toast("Pro Membership", { description: "Coming soon! We'll notify you when it's ready.", duration: 4000 })}
             data-testid="btn-join-pro"
             className="relative z-10 bg-white text-primary font-bold px-8 py-4 rounded-xl hover:bg-muted transition-colors shadow-lg whitespace-nowrap"
           >

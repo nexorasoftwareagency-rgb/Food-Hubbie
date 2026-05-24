@@ -95,6 +95,10 @@
                     <i data-lucide="building-2"></i>
                     <span>Managed Entities</span>
                 </a>
+                <a href="#" class="nav-link" data-tab="outlets">
+                    <i data-lucide="store"></i>
+                    <span>Outlet Profiles</span>
+                </a>
                 <a href="#" class="nav-link" data-tab="analytics">
                     <i data-lucide="bar-chart-3"></i>
                     <span>Global Analytics</span>
@@ -534,21 +538,54 @@
                     <div class="pro-card">
                         <div class="table-header">
                             <h3 class="font-bold flex items-center gap-2">
-                                <i data-lucide="truck" size="18" color="#38BDF8"></i> Infrastructure Flow Slabs
+                                <i data-lucide="truck" size="18" color="#38BDF8"></i> Delivery Fee Configuration
                             </h3>
                             <button class="btn-pro" onclick="saveGlobalDelivery()"><i data-lucide="save" size="18"></i> Deploy Changes</button>
                         </div>
-                        <table class="pro-table">
-                            <thead>
-                                <tr>
-                                    <th>Distance Parameter (Km)</th>
-                                    <th>Service Cost (₹)</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="deliverySlabsList"></tbody>
-                        </table>
-                        <button class="btn-pro-icon mt-4" onclick="addDeliverySlab()" title="Add Delivery Slab" aria-label="Add Delivery Slab"><i data-lucide="plus" size="18"></i></button>
+
+                        <!-- Mode Toggle (mutually exclusive) -->
+                        <div class="mb-6 p-4 bg-dark rounded-lg border border-gray-700">
+                            <label class="text-sm font-bold text-muted mb-3 block">Delivery Fee Mode</label>
+                            <div class="flex gap-4">
+                                <label class="flex items-center gap-2 cursor-pointer" onclick="setDeliveryMode('per_100m')">
+                                    <input type="radio" name="deliveryMode" value="per_100m" class="w-4 h-4 accent-blue-500">
+                                    <span class="text-white font-semibold text-sm">Per 100 Metres</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer" onclick="setDeliveryMode('slabs')">
+                                    <input type="radio" name="deliveryMode" value="slabs" class="w-4 h-4 accent-blue-500">
+                                    <span class="text-white font-semibold text-sm">Slab Based (Km-wise)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Per 100m Rate Input -->
+                        <div id="per100mSection" class="mb-6 p-4 bg-dark rounded-lg border border-gray-700" style="display:none">
+                            <label class="text-sm font-bold text-muted mb-2 block">Rate per 100 metres (₹)</label>
+                            <div class="flex items-center gap-3">
+                                <span class="text-lg font-bold text-accent">₹</span>
+                                <input type="number" id="per100mRate" class="auth-input" style="width:120px;padding:10px;margin-bottom:0;font-size:18px;font-weight:900" value="2" min="0" step="0.5">
+                                <span class="text-sm text-muted font-medium">per 100m</span>
+                            </div>
+                            <p class="text-xs text-muted mt-2">Example: ₹2 per 100m = ₹20 for 1 km, ₹40 for 2 km, etc.</p>
+                        </div>
+
+                        <!-- Slab Table -->
+                        <div id="slabsSection">
+                            <div class="table-header">
+                                <h4 class="font-bold text-sm">Distance Slabs (Km)</h4>
+                            </div>
+                            <table class="pro-table">
+                                <thead>
+                                    <tr>
+                                        <th>Distance Parameter (Km)</th>
+                                        <th>Service Cost (₹)</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="deliverySlabsList"></tbody>
+                            </table>
+                            <button class="btn-pro-icon mt-4" onclick="addDeliverySlab()" title="Add Delivery Slab" aria-label="Add Delivery Slab"><i data-lucide="plus" size="18"></i></button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -891,6 +928,57 @@
                             <tbody id="businessListAlt"></tbody>
                         </table>
                         <div id="businessesPagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outlet Profiles -->
+            <div id="outlets" class="tab-pane">
+                <div class="content-section">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-black text-white mb-1">Outlet Profiles</h2>
+                            <p class="text-muted text-sm">Complete outlet details, credentials, and performance analytics</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="pro-badge badge-info" id="outletCount">0 outlets</div>
+                        </div>
+                    </div>
+                    <div class="pro-card">
+                        <div class="table-header">
+                            <h3 class="font-bold">All Outlets</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="outletSearchInput" class="auth-input" style="width:200px;padding:6px 12px;margin-bottom:0;font-size:13px" placeholder="Search outlets..." oninput="filterOutletList()">
+                            </div>
+                        </div>
+                        <table class="pro-table">
+                            <thead>
+                                <tr>
+                                    <th>Outlet Name</th>
+                                    <th>Business</th>
+                                    <th>Slug</th>
+                                    <th>Status</th>
+                                    <th>Admin Email</th>
+                                    <th>Registered</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="outletListBody"></tbody>
+                        </table>
+                        <div id="outletsPagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outlet Profile Modal -->
+            <div id="outletProfileModal" class="auth-overlay hidden bg-overlay backdrop-blur">
+                <div class="pro-card w-full max-w-800 max-h-90vh overflow-y-auto">
+                    <div class="table-header">
+                        <h3 id="profileModalTitle">Outlet Profile</h3>
+                        <button class="btn-pro-icon" onclick="hideOutletProfile()" title="Close"><i data-lucide="x" size="18"></i></button>
+                    </div>
+                    <div id="outletProfileBody" class="p-4">
+                        <!-- Dynamic profile content loaded here -->
                     </div>
                 </div>
             </div>
@@ -1527,9 +1615,17 @@
                     <div class="col-span-2 border-t mb-2 mt-2">
                         <h4 class="text-xs uppercase tracking-wide text-muted">Admin Access Control</h4>
                     </div>
+                    <div class="col-span-2">
+                        <label class="label-pro text-sm">Admin Email (Username)</label>
+                        <input type="email" id="editAdminEmail" class="auth-input input-pro text-sm" placeholder="admin@email.com" title="Admin Email" readonly style="color:var(--accent);font-weight:700;background:rgba(56,189,248,0.05)">
+                    </div>
                     <div>
                         <label class="label-pro text-sm">Admin Mobile</label>
                         <input type="text" id="editAdminPhone" class="auth-input input-pro text-sm" placeholder="10-digit number" title="Admin Mobile" required autocomplete="tel">
+                    </div>
+                    <div>
+                        <label class="label-pro text-sm">Current Password</label>
+                        <input type="text" id="editAdminPassDisplay" class="auth-input input-pro text-sm" placeholder="Stored password" title="Admin Password" readonly style="color:#F59E0B;font-weight:700;background:rgba(251,191,36,0.05)">
                     </div>
                     <div>
                         <label class="label-pro text-sm">New Password (Optional)</label>
