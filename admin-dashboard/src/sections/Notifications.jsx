@@ -1,106 +1,76 @@
-import { useState, useEffect } from "react";
-import { Bell, Send, Volume2, VolumeX } from "lucide-react";
-import { ref, onValue, off, push, set } from "firebase/database";
-import { db } from "../firebase";
+import { useState } from "react";
+import { Send } from "lucide-react";
 import GlassCard from "../components/GlassCard";
 import BtnPrimary from "../components/BtnPrimary";
-import Modal from "../components/Modal";
-import EmptyState from "../components/EmptyState";
-import { ORANGE, COLORS } from "../utils/constants";
+import SectionHeader from "../components/SectionHeader";
+import { ORANGE } from "../utils/constants";
 
 const Notifications = ({ showToast }) => {
-  const [notifs, setNotifs] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [sound, setSound] = useState(true);
+  const [form, setForm] = useState({ title:"", body:"", audience:"all" });
+  const [sent, setSent] = useState([
+    { id:1, title:"Flash Sale! 20% Off", body:"Hurry, offer valid until 10 PM tonight!", audience:"all", time:"2 hrs ago", sent:1240 },
+    { id:2, title:"New Item: Mango Lassi", body:"Try our refreshing new summer special!", audience:"new", time:"Yesterday", sent:480 },
+  ]);
 
-  useEffect(() => {
-    const broadcastsRef = ref(db, "system/broadcasts");
-    const unsub = onValue(broadcastsRef, snap => {
-      const val = snap.val();
-      if (val) setNotifs(Object.keys(val).map(k => ({ id: k, ...val[k] })).sort((a, b) => ((b.sentAt||"") > (a.sentAt||"") ? 1 : -1)));
-      else setNotifs([]);
-    });
-    return () => off(broadcastsRef, "value", unsub);
-  }, []);
-
-  const sendNotif = async (data) => {
-    try {
-      const ref_ = push(ref(db, "system/broadcasts"));
-      await set(ref_, { ...data, sentAt: new Date().toISOString(), sentTo: 0, opened: 0 });
-      setShowForm(false);
-      showToast("Notification sent!");
-    } catch { showToast("Failed to send"); }
-  };
-
-  const NotificationForm = ({ onSend, onClose }) => {
-    const [title, setTitle] = useState("");
-    const [msg, setMsg] = useState("");
-    const [type, setType] = useState("promo");
-    const send = () => {
-      if (!title || !msg) return;
-      onSend({ title, msg, type });
-    };
-    return (
-      <div className="space-y-3">
-        <input placeholder="Notification title" value={title} onChange={e => setTitle(e.target.value)}
-          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none" />
-        <textarea placeholder="Message" value={msg} onChange={e => setMsg(e.target.value)} rows={3}
-          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none resize-none" />
-        <select value={type} onChange={e => setType(e.target.value)}
-          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none">
-          <option value="promo">Promotional</option>
-          <option value="alert">Alert</option>
-          <option value="update">Update</option>
-        </select>
-        <button onClick={send} className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
-          style={{ backgroundColor: ORANGE }}>Send Notification</button>
-      </div>
-    );
+  const sendNotif = () => {
+    if (!form.title || !form.body) return;
+    setSent(prev => [{ id: Date.now(), ...form, time:"Just now", sent:Math.floor(Math.random()*1500+200) }, ...prev]);
+    setForm({ title:"", body:"", audience:"all" });
+    showToast("Notification sent successfully!");
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <BtnPrimary onClick={() => setShowForm(true)}><Send size={13} /> New Notification</BtnPrimary>
-        <button onClick={() => setSound(p => !p)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600">
-          {sound ? <Volume2 size={13} /> : <VolumeX size={13} />}
-          Sound {sound ? "On" : "Off"}
-        </button>
-      </div>
-      <div className="space-y-3">
-        {notifs.map(n => (
-          <GlassCard key={n.id} className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: n.type === "alert" ? "#ef444420" : n.type === "promo" ? "#f36b2120" : "#3b82f620" }}>
-                  <Bell size={14} style={{ color: n.type === "alert" ? COLORS.error : n.type === "promo" ? ORANGE : COLORS.info }} />
-                </div>
-                <div>
-                  <div className="font-bold text-slate-800 text-sm">{n.title}</div>
-                  <div className="text-xs text-slate-500">{n.sentAt ? new Date(n.sentAt).toLocaleString() : "-"}</div>
-                </div>
+    <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+      <GlassCard className="p-5 h-fit">
+        <SectionHeader title="Compose Notification" />
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Title</label>
+            <input value={form.title} onChange={e => setForm(p => ({...p, title:e.target.value}))}
+              placeholder="e.g. Flash Sale Today!"
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-orange-300" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Message</label>
+            <textarea value={form.body} onChange={e => setForm(p => ({...p, body:e.target.value}))}
+              placeholder="Your notification message..."
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-orange-300 resize-none"
+              rows={3} />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Target Audience</label>
+            <select value={form.audience} onChange={e => setForm(p => ({...p, audience:e.target.value}))}
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none">
+              <option value="all">All Customers</option>
+              <option value="new">New Customers</option>
+              <option value="vip">VIP Customers</option>
+              <option value="inactive">Inactive (7+ days)</option>
+            </select>
+          </div>
+          <BtnPrimary onClick={sendNotif} className="w-full py-2.5 justify-center">
+            <Send size={14} /> Send Notification
+          </BtnPrimary>
+        </div>
+      </GlassCard>
+
+      <div>
+        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Sent History</div>
+        <div className="space-y-3">
+          {sent.map(n => (
+            <GlassCard key={n.id} className="p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="font-bold text-slate-800 text-sm">{n.title}</div>
+                <span className="text-xs text-slate-400">{n.time}</span>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize"
-                style={{
-                  backgroundColor: n.type === "alert" ? "#ef444420" : n.type === "promo" ? "#f36b2120" : "#3b82f620",
-                  color: n.type === "alert" ? COLORS.error : n.type === "promo" ? ORANGE : COLORS.info
-                }}>{n.type}</span>
-            </div>
-            <p className="text-sm text-slate-600 mb-3">{n.msg}</p>
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Sent to {(n.sentTo || 0).toLocaleString()} users · {((n.opened || 0) / (n.sentTo || 1) * 100).toFixed(0)}% opened</span>
-            </div>
-          </GlassCard>
-        ))}
-        {notifs.length === 0 && <EmptyState icon={Bell} msg="No notifications sent yet" />}
+              <div className="text-xs text-slate-500 mb-2">{n.body}</div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor:"#fff7ed", color:ORANGE }}>{n.audience}</span>
+                <span className="text-slate-500">{n.sent.toLocaleString("en-IN")} recipients</span>
+              </div>
+            </GlassCard>
+          ))}
+        </div>
       </div>
-      {showForm && (
-        <Modal title="New Notification" onClose={() => setShowForm(false)}>
-          <NotificationForm onSend={sendNotif} onClose={() => setShowForm(false)} />
-        </Modal>
-      )}
     </div>
   );
 };

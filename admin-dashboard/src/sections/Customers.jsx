@@ -1,104 +1,81 @@
-import { useState, useMemo, useEffect } from "react";
-import { Users, Star, MessageCircle } from "lucide-react";
-import { ref, onValue, off } from "firebase/database";
-import { db } from "../firebase";
+import { useState, useMemo } from "react";
+import { Eye } from "lucide-react";
 import GlassCard from "../components/GlassCard";
 import SearchInput from "../components/SearchInput";
 import Avatar from "../components/Avatar";
-import StarRating from "../components/StarRating";
 import Modal from "../components/Modal";
-import EmptyState from "../components/EmptyState";
 import { ORANGE } from "../utils/constants";
 import { fmt } from "../utils/formatters";
 
-const Customers = ({ showToast }) => {
-  const [customers, setCustomers] = useState([]);
+const MOCK_CUSTOMERS = [
+  { id:"c1", name:"Rahul Sharma", phone:"+91 9876543210", orders:24, spent:8640, last:"2 hours ago", addr:"14 MG Road", city:"Ranchi" },
+  { id:"c2", name:"Priya Singh", phone:"+91 9845671230", orders:18, spent:6120, last:"Yesterday", addr:"Kokar Colony", city:"Ranchi" },
+  { id:"c3", name:"Amit Kumar", phone:"+91 9123456789", orders:31, spent:11280, last:"Today", addr:"Ashok Nagar", city:"Ranchi" },
+  { id:"c4", name:"Sunita Verma", phone:"+91 9988776655", orders:9, spent:2430, last:"3 days ago", addr:"Harmu", city:"Ranchi" },
+  { id:"c5", name:"Deepak Jha", phone:"+91 9012345678", orders:42, spent:15960, last:"1 hour ago", addr:"Lalpur", city:"Ranchi" },
+  { id:"c6", name:"Neha Gupta", phone:"+91 9678901234", orders:14, spent:4780, last:"Today", addr:"Ratu Road", city:"Ranchi" },
+];
+
+const Customers = () => {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
-    const ref_ = ref(db, "customers");
-    const unsub = onValue(ref_, snap => {
-      const val = snap.val();
-      if (val) setCustomers(Object.keys(val).map(k => ({ id: k, ...val[k] })));
-      else setCustomers([]);
-    });
-    return () => off(ref_, "value", unsub);
-  }, []);
-
   const filtered = useMemo(() =>
-    customers.filter(c => (c.name || "").toLowerCase().includes(search.toLowerCase()) || (c.phone || "").includes(search)), [customers, search]);
+    MOCK_CUSTOMERS.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)),
+    [search]);
 
   return (
     <div className="space-y-4">
-      <SearchInput placeholder="Search customers by name or phone..." value={search} onChange={setSearch} className="max-w-md" />
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
-        {filtered.map(c => (
-          <GlassCard key={c.id} className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setSelected(c)}>
-            <div className="flex items-center gap-3 mb-3">
-              <Avatar name={c.name} size={42} />
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-slate-800">{c.name}</div>
-                <div className="text-xs text-slate-500">{c.phone}</div>
-              </div>
-              <StarRating rating={c.rating || 0} />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">{c.orders || 0} orders</span>
-              <span className="font-bold" style={{ color: ORANGE }}>{fmt(c.spent || 0)}</span>
-              <div className="flex gap-1">
-                {(c.tags || []).map(t => (
-                  <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-medium capitalize"
-                    style={{ backgroundColor: ORANGE + "15", color: ORANGE }}>{t}</span>
+      <SearchInput placeholder="Search customers..." value={search} onChange={setSearch} />
+      <GlassCard>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 520 }}>
+            <thead>
+              <tr className="border-b border-slate-100">
+                {["Customer","Phone","Orders","Spent","Last Order",""].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
-              </div>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
-      {filtered.length === 0 && <EmptyState icon={Users} msg="No customers found" />}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(c => (
+                <tr key={c.id} className="border-b border-slate-50 hover:bg-orange-50/30 cursor-pointer" onClick={() => setSelected(c)}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Avatar name={c.name} size={32} />
+                      <span className="font-semibold text-slate-800">{c.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{c.phone}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-800">{c.orders}</td>
+                  <td className="px-4 py-3 font-bold" style={{ color: ORANGE }}>{fmt(c.spent)}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">{c.last}</td>
+                  <td className="px-4 py-3"><Eye size={14} className="text-slate-400" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+
       {selected && (
         <Modal title="Customer Profile" onClose={() => setSelected(null)}>
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Avatar name={selected.name} size={56} />
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+              <Avatar name={selected.name} size={52} />
               <div>
-                <div className="font-bold text-slate-800 text-lg">{selected.name}</div>
+                <div className="font-bold text-lg text-slate-800">{selected.name}</div>
                 <div className="text-sm text-slate-500">{selected.phone}</div>
-                <div className="flex items-center gap-1 text-sm">
-                  <Star size={14} style={{ color: ORANGE }} fill={ORANGE} />
-                  <span className="font-bold text-slate-800">{selected.rating || 0}</span>
-                  <span className="text-slate-400 ml-2">Since {selected.since || "-"}</span>
+                <div className="text-sm text-slate-500">{selected.addr}, {selected.city}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[["Total Orders", selected.orders], ["Total Spent", fmt(selected.spent)], ["Last Order", selected.last]].map(([l,v]) => (
+                <div key={l} className="p-3 bg-slate-50 rounded-xl text-center">
+                  <div className="text-xs text-slate-500 mb-1">{l}</div>
+                  <div className="font-bold text-slate-800">{v}</div>
                 </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="p-3 bg-slate-50 rounded-xl">
-                <div className="text-xs text-slate-500">Total Orders</div>
-                <div className="font-bold text-slate-800 text-lg">{selected.orders || 0}</div>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl">
-                <div className="text-xs text-slate-500">Total Spent</div>
-                <div className="font-bold text-lg" style={{ color: ORANGE }}>{fmt(selected.spent || 0)}</div>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl">
-                <div className="text-xs text-slate-500">Favorite Dish</div>
-                <div className="font-bold text-slate-800">{selected.fav || "-"}</div>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl">
-                <div className="text-xs text-slate-500">Last Active</div>
-                <div className="font-bold text-slate-800">{selected.last || "-"}</div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button className="flex-1 py-2 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1"
-                style={{ backgroundColor: ORANGE }}>
-                <MessageCircle size={13} /> Message
-              </button>
-              <button className="flex-1 py-2 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1"
-                style={{ backgroundColor: "#22c55e" }}>
-                <Star size={13} /> Add to VIP
-              </button>
+              ))}
             </div>
           </div>
         </Modal>

@@ -1,127 +1,60 @@
-import { useState, useMemo } from "react";
-import { ThumbsUp, ThumbsDown, MessageCircle } from "lucide-react";
-import { push } from "firebase/database";
-import { useRealtimeData, Outlet } from "../hooks/useRealtimeData";
 import GlassCard from "../components/GlassCard";
-import StarRating from "../components/StarRating";
 import Avatar from "../components/Avatar";
-import Pill from "../components/Pill";
-import Modal from "../components/Modal";
-import EmptyState from "../components/EmptyState";
+import StarRating from "../components/StarRating";
 import { ORANGE } from "../utils/constants";
 
-const Feedback = ({ showToast }) => {
-  const { data: reviews = [] } = useRealtimeData("feedbacks");
-  const [filter, setFilter] = useState("all");
-  const [sort, setSort] = useState("newest");
-  const [selected, setSelected] = useState(null);
+const MOCK_FEEDBACK = [
+  { id:1, customer:"Rahul S.", rating:5, comment:"Amazing food and super fast delivery! The butter chicken was exceptional.", dish:"Butter Chicken", time:"1 hr ago" },
+  { id:2, customer:"Priya S.", rating:4, comment:"Really good paneer tikka. Could be a bit more spicy but overall great.", dish:"Paneer Tikka", time:"3 hrs ago" },
+  { id:3, customer:"Amit K.", rating:5, comment:"Best biryani in Ranchi! Will definitely order again.", dish:"Biryani", time:"5 hrs ago" },
+  { id:4, customer:"Neha G.", rating:3, comment:"Food was good but delivery took longer than expected.", dish:"Dal Makhani", time:"Yesterday" },
+  { id:5, customer:"Deepak J.", rating:5, comment:"Excellent quality and packaging. Rider was very polite.", dish:"Tandoori Chicken", time:"2 days ago" },
+];
 
-  const avgRating = useMemo(() =>
-    reviews.length ? reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length : 0, [reviews]);
-
-  const filtered = useMemo(() => {
-    let arr = [...reviews];
-    if (filter === "positive") arr = arr.filter(r => r.rating >= 4);
-    else if (filter === "negative") arr = arr.filter(r => r.rating <= 2);
-    else if (filter === "neutral") arr = arr.filter(r => r.rating === 3);
-    if (sort === "newest") arr.sort((a, b) => ((b.createdAt||"") > (a.createdAt||"") ? 1 : -1));
-    else if (sort === "highest") arr.sort((a, b) => (b.rating||0) - (a.rating||0));
-    else if (sort === "lowest") arr.sort((a, b) => (a.rating||0) - (b.rating||0));
-    return arr;
-  }, [reviews, filter, sort]);
-
-  const reply = async (id) => {
-    try {
-      await push(Outlet(`feedbacks/${id}/replies`), {
-        text: "Thank you for your feedback!",
-        createdAt: new Date().toISOString()
-      });
-      setSelected(null);
-      showToast("Reply sent!");
-    } catch { showToast("Failed to send reply"); }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4 mb-2">
+const Feedback = () => (
+  <div className="space-y-4">
+    <GlassCard className="p-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
         <div className="text-center">
-          <div className="text-3xl font-bold" style={{ color: ORANGE }}>{avgRating.toFixed(1)}</div>
-          <StarRating rating={Math.round(avgRating)} />
-          <div className="text-xs text-slate-500">{reviews.length} reviews</div>
+          <div className="text-5xl font-black text-slate-800" style={{ fontFamily:"'Outfit', sans-serif" }}>4.7</div>
+          <StarRating rating={4.7} />
+          <div className="text-xs text-slate-500 mt-1">148 reviews</div>
+        </div>
+        <div className="flex-1 space-y-2 w-full">
+          {[5,4,3,2,1].map((n,i) => {
+            const pcts = [70,18,8,2,2];
+            return (
+              <div key={n} className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 w-4">{n}\u2605</span>
+                <div className="flex-1 bg-slate-100 rounded-full h-2">
+                  <div className="h-2 rounded-full transition-all" style={{ width:`${pcts[i]}%`, backgroundColor:"#f59e0b" }} />
+                </div>
+                <span className="text-xs text-slate-400 w-8">{pcts[i]}%</span>
+              </div>
+            );
+          })}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {["all","positive","neutral","negative"].map(f => (
-          <Pill key={f} label={f.charAt(0).toUpperCase() + f.slice(1)} active={filter === f} onClick={() => setFilter(f)} />
-        ))}
-      </div>
-      <div className="flex gap-3 items-center">
-        <select value={sort} onChange={e => setSort(e.target.value)}
-          className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none">
-          <option value="newest">Newest First</option>
-          <option value="highest">Highest Rated</option>
-          <option value="lowest">Lowest Rated</option>
-        </select>
-      </div>
-      <div className="space-y-3">
-        {filtered.map(r => (
-          <GlassCard key={r.id} className="p-4 cursor-pointer hover:shadow-md transition-all" onClick={() => setSelected(r)}>
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <Avatar name={r.name || r.customerName || "Anonymous"} size={36} />
-                <div>
-                  <div className="font-bold text-slate-800 text-sm">{r.name || r.customerName || "Anonymous"}</div>
-                  <StarRating rating={r.rating || 0} />
-                </div>
+    </GlassCard>
+    <div className="space-y-3">
+      {MOCK_FEEDBACK.map(f => (
+        <GlassCard key={f.id} className="p-4">
+          <div className="flex items-start gap-3">
+            <Avatar name={f.customer} size={36} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-slate-800">{f.customer}</span>
+                <span className="text-xs text-slate-400">{f.time}</span>
               </div>
-              <span className="text-xs text-slate-400">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "-"}</span>
+              <StarRating rating={f.rating} />
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">{f.comment}</p>
+              <span className="text-xs mt-2 inline-block px-2 py-0.5 rounded-full" style={{ backgroundColor:"#fff7ed", color:ORANGE }}>re: {f.dish}</span>
             </div>
-            <p className="text-sm text-slate-600 mb-3">{r.review || r.comment || ""}</p>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span className="flex items-center gap-1"><ThumbsUp size={12} /> {r.likes || 0}</span>
-                <span className="flex items-center gap-1"><ThumbsDown size={12} /> {r.dislikes || 0}</span>
-                {r.replied && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-600 bg-green-100">Replied</span>}
-              </div>
-              <div className="flex gap-1">
-                {(r.tags || []).map(t => (
-                  <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-medium capitalize"
-                    style={{ backgroundColor: ORANGE + "15", color: ORANGE }}>{t}</span>
-                ))}
-              </div>
-            </div>
-          </GlassCard>
-        ))}
-        {filtered.length === 0 && <EmptyState icon={MessageCircle} msg="No reviews found" />}
-      </div>
-      {selected && (
-        <Modal title="Review Detail" onClose={() => setSelected(null)}>
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Avatar name={selected.name || "Anonymous"} size={44} />
-              <div>
-                <div className="font-bold text-slate-800">{selected.name || "Anonymous"}</div>
-                <StarRating rating={selected.rating || 0} />
-                <div className="text-xs text-slate-500">{selected.createdAt ? new Date(selected.createdAt).toLocaleDateString() : "-"}</div>
-              </div>
-            </div>
-            <p className="text-sm text-slate-600">{selected.review || selected.comment || ""}</p>
-            <div className="flex gap-3 text-sm text-slate-500">
-              <span className="flex items-center gap-1"><ThumbsUp size={14} /> {selected.likes || 0}</span>
-              <span className="flex items-center gap-1"><ThumbsDown size={14} /> {selected.dislikes || 0}</span>
-            </div>
-            {selected.replied ? (
-              <div className="p-3 bg-green-50 rounded-xl text-sm text-green-700">You have already replied to this review.</div>
-            ) : (
-              <button onClick={() => reply(selected.id)}
-                className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ backgroundColor: ORANGE }}>Send Reply</button>
-            )}
           </div>
-        </Modal>
-      )}
+        </GlassCard>
+      ))}
     </div>
-  );
-};
+  </div>
+);
 
 export default Feedback;
