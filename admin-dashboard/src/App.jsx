@@ -6,9 +6,10 @@ import {
   Sun, Moon, Search, X, Menu, ChevronRight, ChevronLeft,
   ShoppingCart, Wallet, Store, Plus, Edit3, Trash2, Printer,
   Minus, Phone, Save, Image, Upload, DollarSign, CheckCircle,
-  AlertTriangle, ArrowUp, ArrowDown, Clock, TrendingUp, Globe
+  AlertTriangle, ArrowUp, ArrowDown, Clock, TrendingUp, Globe,
+  Activity, Navigation, Truck, Eye, Download, Send, Star, XCircle
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref, update, push, set, remove, serverTimestamp, onValue, off, query, orderByChild, equalTo, uploadImage } from "./firebase";
 import "./App.css";
 
@@ -21,6 +22,12 @@ const ORD_ST = {
   "Reached Drop Location": { label: "Reached Drop", color: "#f97316", bg: "#fff7ed" }, Delivered: { label: "Delivered", color: "#22c55e", bg: "#dcfce7" },
   Cancelled: { label: "Cancelled", color: "#ef4444", bg: "#fee2e2" },
 };
+const ORDER_STATUSES = {
+  pending: { label: "Pending", color: "#f59e0b", bg: "#fef3c7" }, confirmed: { label: "Confirmed", color: "#3b82f6", bg: "#dbeafe" },
+  preparing: { label: "Preparing", color: "#8b5cf6", bg: "#ede9fe" }, ready: { label: "Ready", color: "#06b6d4", bg: "#cffafe" },
+  out_for_delivery: { label: "Out for Delivery", color: "#f36b21", bg: "#ffedd5" }, delivered: { label: "Delivered", color: "#22c55e", bg: "#dcfce7" },
+  cancelled: { label: "Cancelled", color: "#ef4444", bg: "#fee2e2" },
+};
 const SEQ = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Out for Delivery", "Reached Drop Location", "Delivered"];
 const LIVE_ST = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Out for Delivery", "Pending", "New"];
 const fmt = (v) => `\u20B9${Number(v).toLocaleString("en-IN")}`;
@@ -32,10 +39,121 @@ const validateCoords = (lat,lng) => { const l=parseFloat(lat),n=parseFloat(lng);
 let _bizId=null,_outletId=null;
 function Outlet(path) { return _bizId&&_outletId ? ref(db,`businesses/${_bizId}/outlets/${_outletId}/${path}`) : null; }
 
+// ─── MOCK DATA ──────────────────────────────────────────────────────────────
+const PIE_COLORS = ["#f36b21", "#3b82f6", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899"];
+const MOCK_ORDERS = [
+  { id:"ORD-1001", customer:"Rahul Sharma",  items:3, total:485,  status:"pending",          type:"delivery", time:"2 min ago",  phone:"+91 9876543210", address:"14 MG Road, Ranchi" },
+  { id:"ORD-1002", customer:"Priya Singh",   items:2, total:320,  status:"preparing",        type:"dinein",   time:"8 min ago",  phone:"+91 9845671230", address:"Table 4" },
+  { id:"ORD-1003", customer:"Amit Kumar",    items:5, total:890,  status:"out_for_delivery", type:"delivery", time:"15 min ago", phone:"+91 9123456789", address:"22 Ashok Nagar" },
+  { id:"ORD-1004", customer:"Sunita Verma",  items:1, total:150,  status:"delivered",        type:"takeaway", time:"22 min ago", phone:"+91 9988776655", address:"Takeaway" },
+  { id:"ORD-1005", customer:"Deepak Jha",    items:4, total:640,  status:"confirmed",        type:"delivery", time:"5 min ago",  phone:"+91 9012345678", address:"7 Kokar Colony" },
+  { id:"ORD-1006", customer:"Anjali Mishra", items:2, total:275,  status:"cancelled",        type:"delivery", time:"30 min ago", phone:"+91 9567890123", address:"Harmu Housing Colony" },
+  { id:"ORD-1007", customer:"Vikram Pandey", items:6, total:1120, status:"ready",            type:"delivery", time:"12 min ago", phone:"+91 9345678901", address:"Lalpur Chowk" },
+  { id:"ORD-1008", customer:"Neha Gupta",    items:2, total:390,  status:"pending",          type:"dinein",   time:"1 min ago",  phone:"+91 9678901234", address:"Table 7" },
+];
+const MOCK_RIDERS = [
+  { id:"r1", name:"Rajesh Kumar",  phone:"+91 9876543210", vehicle:"bike",   status:"online",  earn:1840, deliv:12, rating:4.7, order:"ORD-1003" },
+  { id:"r2", name:"Suresh Yadav",  phone:"+91 9845671230", vehicle:"scooty", status:"busy",    earn:2100, deliv:15, rating:4.5, order:"ORD-1007" },
+  { id:"r3", name:"Mohan Singh",   phone:"+91 9765432109", vehicle:"bike",   status:"offline", earn:980,  deliv:7,  rating:4.2, order:null },
+  { id:"r4", name:"Ramesh Thakur", phone:"+91 9654321098", vehicle:"cycle",  status:"online",  earn:1560, deliv:11, rating:4.8, order:null },
+];
+const MOCK_FEEDBACK = [
+  { id:1, customer:"Rahul S.", rating:5, comment:"Amazing food and super fast delivery! The butter chicken was exceptional.", dish:"Butter Chicken", time:"1 hr ago" },
+  { id:2, customer:"Priya S.", rating:4, comment:"Really good paneer tikka. Could be a bit more spicy but overall great.", dish:"Paneer Tikka", time:"3 hrs ago" },
+  { id:3, customer:"Amit K.", rating:5, comment:"Best biryani in Ranchi! Will definitely order again.", dish:"Biryani", time:"5 hrs ago" },
+  { id:4, customer:"Neha G.", rating:3, comment:"Food was good but delivery took longer than expected.", dish:"Dal Makhani", time:"Yesterday" },
+  { id:5, customer:"Deepak J.", rating:5, comment:"Excellent quality and packaging. Rider was very polite.", dish:"Tandoori Chicken", time:"2 days ago" },
+];
+const MOCK_LOST = [
+  { id:"ORD-0985", customer:"Arun Tiwari",   reason:"Customer cancelled", time:"Yesterday", total:480 },
+  { id:"ORD-0971", customer:"Suman Devi",    reason:"Item unavailable",   time:"2 days ago", total:320 },
+  { id:"ORD-0954", customer:"Manish Roy",    reason:"No rider available",  time:"3 days ago", total:890 },
+  { id:"ORD-0940", customer:"Kavita Sinha",  reason:"Customer cancelled", time:"4 days ago", total:225 },
+  { id:"ORD-0921", customer:"Pankaj Gupta",  reason:"Store closed",       time:"5 days ago", total:650 },
+];
+const MOCK_TRANSACTIONS = [
+  { id:"TXN-001", date:"May 23", type:"Order Sales",    amount:8450,  method:"UPI",  status:"settled" },
+  { id:"TXN-002", date:"May 23", type:"Commission",     amount:-845,  method:"Auto", status:"settled" },
+  { id:"TXN-003", date:"May 22", type:"Order Sales",    amount:11200, method:"UPI",  status:"settled" },
+  { id:"TXN-004", date:"May 22", type:"Rider Payout",   amount:-1840, method:"NEFT", status:"pending" },
+  { id:"TXN-005", date:"May 21", type:"Order Sales",    amount:9600,  method:"UPI",  status:"settled" },
+  { id:"TXN-006", date:"May 21", type:"Refund Issued",  amount:-320,  method:"UPI",  status:"settled" },
+];
+const MOCK_PARTNERS = [
+  { id:"p1", name:"Ravi Supplies Co.",    type:"Raw Materials", status:"pending",  since:"May 20", contact:"9876001234" },
+  { id:"p2", name:"Freshmart Veggies",    type:"Vegetables",    status:"approved", since:"Apr 12", contact:"9812345678" },
+  { id:"p3", name:"SpiceBox India",       type:"Spices",        status:"pending",  since:"May 22", contact:"9901234567" },
+  { id:"p4", name:"Dairy Fresh Pvt Ltd",  type:"Dairy",         status:"rejected", since:"May 10", contact:"9845611234" },
+];
+const MOCK_INVENTORY = [
+  { id:1, name:"Chicken (kg)",   stock:12, threshold:5,  unit:"kg" },
+  { id:2, name:"Paneer (kg)",    stock:3,  threshold:4,  unit:"kg" },
+  { id:3, name:"Rice (kg)",      stock:25, threshold:10, unit:"kg" },
+  { id:4, name:"Tomatoes (kg)",  stock:2,  threshold:5,  unit:"kg" },
+  { id:5, name:"Onions (kg)",    stock:18, threshold:8,  unit:"kg" },
+  { id:6, name:"Cream (L)",      stock:4,  threshold:3,  unit:"L"  },
+  { id:7, name:"Butter (kg)",    stock:1,  threshold:2,  unit:"kg" },
+  { id:8, name:"Maida (kg)",     stock:30, threshold:10, unit:"kg" },
+];
+const WEEK_DATA = [
+  { d:"Mon", rev:38000, ord:62 }, { d:"Tue", rev:42000, ord:68 },
+  { d:"Wed", rev:35000, ord:55 }, { d:"Thu", rev:51000, ord:84 },
+  { d:"Fri", rev:68000, ord:110 }, { d:"Sat", rev:82000, ord:134 },
+  { d:"Sun", rev:74000, ord:121 },
+];
+const CAT_DATA = [
+  { name:"Main Course", value:38 }, { name:"Starters", value:22 },
+  { name:"Rice", value:18 }, { name:"Desserts", value:12 }, { name:"Breads", value:10 },
+];
+
+const stockStatus = (stock, thr) => stock === 0 ? "critical" : stock <= thr ? "low" : "ok";
+const statusColors = { ok: { color: COLORS.success, bg: "#dcfce7" }, low: { color: COLORS.warning, bg: "#fef3c7" }, critical: { color: COLORS.error, bg: "#fee2e2" } };
+
+const KPICard = ({ title, value, sub, icon: Icon, trend, color = ORANGE }) => (
+  <div style={{ background:"rgba(255,255,255,0.85)", backdropFilter:"blur(12px)", borderRadius:16, border:"1px solid rgba(243,107,33,0.08)", boxShadow:"0 4px 24px rgba(0,0,0,0.04)", padding:"16px 18px", display:"flex", flexDirection:"column", gap:6 }}>
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+      <span style={{ fontSize:11, fontWeight:600, color:"#64748b", textTransform:"uppercase", letterSpacing:0.5 }}>{title}</span>
+      {Icon && <span style={{ width:32, height:32, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", background:`${color}18`, flexShrink:0 }}><Icon size={15} color={color} /></span>}
+    </div>
+    <div style={{ fontSize:22, fontWeight:800, color:"#0f172a", lineHeight:1.2 }}>{value}</div>
+    {sub && <div style={{ fontSize:11, color:"#94a3b8" }}>{sub}</div>}
+    {trend !== undefined && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11 }}>
+      {trend >= 0 ? <ArrowUp size={12} color="#22c55e" /> : <ArrowDown size={12} color="#ef4444" />}
+      <span style={{ color: trend >= 0 ? "#16a34a" : "#ef4444" }}>{Math.abs(trend)}% vs yesterday</span>
+    </div>}
+  </div>
+);
+const StarRating = ({ rating }) => (
+  <div style={{ display:"flex", alignItems:"center", gap:2 }}>
+    {[1,2,3,4,5].map(i => <Star key={i} size={11} fill={i <= Math.round(rating) ? "#f59e0b" : "none"} stroke={i <= Math.round(rating) ? "#f59e0b" : "#cbd5e1"} />)}
+    <span style={{ fontSize:11, color:"#64748b", marginLeft:2 }}>{rating}</span>
+  </div>
+);
+const Pill = ({ label, active, onClick }) => (
+  <div onClick={onClick} style={{ padding:"5px 14px", borderRadius:99, cursor:"pointer", fontSize:12, fontWeight:600, whiteSpace:"nowrap", transition:"all 0.2s", color:active?"white":"#64748b", background:active?ORANGE:"#f1f5f9" }}>{label}</div>
+);
+const ToggleSwitch = ({ checked, onChange }) => (
+  <div onClick={()=>onChange(!checked)} style={{ width:36, height:20, borderRadius:10, background:checked?ORANGE:"#cbd5e1", position:"relative", cursor:"pointer", flexShrink:0 }}>
+    <div style={{ width:16, height:16, borderRadius:"50%", background:"white", position:"absolute", top:2, boxShadow:"0 1px 3px rgba(0,0,0,0.15)", transition:"left 0.15s", left:checked?"18px":"2px" }} />
+  </div>
+);
+const EmptyState = ({ icon: Icon, msg }) => (
+  <div style={{ textAlign:"center", padding:40, color:"#94a3b8" }}>
+    <Icon size={36} style={{ margin:"0 auto 8px", opacity:0.3 }} />
+    <div style={{ fontSize:13, fontWeight:500 }}>{msg}</div>
+  </div>
+);
+const SectionHeader = ({ title, action }) => (
+  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+    <h3 style={{ fontSize:14, fontWeight:700, color:"#0f172a", margin:0, fontFamily:"'Outfit', sans-serif" }}>{title}</h3>
+    {action}
+  </div>
+);
+
 // Shared components
 const StatusBadge = ({ status }) => {
-  const s = ORD_ST[status] || { label: status || "Unknown", color: "#64748b", bg: "#f1f5f9" };
-  return <span className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap" style={{ color: s.color, backgroundColor: s.bg, border: `1px solid ${s.color}30` }}>● {s.label}</span>;
+  const s = ORD_ST[status] || ORDER_STATUSES[status] || { label: status || "Unknown", color: "#64748b", bg: "#f1f5f9" };
+  return <span style={{ padding:"2px 10px", borderRadius:99, fontSize:11, fontWeight:600, whiteSpace:"nowrap", color:s.color, backgroundColor:s.bg, border:`1px solid ${s.color}30` }}>● {s.label}</span>;
 };
 const GlassCard = ({ children, className="", style }) => (
   <div className={className} style={{ background:"rgba(255,255,255,0.85)", backdropFilter:"blur(12px)", borderRadius:16, border:"1px solid rgba(243,107,33,0.08)", boxShadow:"0 4px 24px rgba(0,0,0,0.04)", ...style }}>{children}</div>
@@ -1024,18 +1142,690 @@ function SettingsPage({ showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STUB PAGES
+// LIVE OPS PAGE
 // ═══════════════════════════════════════════════════════════════════════════
-function LiveOpsPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Live Operations — coming soon</div>; }
-function KitchenPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Kitchen Display — coming soon</div>; }
-function InventoryPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Inventory — coming soon</div>; }
-function RidersPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Riders — coming soon</div>; }
-function PartnersPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Partners — coming soon</div>; }
-function AnalyticsPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Analytics — coming soon</div>; }
-function LostSalesPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Lost Sales — coming soon</div>; }
-function SettlementsPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Settlements — coming soon</div>; }
-function NotificationsPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Notifications — coming soon</div>; }
-function FeedbackPage() { return <div className="text-center py-12 text-slate-500" style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Feedback — coming soon</div>; }
+function LiveOpsPage({ showToast }) {
+  const [orders, setOrders] = useState(MOCK_ORDERS.filter(o => !["delivered","cancelled"].includes(o.status)));
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setTick(p => p + 1), 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  const accept = useCallback((id) => {
+    setOrders(prev => prev.map(o => o.id === id && o.status === "pending" ? { ...o, status:"confirmed" } : o));
+    showToast("Order confirmed!");
+  }, [showToast]);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+        <KPICard title="Live Orders" value={orders.length} icon={Zap} color={COLORS.error} />
+        <KPICard title="Pending Accept" value={orders.filter(o=>o.status==="pending").length} icon={Clock} color={COLORS.warning} />
+        <KPICard title="In Kitchen" value={orders.filter(o=>["confirmed","preparing"].includes(o.status)).length} icon={ChefHat} color={COLORS.info} />
+        <KPICard title="Out for Delivery" value={orders.filter(o=>o.status==="out_for_delivery").length} icon={Truck} color={COLORS.primary} />
+      </div>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+        <GlassCard className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="font-bold text-slate-800 text-sm" style={{ fontFamily:"'Outfit', sans-serif" }}>Live Order Feed</span>
+          </div>
+          <div className="space-y-3">
+            {orders.map(o => (
+              <div key={o.id} className="p-3 rounded-xl border border-slate-100 hover:border-orange-200 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-mono text-xs font-bold" style={{ color: ORANGE }}>{o.id}</span>
+                  <StatusBadge status={o.status} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">{o.customer}</div>
+                    <div className="text-xs text-slate-500">{o.items} items · {fmt(o.total)} · {o.time}</div>
+                  </div>
+                  {o.status === "pending" && (
+                    <button onClick={() => accept(o.id)}
+                      className="px-3 py-1 rounded-lg text-xs font-bold text-white ml-2 flex-shrink-0"
+                      style={{ backgroundColor: ORANGE }}>Accept</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-4">
+          <SectionHeader title="Rider Activity" />
+          <div className="space-y-3">
+            {MOCK_RIDERS.map(r => (
+              <div key={r.id} className="p-3 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <Avatar name={r.name} size={36} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-800">{r.name}</div>
+                    <div className="text-xs text-slate-500">{r.vehicle} · {fmt(r.earn)} today</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold capitalize" style={{ color: r.status==="online" ? COLORS.success : r.status==="busy" ? COLORS.warning : "#94a3b8" }}>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: r.status==="online" ? COLORS.success : r.status==="busy" ? COLORS.warning : "#94a3b8" }} />
+                      {r.status}
+                    </div>
+                    {r.order && <div className="text-xs text-slate-500 mt-0.5">{r.order}</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KITCHEN PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function KitchenPage({ showToast }) {
+  const [orders, setOrders] = useState(MOCK_ORDERS.filter(o => !["delivered","cancelled"].includes(o.status)));
+  const [timers, setTimers] = useState({});
+
+  useEffect(() => {
+    const t = setInterval(() => setTimers(p => {
+      const next = { ...p };
+      orders.forEach(o => { next[o.id] = (next[o.id] || 0) + 1; });
+      return next;
+    }), 60000);
+    return () => clearInterval(t);
+  }, [orders]);
+
+  const flow = { pending:"confirmed", confirmed:"preparing", preparing:"ready", ready:"out_for_delivery", out_for_delivery:"delivered" };
+  const kColors = { pending:"#f59e0b", confirmed:"#3b82f6", preparing:"#8b5cf6", ready:"#06b6d4", out_for_delivery:ORANGE };
+  const kLabels = { pending:"Confirm", confirmed:"Start Prep", preparing:"Mark Ready", ready:"Dispatch", out_for_delivery:"Delivered" };
+
+  const advance = useCallback((id) => {
+    setOrders(prev => {
+      const o = prev.find(x => x.id === id);
+      if (!o || !flow[o.status]) return prev;
+      const next = flow[o.status];
+      showToast(`${id} → ${ORDER_STATUSES[next]?.label}`);
+      if (next === "delivered") return prev.filter(x => x.id !== id);
+      return prev.map(x => x.id === id ? { ...x, status: next } : x);
+    });
+  }, [showToast]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {["pending","confirmed","preparing","ready","out_for_delivery"].map(s => (
+          <div key={s} className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: `${kColors[s]}18`, color: kColors[s] }}>
+            {ORDER_STATUSES[s].label}
+            <span className="w-5 h-5 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: kColors[s] }}>
+              {orders.filter(o => o.status === s).length}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
+        {orders.map(o => (
+          <GlassCard key={o.id} className="p-4" style={{ borderLeft: `3px solid ${kColors[o.status] || ORANGE}` }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-mono text-xs font-bold" style={{ color: ORANGE }}>{o.id}</span>
+              <span className="text-xs text-slate-400 flex items-center gap-1"><Clock size={10} />{timers[o.id] || 0}m</span>
+            </div>
+            <div className="font-bold text-slate-800 mb-1">{o.customer}</div>
+            <div className="text-xs text-slate-500 mb-3">{o.items} items · {o.type} · {fmt(o.total)}</div>
+            <StatusBadge status={o.status} />
+            {flow[o.status] && (
+              <button onClick={() => advance(o.id)}
+                className="w-full mt-3 py-2 rounded-xl text-xs font-bold text-white"
+                style={{ backgroundColor: kColors[o.status] }}>
+                {kLabels[o.status]}
+              </button>
+            )}
+          </GlassCard>
+        ))}
+        {orders.length === 0 && <EmptyState icon={ChefHat} msg="Kitchen is clear! No active orders." />}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INVENTORY PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function InventoryPage({ showToast }) {
+  const [items, setItems] = useState(MOCK_INVENTORY.map(i => ({ ...i, status: stockStatus(i.stock, i.threshold) })));
+
+  const updateStock = useCallback((id, delta) => {
+    setItems(prev => prev.map(i => {
+      if (i.id !== id) return i;
+      const stock = Math.max(0, i.stock + delta);
+      return { ...i, stock, status: stockStatus(stock, i.threshold) };
+    }));
+  }, []);
+
+  const low = items.filter(i => i.status !== "ok").length;
+  const critical = items.filter(i => i.status === "critical").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+        <KPICard title="Total Items" value={items.length} icon={Package} />
+        <KPICard title="Low Stock" value={low} icon={AlertTriangle} color={COLORS.warning} />
+        <KPICard title="Out of Stock" value={critical} icon={XCircle} color={COLORS.error} />
+      </div>
+      <GlassCard>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 500 }}>
+            <thead>
+              <tr className="border-b border-slate-100">
+                {["Item","Stock","Threshold","Status","Actions"].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(item => {
+                const st = statusColors[item.status];
+                const pct = Math.min(100, item.stock / (item.threshold * 2) * 100);
+                return (
+                  <tr key={item.id} className="border-b border-slate-50 hover:bg-orange-50/30">
+                    <td className="px-4 py-3 font-semibold text-slate-800">{item.name}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-slate-800 w-8">{item.stock}</span>
+                        <div className="flex-1 bg-slate-100 rounded-full h-1.5 w-20 min-w-0">
+                          <div className="h-1.5 rounded-full transition-all" style={{ width:`${pct}%`, backgroundColor: st.color }} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{item.threshold} {item.unit}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 rounded-full text-xs font-bold capitalize"
+                        style={{ color: st.color, backgroundColor: st.bg }}>{item.status}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1.5">
+                        <button onClick={() => updateStock(item.id, -1)} className="px-2 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-500">-1</button>
+                        <button onClick={() => updateStock(item.id, 5)}  className="px-2 py-1 rounded-lg text-xs font-bold text-white" style={{ backgroundColor: ORANGE }}>+5</button>
+                        <button onClick={() => updateStock(item.id, 10)} className="px-2 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-600">+10</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RIDERS PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function RidersPage({ showToast }) {
+  const [riders, setRiders] = useState(MOCK_RIDERS);
+  const [selected, setSelected] = useState(null);
+
+  const online = riders.filter(r => r.status === "online").length;
+  const busy = riders.filter(r => r.status === "busy").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+        <KPICard title="Online" value={online} icon={Activity} color={COLORS.success} />
+        <KPICard title="On Delivery" value={busy} icon={Truck} color={COLORS.warning} />
+        <KPICard title="Offline" value={riders.filter(r => r.status === "offline").length} icon={XCircle} color={COLORS.muted} />
+        <KPICard title="Total Earnings" value={fmt(riders.reduce((s,r) => s+r.earn, 0))} icon={Wallet} color={COLORS.info} />
+      </div>
+      <GlassCard>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 580 }}>
+            <thead>
+              <tr className="border-b border-slate-100">
+                {["Rider","Vehicle","Status","Deliveries","Earnings","Rating","Order",""].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {riders.map(r => (
+                <tr key={r.id} className="border-b border-slate-50 hover:bg-orange-50/30 cursor-pointer" onClick={() => setSelected(r)}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Avatar name={r.name} size={32} />
+                      <div><div className="font-semibold text-slate-800">{r.name}</div><div className="text-xs text-slate-500">{r.phone}</div></div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 capitalize">{r.vehicle}</td>
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold capitalize whitespace-nowrap"
+                      style={{ color: r.status==="online" ? COLORS.success : r.status==="busy" ? COLORS.warning : "#94a3b8" }}>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: r.status==="online" ? COLORS.success : r.status==="busy" ? COLORS.warning : "#94a3b8" }} />
+                      {r.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-slate-800">{r.deliv}</td>
+                  <td className="px-4 py-3 font-bold" style={{ color: ORANGE }}>{fmt(r.earn)}</td>
+                  <td className="px-4 py-3"><StarRating rating={r.rating} /></td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: r.order ? ORANGE : "#94a3b8" }}>{r.order || "—"}</td>
+                  <td className="px-4 py-3"><Eye size={14} className="text-slate-400" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+      <Modal open={!!selected} onClose={() => setSelected(null)}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-base text-slate-800" style={{ fontFamily:"'Outfit', sans-serif" }}>Rider Profile</h3>
+          <button onClick={() => setSelected(null)} className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 transition-all"><X size={17} /></button>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+            <Avatar name={selected?.name} size={52} />
+            <div>
+              <div className="font-bold text-lg text-slate-800">{selected?.name}</div>
+              <div className="text-sm text-slate-500">{selected?.phone}</div>
+              <div className="capitalize text-sm" style={{ color: selected?.status==="online" ? COLORS.success : selected?.status==="busy" ? COLORS.warning : "#94a3b8" }}>● {selected?.status}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[["Deliveries Today", selected?.deliv], ["Earnings Today", fmt(selected?.earn)], ["Rating", selected?.rating + " ★"], ["Vehicle", selected?.vehicle]].map(([l,v]) => (
+              <div key={l} className="p-3 bg-slate-50 rounded-xl">
+                <div className="text-xs text-slate-500 mb-1">{l}</div>
+                <div className="font-bold text-slate-800 capitalize">{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTNERS PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function PartnersPage({ showToast }) {
+  const [partners, setPartners] = useState(MOCK_PARTNERS);
+
+  const update = (id, status) => {
+    setPartners(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+    showToast(`Partner ${status}`);
+  };
+
+  const statusStyle = {
+    pending:  { color:"#f59e0b", bg:"#fef3c7" },
+    approved: { color:"#22c55e", bg:"#dcfce7" },
+    rejected: { color:"#ef4444", bg:"#fee2e2" },
+  };
+
+  return (
+    <div className="space-y-4">
+      <GlassCard>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 520 }}>
+            <thead>
+              <tr className="border-b border-slate-100">
+                {["Partner","Type","Since","Contact","Status","Actions"].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {partners.map(p => {
+                const st = statusStyle[p.status];
+                return (
+                  <tr key={p.id} className="border-b border-slate-50 hover:bg-orange-50/30">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={p.name} size={32} />
+                        <span className="font-semibold text-slate-800">{p.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{p.type}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs">{p.since}</td>
+                    <td className="px-4 py-3 text-slate-500">{p.contact}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 rounded-full text-xs font-bold capitalize"
+                        style={{ color: st.color, backgroundColor: st.bg }}>{p.status}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.status === "pending" && (
+                        <div className="flex gap-2">
+                          <button onClick={() => update(p.id,"approved")}
+                            className="px-3 py-1 rounded-lg text-xs font-bold text-white" style={{ backgroundColor: COLORS.success }}>Approve</button>
+                          <button onClick={() => update(p.id,"rejected")}
+                            className="px-3 py-1 rounded-lg text-xs font-bold text-white" style={{ backgroundColor: COLORS.error }}>Reject</button>
+                        </div>
+                      )}
+                      {p.status !== "pending" && <span className="text-xs text-slate-400">—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANALYTICS PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function AnalyticsPage() {
+  const [tab, setTab] = useState("revenue");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {["revenue","categories","riders"].map(t => (
+          <Pill key={t} label={t.charAt(0).toUpperCase()+t.slice(1)} active={tab===t} onClick={() => setTab(t)} />
+        ))}
+      </div>
+      {tab === "revenue" && (
+        <div className="space-y-4">
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+            <KPICard title="Weekly Revenue" value="₹3,91,000" icon={TrendingUp} trend={8.2} />
+            <KPICard title="Weekly Orders" value="634" icon={ShoppingBag} trend={5.1} />
+            <KPICard title="Best Day" value="Sat" icon={Star} color={COLORS.warning} />
+            <KPICard title="Avg Per Day" value="₹55,857" icon={BarChart3} />
+          </div>
+          <GlassCard className="p-4">
+            <SectionHeader title="Revenue This Week" />
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={WEEK_DATA}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="d" tick={{ fontSize:11, fill:"#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize:11, fill:"#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={v => `\u20B9${v/1000}k`} width={45} />
+                <Tooltip formatter={(v,n) => [n==="rev" ? fmt(v) : v, n==="rev" ? "Revenue":"Orders"]} />
+                <Bar dataKey="rev" fill={ORANGE} radius={[6,6,0,0]} />
+                <Bar dataKey="ord" fill={COLORS.info} radius={[6,6,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </GlassCard>
+        </div>
+      )}
+      {tab === "categories" && (
+        <GlassCard className="p-4">
+          <SectionHeader title="Sales by Category" />
+          <div className="flex flex-col lg:flex-row items-center gap-6">
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie data={CAT_DATA} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="value">
+                  {CAT_DATA.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v) => [`${v}%`, "Share"]} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="space-y-3 min-w-48">
+              {CAT_DATA.map((c, i) => (
+                <div key={c.name} className="flex items-center gap-3">
+                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i] }} />
+                  <span className="text-sm text-slate-700 flex-1">{c.name}</span>
+                  <span className="text-sm font-bold text-slate-800">{c.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </GlassCard>
+      )}
+      {tab === "riders" && (
+        <GlassCard className="p-4">
+          <SectionHeader title="Rider Performance" />
+          <div className="space-y-4">
+            {MOCK_RIDERS.map(r => (
+              <div key={r.id}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Avatar name={r.name} size={28} />
+                    <span className="text-sm font-semibold text-slate-800">{r.name}</span>
+                  </div>
+                  <span className="text-sm font-bold" style={{ color: ORANGE }}>{r.deliv} deliveries</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2">
+                  <div className="h-2 rounded-full transition-all" style={{ width:`${(r.deliv/15)*100}%`, backgroundColor: ORANGE }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOST SALES PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function LostSalesPage() {
+  const totalLoss = MOCK_LOST.reduce((s, l) => s + l.total, 0);
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+        <KPICard title="Total Loss" value={fmt(totalLoss)} icon={TrendingDown} color={COLORS.error} />
+        <KPICard title="Cancelled Orders" value={MOCK_LOST.length} icon={XCircle} color={COLORS.warning} />
+        <KPICard title="Avg Loss/Order" value={fmt(Math.round(totalLoss / MOCK_LOST.length))} icon={AlertTriangle} />
+      </div>
+      <GlassCard>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 480 }}>
+            <thead>
+              <tr className="border-b border-slate-100">
+                {["Order ID","Customer","Reason","Time","Loss"].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_LOST.map(l => (
+                <tr key={l.id} className="border-b border-slate-50 hover:bg-red-50/20">
+                  <td className="px-4 py-3 font-mono text-xs font-bold text-red-400">{l.id}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Avatar name={l.customer} size={28} />
+                      <span className="font-medium text-slate-800">{l.customer}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{l.reason}</td>
+                  <td className="px-4 py-3 text-xs text-slate-400">{l.time}</td>
+                  <td className="px-4 py-3 font-bold text-red-500">-{fmt(l.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTLEMENTS PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function SettlementsPage() {
+  const total = MOCK_TRANSACTIONS.reduce((s,t) => s + t.amount, 0);
+  const credits = MOCK_TRANSACTIONS.filter(t => t.amount > 0).reduce((s,t) => s + t.amount, 0);
+  const debits = MOCK_TRANSACTIONS.filter(t => t.amount < 0).reduce((s,t) => s + Math.abs(t.amount), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+        <KPICard title="Net Balance" value={fmt(total)} icon={Wallet} color={total >= 0 ? COLORS.success : COLORS.error} />
+        <KPICard title="Total Credits" value={fmt(credits)} icon={ArrowUp} color={COLORS.success} />
+        <KPICard title="Total Debits" value={fmt(debits)} icon={ArrowDown} color={COLORS.error} />
+      </div>
+      <GlassCard>
+        <div className="p-4 flex gap-3 border-b border-slate-100">
+          <BtnPrimary><Download size={13} /> Export CSV</BtnPrimary>
+          <button className="px-4 py-2 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50">
+            <Download size={13} className="inline mr-1.5" /> Export PDF
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 500 }}>
+            <thead>
+              <tr className="border-b border-slate-100">
+                {["ID","Date","Type","Amount","Method","Status"].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_TRANSACTIONS.map(t => (
+                <tr key={t.id} className="border-b border-slate-50 hover:bg-orange-50/20">
+                  <td className="px-4 py-3 font-mono text-xs text-slate-400">{t.id}</td>
+                  <td className="px-4 py-3 text-slate-500">{t.date}</td>
+                  <td className="px-4 py-3 text-slate-700">{t.type}</td>
+                  <td className="px-4 py-3 font-bold" style={{ color: t.amount > 0 ? COLORS.success : COLORS.error }}>
+                    {t.amount > 0 ? "+" : ""}{fmt(Math.abs(t.amount))}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{t.method}</td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-1 rounded-full text-xs font-bold capitalize"
+                      style={{ color: t.status==="settled" ? COLORS.success : COLORS.warning, backgroundColor: t.status==="settled" ? "#dcfce7" : "#fef3c7" }}>
+                      {t.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NOTIFICATIONS PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function NotificationsPage({ showToast }) {
+  const [form, setForm] = useState({ title:"", body:"", audience:"all" });
+  const [sent, setSent] = useState([
+    { id:1, title:"Flash Sale! 20% Off", body:"Hurry, offer valid until 10 PM tonight!", audience:"all", time:"2 hrs ago", sent:1240 },
+    { id:2, title:"New Item: Mango Lassi", body:"Try our refreshing new summer special!", audience:"new", time:"Yesterday", sent:480 },
+  ]);
+
+  const sendNotif = () => {
+    if (!form.title || !form.body) return;
+    setSent(prev => [{ id: Date.now(), ...form, time:"Just now", sent:Math.floor(Math.random()*1500+200) }, ...prev]);
+    setForm({ title:"", body:"", audience:"all" });
+    showToast("Notification sent successfully!");
+  };
+
+  return (
+    <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+      <GlassCard className="p-5 h-fit">
+        <SectionHeader title="Compose Notification" />
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Title</label>
+            <input value={form.title} onChange={e => setForm(p => ({...p, title:e.target.value}))}
+              placeholder="e.g. Flash Sale Today!"
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-orange-300" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Message</label>
+            <textarea value={form.body} onChange={e => setForm(p => ({...p, body:e.target.value}))}
+              placeholder="Your notification message..."
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-orange-300 resize-none"
+              rows={3} />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Target Audience</label>
+            <select value={form.audience} onChange={e => setForm(p => ({...p, audience:e.target.value}))}
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none">
+              <option value="all">All Customers</option>
+              <option value="new">New Customers</option>
+              <option value="vip">VIP Customers</option>
+              <option value="inactive">Inactive (7+ days)</option>
+            </select>
+          </div>
+          <BtnPrimary onClick={sendNotif} className="w-full py-2.5 justify-center">
+            <Send size={14} /> Send Notification
+          </BtnPrimary>
+        </div>
+      </GlassCard>
+      <div>
+        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Sent History</div>
+        <div className="space-y-3">
+          {sent.map(n => (
+            <GlassCard key={n.id} className="p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="font-bold text-slate-800 text-sm">{n.title}</div>
+                <span className="text-xs text-slate-400">{n.time}</span>
+              </div>
+              <div className="text-xs text-slate-500 mb-2">{n.body}</div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor:"#fff7ed", color:ORANGE }}>{n.audience}</span>
+                <span className="text-slate-500">{n.sent.toLocaleString("en-IN")} recipients</span>
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEEDBACK PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function FeedbackPage() {
+  return (
+    <div className="space-y-4">
+      <GlassCard className="p-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+          <div className="text-center">
+            <div className="text-5xl font-black text-slate-800" style={{ fontFamily:"'Outfit', sans-serif" }}>4.7</div>
+            <StarRating rating={4.7} />
+            <div className="text-xs text-slate-500 mt-1">148 reviews</div>
+          </div>
+          <div className="flex-1 space-y-2 w-full">
+            {[5,4,3,2,1].map((n,i) => {
+              const pcts = [70,18,8,2,2];
+              return (
+                <div key={n} className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 w-4">{n}★</span>
+                  <div className="flex-1 bg-slate-100 rounded-full h-2">
+                    <div className="h-2 rounded-full transition-all" style={{ width:`${pcts[i]}%`, backgroundColor:"#f59e0b" }} />
+                  </div>
+                  <span className="text-xs text-slate-400 w-8">{pcts[i]}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </GlassCard>
+      <div className="space-y-3">
+        {MOCK_FEEDBACK.map(f => (
+          <GlassCard key={f.id} className="p-4">
+            <div className="flex items-start gap-3">
+              <Avatar name={f.customer} size={36} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-slate-800">{f.customer}</span>
+                  <span className="text-xs text-slate-400">{f.time}</span>
+                </div>
+                <StarRating rating={f.rating} />
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed">{f.comment}</p>
+                <span className="text-xs mt-2 inline-block px-2 py-0.5 rounded-full" style={{ backgroundColor:"#fff7ed", color:ORANGE }}>re: {f.dish}</span>
+              </div>
+            </div>
+          </GlassCard>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE REGISTRY
