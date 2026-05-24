@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Outlet, onValue, off, get as fbGet } from "../firebase";
 
 export function useRealtimeData(path) {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
