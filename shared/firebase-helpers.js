@@ -49,6 +49,18 @@ function resolvePath(path, businessId, outletId) {
 
   const rootNode = path.split('/')[0];
 
+  // Special alias: botCommands are stored under bot/{businessId}/{outletId}/...
+  // (kept for backward compatibility with older bots/tools)
+  if (rootNode === 'botCommands') {
+    if (!businessId || !outletId) {
+      console.warn(`⚠️ [resolvePath] Missing businessId or outletId for path: ${path}`);
+      return path;
+    }
+
+    const rest = path === 'botCommands' ? '' : path.slice('botCommands/'.length);
+    return `bot/${businessId}/${outletId}/${rest}`;
+  }
+
   // Global nodes stay at root level
   if (GLOBAL_NODES.includes(rootNode)) {
     return path;

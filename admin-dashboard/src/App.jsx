@@ -32,6 +32,23 @@ const SEQ = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Out for Del
 const LIVE_ST = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Out for Delivery", "Pending", "New"];
 const fmt = (v) => `\u20B9${Number(v).toLocaleString("en-IN")}`;
 const esc = (t) => { if (!t) return ""; const m = {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}; return String(t).replace(/[&<>"']/g, c => m[c]); };
+const csvValue = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+const downloadCSV = (filename, rows) => {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const csv = [headers.map(csvValue).join(","), ...rows.map(row => headers.map(h => csvValue(row[h])).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+const orderItemsCount = (order) => Array.isArray(order.cart) ? order.cart.length : (order.items ? Object.keys(order.items).length : Number(order.items || 0));
+const orderItemsText = (order) => Array.isArray(order.cart)
+  ? order.cart.map(i => `${i.qty || 1}x ${i.name || i.item || "Item"}`).join(", ")
+  : (order.items && typeof order.items === "object" ? Object.values(order.items).map(i => `${i.qty || 1}x ${i.name || i.item || "Item"}`).join(", ") : `${order.items || ""}`);
 const validateGSTIN = (g) => { if (!g) return true; return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(g) ? true : {valid:false,msg:"Invalid GSTIN"}; };
 const validateFSSAI = (f) => { if (!f) return true; return /^[0-9]{14}$/.test(f) ? true : {valid:false,msg:"FSSAI must be 14 digits"}; };
 const validateCoords = (lat,lng) => { const l=parseFloat(lat),n=parseFloat(lng); if(isNaN(l)||l<-90||l>90)return {valid:false,msg:"Invalid Lat"}; if(isNaN(n)||n<-180||n>180)return {valid:false,msg:"Invalid Lng"}; return {valid:true}; };
@@ -109,19 +126,17 @@ const CAT_DATA = [
 const stockStatus = (stock, thr) => stock === 0 ? "critical" : stock <= thr ? "low" : "ok";
 const statusColors = { ok: { color: COLORS.success, bg: "#dcfce7" }, low: { color: COLORS.warning, bg: "#fef3c7" }, critical: { color: COLORS.error, bg: "#fee2e2" } };
 
-const KPICard = ({ title, value, sub, icon: Icon, trend, color = ORANGE }) => (
-  <div style={{ background:"rgba(255,255,255,0.85)", backdropFilter:"blur(12px)", borderRadius:16, border:"1px solid rgba(243,107,33,0.08)", boxShadow:"0 4px 24px rgba(0,0,0,0.04)", padding:"16px 18px", display:"flex", flexDirection:"column", gap:6 }}>
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-      <span style={{ fontSize:11, fontWeight:600, color:"#64748b", textTransform:"uppercase", letterSpacing:0.5 }}>{title}</span>
-      {Icon && <span style={{ width:32, height:32, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", background:`${color}18`, flexShrink:0 }}><Icon size={15} color={color} /></span>}
+const KPICard = ({ title, value, sub, icon: Icon, color = ORANGE }) => (
+  <GlassCard className="p-4 flex flex-col gap-2">
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
+      <span className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}18` }}>
+        <Icon size={15} style={{ color }} />
+      </span>
     </div>
-    <div style={{ fontSize:22, fontWeight:800, color:"#0f172a", lineHeight:1.2 }}>{value}</div>
-    {sub && <div style={{ fontSize:11, color:"#94a3b8" }}>{sub}</div>}
-    {trend !== undefined && <div style={{ display:"flex", alignItems:"center", gap:4, fontSize:11 }}>
-      {trend >= 0 ? <ArrowUp size={12} color="#22c55e" /> : <ArrowDown size={12} color="#ef4444" />}
-      <span style={{ color: trend >= 0 ? "#16a34a" : "#ef4444" }}>{Math.abs(trend)}% vs yesterday</span>
-    </div>}
-  </div>
+    <div className="text-2xl font-bold text-slate-800" style={{ fontFamily: "'Outfit', sans-serif" }}>{value}</div>
+    {sub && <div className="text-xs text-slate-500">{sub}</div>}
+  </GlassCard>
 );
 const StarRating = ({ rating }) => (
   <div style={{ display:"flex", alignItems:"center", gap:2 }}>
@@ -158,8 +173,8 @@ const StatusBadge = ({ status }) => {
 const GlassCard = ({ children, className="", style }) => (
   <div className={className} style={{ background:"rgba(255,255,255,0.85)", backdropFilter:"blur(12px)", borderRadius:16, border:"1px solid rgba(243,107,33,0.08)", boxShadow:"0 4px 24px rgba(0,0,0,0.04)", ...style }}>{children}</div>
 );
-const BtnPrimary = ({ children, className="", style, onClick, disabled }) => (
-  <button onClick={onClick} disabled={disabled} className={className} style={{ background:`linear-gradient(135deg,${ORANGE},#e85d1a)`, color:"white", border:"none", fontWeight:600, cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, fontSize:14, transition:"all 0.2s", borderRadius:10, padding:"10px 18px", ...style }}>{children}</button>
+const BtnPrimary = ({ children, className="", style, onClick, disabled, type = "button" }) => (
+  <button type={type} onClick={onClick} disabled={disabled} className={className} style={{ background:`linear-gradient(135deg,${ORANGE},#e85d1a)`, color:"white", border:"none", fontWeight:600, cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.5:1, fontSize:14, transition:"all 0.2s", borderRadius:10, padding:"10px 18px", ...style }}>{children}</button>
 );
 const BtnSecondary = ({ children, style, onClick }) => (
   <button onClick={onClick} style={{ padding:"8px 14px", borderRadius:10, border:"1.5px solid #e2e8f0", background:"white", fontSize:13, fontWeight:600, color:"#475569", cursor:"pointer", transition:"all 0.2s", ...style }}>{children}</button>
@@ -187,14 +202,16 @@ const Loading = () => (
 );
 const Input = (p) => <input {...p} style={{ padding:"10px 14px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:13, color:"#1e293b", background:"#f8fafc", outline:"none", width:"100%", transition:"border-color 0.2s", ...p.style }} />;
 const Select = ({ children, ...p }) => <select {...p} style={{ padding:"10px 14px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:13, color:"#1e293b", background:"#f8fafc", outline:"none", width:"100%", ...p.style }}>{children}</select>;
-const StatCard = ({ label, value, icon:Icon, color, bg, sub }) => (
-  <GlassCard style={{ padding:16, flex:1, minWidth:160 }}>
-    <div className="flex items-center justify-between mb-3">
-      <div style={{ fontSize:12, fontWeight:600, color:"#64748b", textTransform:"uppercase", letterSpacing:0.5 }}>{label}</div>
-      <div style={{ width:32, height:32, borderRadius:10, background:bg||"rgba(243,107,33,0.1)", display:"flex", alignItems:"center", justifyContent:"center" }}><Icon size={16} color={color||ORANGE} /></div>
+const StatCard = ({ label, value, icon: Icon, color, bg, sub }) => (
+  <GlassCard className="p-4 flex flex-col gap-2" style={{ flex: 1, minWidth: 160 }}>
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
+      <span className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: bg || `${color || ORANGE}18` }}>
+        <Icon size={15} style={{ color: color || ORANGE }} />
+      </span>
     </div>
-    <div style={{ fontSize:24, fontWeight:800, color:"#0f172a", lineHeight:1.2 }}>{value||"—"}</div>
-    {sub && <div style={{ fontSize:11, color:"#94a3b8", marginTop:4 }}>{sub}</div>}
+    <div className="text-2xl font-bold text-slate-800" style={{ fontFamily: "'Outfit', sans-serif" }}>{value || "—"}</div>
+    {sub && <div className="text-xs text-slate-500">{sub}</div>}
   </GlassCard>
 );
 const SectionLabel = ({ children }) => <div style={{ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:0.8, color:"#94a3b8", marginBottom:8 }}>{children}</div>;
@@ -394,69 +411,111 @@ function OrdersPage({ showToast }) {
       if (!o) return;
       const rs = await get(ref(db,`riders/${riderId}`));
       const rider = rs.val();
-      await update(Outlet(`orders/${orderId}`), { riderId, assignedRider:rider?.email, riderName:rider?.name, riderPhone:rider?.phone, assignedAt:serverTimestamp });
+      await update(Outlet(`orders/${orderId}`), { riderId, assignedRider:rider?.email, riderName:rider?.name, riderPhone:rider?.phone, assignedAt:serverTimestamp() });
       showToast(`Rider ${rider?.name||''} assigned`,"success");
     } catch(e) { showToast("Assignment failed","error"); }
   }, [showToast]);
+
+  const deleteOrder = useCallback(async (id) => {
+    if (!confirm("Delete this order permanently?")) return;
+    try {
+      await remove(Outlet(`orders/${id}`));
+      setSelOrder(null);
+      showToast("Order deleted", "success");
+    } catch(e) {
+      showToast("Delete failed", "error");
+    }
+  }, [showToast]);
+
+  const exportOrders = useCallback(() => {
+    downloadCSV(`orders-${new Date().toISOString().slice(0,10)}.csv`, filtered.map((o, index) => ({
+      row: index + 1,
+      orderId: o.orderId || o.id,
+      customer: o.customerName || "Guest",
+      phone: o.phone || "",
+      items: orderItemsText(o),
+      itemCount: orderItemsCount(o),
+      total: o.total || 0,
+      paymentMethod: o.paymentMethod || "Cash",
+      paymentStatus: o.paymentStatus || "",
+      status: o.status || "",
+      rider: o.riderName || "",
+      createdAt: o.createdAt || "",
+    })));
+    showToast("Orders exported", "success");
+  }, [filtered, showToast]);
 
   const activeRiders = riders.filter(r=>r.status==="Online"||r.status==="On Delivery");
 
   return (
     <div>
-      <div className="flex flex-wrap gap-3 mb-4" style={{ display:"flex", gap:12, marginBottom:16 }}>
-        <div style={{ flex:1, minWidth:200, position:"relative" }}>
+      <div className="sheet-toolbar">
+        <div style={{ flex:1, minWidth:240, position:"relative", maxWidth:420 }}>
           <Search size={14} style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#94a3b8" }} />
-          <input placeholder="Search orders, customers, phone..." value={search} onChange={e=>setSearch(e.target.value)} style={{ padding:"8px 10px 8px 32px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:13, width:"100%", background:"#f8fafc", outline:"none" }} />
+          <input className="sheet-input" placeholder="Search orders, customers, phone..." value={search} onChange={e=>setSearch(e.target.value)} style={{ paddingLeft:32 }} />
         </div>
-        <input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={{ padding:"8px 12px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:12, background:"#f8fafc" }} />
-        <input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={{ padding:"8px 12px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:12, background:"#f8fafc" }} />
+        <div className="sheet-actions">
+          <input className="sheet-input" type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} />
+          <input className="sheet-input" type="date" value={toDate} onChange={e=>setToDate(e.target.value)} />
+          {[{id:"all",label:"All"}, {id:"live",label:"Live"}, {id:"history",label:"History"}].map(t=>(
+            <button type="button" key={t.id} onClick={()=>setOrderTab(t.id)} className="sheet-button" style={{ color:orderTab===t.id?"white":"#64748b", background:orderTab===t.id?ORANGE:"#fff", borderColor:orderTab===t.id?ORANGE:"#e2e8f0" }}>{t.label} {t.id==="live"?`(${orders.filter(o=>LIVE_ST.includes(o.status)).length})`:""}</button>
+          ))}
+          <button type="button" className="sheet-button" onClick={exportOrders}><Download size={14} /> Export CSV</button>
+        </div>
       </div>
-      <div className="flex gap-2 mb-4" style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {[{id:"all",label:"All"}, {id:"live",label:"Live"}, {id:"history",label:"History"}].map(t=>(
-          <div key={t.id} onClick={()=>setOrderTab(t.id)} style={{ padding:"6px 16px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:600, color:orderTab===t.id?"white":"#64748b", background:orderTab===t.id?ORANGE:"#f1f5f9" }}>{t.label} {t.id==="live"?`(${orders.filter(o=>LIVE_ST.includes(o.status)).length})`:""}</div>
-        ))}
-      </div>
-      <GlassCard style={{ overflow:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:700 }}>
-          <thead><tr style={{ borderBottom:"1px solid #f1f5f9" }}>
-            <th style={{ textAlign:"left", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Order</th>
-            <th style={{ textAlign:"left", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Customer</th>
-            <th style={{ textAlign:"left", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Items</th>
-            <th style={{ textAlign:"right", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Total</th>
-            <th style={{ textAlign:"center", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Payment</th>
-            <th style={{ textAlign:"center", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Status</th>
-            <th style={{ textAlign:"center", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Rider</th>
-            <th style={{ textAlign:"center", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Actions</th>
+      <GlassCard style={{ overflow:"hidden" }}>
+        <div className="sheet-table-wrap">
+        <table className="sheet-table">
+          <thead><tr>
+            <th className="sheet-row-number">#</th>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Items</th>
+            <th>Total</th>
+            <th>Payment</th>
+            <th>Status</th>
+            <th>Rider</th>
+            <th>Created</th>
+            <th>Actions</th>
           </tr></thead>
           <tbody>
-            {filtered.map(o => (
-              <tr key={o.id} style={{ borderBottom:"1px solid #f8fafc", cursor:"pointer" }} onClick={()=>setSelOrder(o)}>
-                <td style={{ padding:"10px 12px", fontWeight:600, color:ORANGE, fontSize:12, fontFamily:"monospace" }}>#{o.orderId||o.id.slice(-5)}</td>
-                <td style={{ padding:"10px 12px" }}>
-                  <div style={{ fontWeight:500, color:"#1e293b" }}>{o.customerName||"Guest"}</div>
-                  <div style={{ fontSize:11, color:"#94a3b8" }}>{o.phone||""}</div>
+            {filtered.map((o, index) => (
+              <tr key={o.id} onDoubleClick={()=>setSelOrder(o)}>
+                <td className="sheet-row-number">{index + 1}</td>
+                <td className="sheet-cell-strong" style={{ color:ORANGE, fontFamily:"monospace" }}>#{o.orderId||o.id.slice(-5)}</td>
+                <td className="sheet-cell-strong">
+                  {o.customerName||"Guest"}
                 </td>
-                <td style={{ padding:"10px 12px", color:"#64748b", fontSize:12 }}>
+                <td>{o.phone||""}</td>
+                <td title={orderItemsText(o)}>
                   {(Array.isArray(o.cart)?o.cart.length+" items":(o.items?Object.keys(o.items).length+" items":"—"))}
                 </td>
-                <td style={{ padding:"10px 12px", textAlign:"right", fontWeight:700, color:"#0f172a" }}>{fmt(o.total)}</td>
-                <td style={{ padding:"10px 12px", textAlign:"center", fontSize:12 }}>{o.paymentMethod||"Cash"}</td>
-                <td style={{ padding:"10px 12px", textAlign:"center" }}><StatusBadge status={o.status} /></td>
-                <td style={{ padding:"10px 12px", textAlign:"center", fontSize:12 }}>{o.riderName||"—"}</td>
-                <td style={{ padding:"10px 12px", textAlign:"center" }}>
-                  <div style={{ display:"flex", gap:4, justifyContent:"center" }}>
-                    <select value="" onChange={e=>{e.stopPropagation();const v=e.target.value;if(v==="assignRider"){const rid=prompt("Enter Rider ID:");if(rid)assignRider(o.id,rid);}else if(v)updateStatus(o.id,v);e.target.value="";}} onClick={e=>e.stopPropagation()} style={{ padding:"4px 6px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:11, background:"white" }}>
-                      <option value="">Action</option>
-                      {SEQ.filter(s=>s!==o.status).map(s=><option key={s} value={s}>{s}</option>)}
-                      <option value="Cancelled">Cancel</option>
-                      <option value="assignRider">Assign Rider</option>
-                    </select>
+                <td className="sheet-cell-strong" style={{ textAlign:"right" }}>{fmt(o.total)}</td>
+                <td>{o.paymentMethod||"Cash"} {o.paymentStatus ? `/${o.paymentStatus}` : ""}</td>
+                <td>
+                  <select className="sheet-select" value={o.status || ""} onChange={e=>updateStatus(o.id,e.target.value)} onClick={e=>e.stopPropagation()}>
+                    {[...new Set([o.status, ...SEQ, "Cancelled"].filter(Boolean))].map(s=><option key={s} value={s}>{ORD_ST[s]?.label || ORDER_STATUSES[s]?.label || s}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <select className="sheet-select" value={o.riderId || ""} onChange={e=>e.target.value && assignRider(o.id,e.target.value)} onClick={e=>e.stopPropagation()}>
+                    <option value="">{o.riderName || "Unassigned"}</option>
+                    {activeRiders.map(r=><option key={r.id} value={r.id}>{r.name || r.email || r.id}</option>)}
+                  </select>
+                </td>
+                <td>{o.createdAt ? new Date(o.createdAt).toLocaleString("en-IN") : ""}</td>
+                <td>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button type="button" className="sheet-icon-button" title="Open order" onClick={()=>setSelOrder(o)}><Eye size={14} /></button>
+                    <button type="button" className="sheet-icon-button sheet-danger" title="Delete order" onClick={()=>deleteOrder(o.id)}><Trash2 size={14} /></button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
         {filtered.length===0&&<div style={{ textAlign:"center", padding:40, color:"#94a3b8", fontSize:13 }}>No orders found</div>}
       </GlassCard>
 
@@ -941,13 +1000,26 @@ function CustomersPage({ showToast }) {
     return list.sort((a,b)=>b.ltv-a.ltv);
   }, [customers, orders, search]);
 
+  const exportCustomers = useCallback(() => {
+    downloadCSV(`customers-${new Date().toISOString().slice(0,10)}.csv`, data.map((c, index) => ({
+      row: index + 1,
+      name: c.name || "Anonymous",
+      phone: c.phone,
+      orders: c.orderCount,
+      ltv: c.ltv,
+      registeredAt: c.registeredAt || "",
+    })));
+    showToast("Customers exported", "success");
+  }, [data, showToast]);
+
   return (
     <div>
-      <div style={{ display:"flex", gap:12, marginBottom:16 }}>
+      <div className="sheet-toolbar">
         <div style={{ flex:1, maxWidth:300, position:"relative" }}>
           <Search size={14} style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#94a3b8" }} />
           <input placeholder="Search by name or phone..." value={search} onChange={e=>setSearch(e.target.value)} style={{ padding:"8px 10px 8px 32px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:13, width:"100%", background:"#f8fafc", outline:"none" }} />
         </div>
+        <button type="button" className="sheet-button" onClick={exportCustomers}><Download size={14} /> Export CSV</button>
       </div>
       <GlassCard style={{ overflow:"auto" }}>
         <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:600 }}>
@@ -1146,6 +1218,9 @@ function SettingsPage({ showToast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 function LiveOpsPage({ showToast }) {
   const [orders, setOrders] = useState(MOCK_ORDERS.filter(o => !["delivered","cancelled"].includes(o.status)));
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [editing, setEditing] = useState(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -1158,6 +1233,39 @@ function LiveOpsPage({ showToast }) {
     showToast("Order confirmed!");
   }, [showToast]);
 
+  const filteredOps = useMemo(() => {
+    let list = orders;
+    if (statusFilter !== "all") list = list.filter(o => o.status === statusFilter);
+    if (search) {
+      const s = search.toLowerCase();
+      list = list.filter(o => [o.id, o.customer, o.phone, o.address, o.status, o.type].some(v => String(v || "").toLowerCase().includes(s)));
+    }
+    return list;
+  }, [orders, search, statusFilter]);
+
+  const saveOperation = useCallback(() => {
+    if (!editing?.customer?.trim()) return showToast("Customer name is required", "error");
+    setOrders(prev => {
+      const payload = { ...editing, id: editing.id || `ORD-${Date.now().toString().slice(-5)}`, items: Number(editing.items || 1), total: Number(editing.total || 0), time: editing.time || "Just now" };
+      return prev.some(o => o.id === payload.id) ? prev.map(o => o.id === payload.id ? payload : o) : [payload, ...prev];
+    });
+    setEditing(null);
+    showToast("Operation saved", "success");
+  }, [editing, showToast]);
+
+  const deleteOperation = useCallback((id) => {
+    if (!confirm("Delete this operation row?")) return;
+    setOrders(prev => prev.filter(o => o.id !== id));
+    showToast("Operation deleted", "success");
+  }, [showToast]);
+
+  const exportOperations = useCallback(() => {
+    downloadCSV(`live-operations-${new Date().toISOString().slice(0,10)}.csv`, filteredOps.map((o, index) => ({
+      row: index + 1, orderId: o.id, customer: o.customer, phone: o.phone, items: o.items, total: o.total, type: o.type, status: o.status, address: o.address, time: o.time
+    })));
+    showToast("Live operations exported", "success");
+  }, [filteredOps, showToast]);
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
@@ -1166,6 +1274,56 @@ function LiveOpsPage({ showToast }) {
         <KPICard title="In Kitchen" value={orders.filter(o=>["confirmed","preparing"].includes(o.status)).length} icon={ChefHat} color={COLORS.info} />
         <KPICard title="Out for Delivery" value={orders.filter(o=>o.status==="out_for_delivery").length} icon={Truck} color={COLORS.primary} />
       </div>
+      <GlassCard className="p-4">
+        <div className="sheet-toolbar">
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="font-bold text-slate-800 text-sm" style={{ fontFamily:"'Outfit', sans-serif" }}>Live Operations Sheet</span>
+          </div>
+          <div className="sheet-actions">
+            <input className="sheet-input" placeholder="Search live ops..." value={search} onChange={e=>setSearch(e.target.value)} />
+            <select className="sheet-select" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
+              <option value="all">All Status</option>
+              {Object.keys(ORDER_STATUSES).map(s=><option key={s} value={s}>{ORDER_STATUSES[s].label}</option>)}
+            </select>
+            <button type="button" className="sheet-button" onClick={()=>setEditing({ id:"", customer:"", phone:"", items:1, total:0, status:"pending", type:"delivery", time:"Just now", address:"" })}><Plus size={14} /> New Row</button>
+            <button type="button" className="sheet-button" onClick={exportOperations}><Download size={14} /> Export CSV</button>
+          </div>
+        </div>
+        <div className="sheet-table-wrap">
+          <table className="sheet-table">
+            <thead><tr><th className="sheet-row-number">#</th><th>Order</th><th>Customer</th><th>Phone</th><th>Items</th><th>Total</th><th>Type</th><th>Status</th><th>Address</th><th>Time</th><th>Actions</th></tr></thead>
+            <tbody>
+              {filteredOps.map((o, index) => (
+                <tr key={o.id}>
+                  <td className="sheet-row-number">{index + 1}</td>
+                  <td className="sheet-cell-strong" style={{ color:ORANGE, fontFamily:"monospace" }}>{o.id}</td>
+                  <td className="sheet-cell-strong">{o.customer}</td>
+                  <td>{o.phone}</td>
+                  <td>{o.items}</td>
+                  <td className="sheet-cell-strong" style={{ textAlign:"right" }}>{fmt(o.total)}</td>
+                  <td>{o.type}</td>
+                  <td>
+                    <select className="sheet-select" value={o.status} onChange={e=>setOrders(prev=>prev.map(row=>row.id===o.id?{...row,status:e.target.value}:row))}>
+                      {Object.keys(ORDER_STATUSES).map(s=><option key={s} value={s}>{ORDER_STATUSES[s].label}</option>)}
+                    </select>
+                  </td>
+                  <td>{o.address}</td>
+                  <td>{o.time}</td>
+                  <td>
+                    <div style={{ display:"flex", gap:6 }}>
+                      {o.status === "pending" && <button type="button" className="sheet-icon-button" title="Accept" onClick={() => accept(o.id)}><CheckCircle size={14} /></button>}
+                      <button type="button" className="sheet-icon-button" title="Edit" onClick={()=>setEditing(o)}><Edit3 size={14} /></button>
+                      <button type="button" className="sheet-icon-button sheet-danger" title="Delete" onClick={()=>deleteOperation(o.id)}><Trash2 size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredOps.length===0&&<div style={{ textAlign:"center", padding:28, color:"#94a3b8", fontSize:13 }}>No operation rows found</div>}
+      </GlassCard>
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
         <GlassCard className="p-4">
           <div className="flex items-center gap-2 mb-4">
@@ -1218,6 +1376,29 @@ function LiveOpsPage({ showToast }) {
           </div>
         </GlassCard>
       </div>
+      <Modal open={!!editing} onClose={()=>setEditing(null)}>
+        {editing && <div>
+          <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", marginBottom:16 }}>{editing.id ? "Edit Operation Row" : "New Operation Row"}</h3>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <Input placeholder="Order ID" value={editing.id} onChange={e=>setEditing({...editing,id:e.target.value})} />
+            <Input placeholder="Customer" value={editing.customer} onChange={e=>setEditing({...editing,customer:e.target.value})} />
+            <Input placeholder="Phone" value={editing.phone} onChange={e=>setEditing({...editing,phone:e.target.value})} />
+            <Input type="number" placeholder="Items" value={editing.items} onChange={e=>setEditing({...editing,items:e.target.value})} />
+            <Input type="number" placeholder="Total" value={editing.total} onChange={e=>setEditing({...editing,total:e.target.value})} />
+            <Select value={editing.type} onChange={e=>setEditing({...editing,type:e.target.value})}>
+              <option value="delivery">Delivery</option>
+              <option value="dinein">Dine-in</option>
+              <option value="takeaway">Takeaway</option>
+            </Select>
+            <Select value={editing.status} onChange={e=>setEditing({...editing,status:e.target.value})}>
+              {Object.keys(ORDER_STATUSES).map(s=><option key={s} value={s}>{ORDER_STATUSES[s].label}</option>)}
+            </Select>
+            <Input placeholder="Time" value={editing.time} onChange={e=>setEditing({...editing,time:e.target.value})} />
+          </div>
+          <Input placeholder="Address / table / note" value={editing.address} onChange={e=>setEditing({...editing,address:e.target.value})} style={{ marginTop:10 }} />
+          <BtnPrimary onClick={saveOperation} style={{ width:"100%", marginTop:14 }}>Save Row</BtnPrimary>
+        </div>}
+      </Modal>
     </div>
   );
 }
@@ -1307,9 +1488,24 @@ function InventoryPage({ showToast }) {
 
   const low = items.filter(i => i.status !== "ok").length;
   const critical = items.filter(i => i.status === "critical").length;
+  const exportInventory = useCallback(() => {
+    downloadCSV(`inventory-${new Date().toISOString().slice(0,10)}.csv`, items.map((item, index) => ({
+      row: index + 1,
+      item: item.name,
+      stock: item.stock,
+      threshold: item.threshold,
+      unit: item.unit,
+      status: item.status,
+    })));
+    showToast("Inventory exported", "success");
+  }, [items, showToast]);
 
   return (
     <div className="space-y-4">
+      <div className="sheet-toolbar">
+        <div />
+        <button type="button" className="sheet-button" onClick={exportInventory}><Download size={14} /> Export CSV</button>
+      </div>
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
         <KPICard title="Total Items" value={items.length} icon={Package} />
         <KPICard title="Low Stock" value={low} icon={AlertTriangle} color={COLORS.warning} />
@@ -1372,9 +1568,27 @@ function RidersPage({ showToast }) {
 
   const online = riders.filter(r => r.status === "online").length;
   const busy = riders.filter(r => r.status === "busy").length;
+  const exportRiders = useCallback(() => {
+    downloadCSV(`riders-${new Date().toISOString().slice(0,10)}.csv`, riders.map((r, index) => ({
+      row: index + 1,
+      name: r.name,
+      phone: r.phone,
+      vehicle: r.vehicle,
+      status: r.status,
+      deliveries: r.deliv,
+      earnings: r.earn,
+      rating: r.rating,
+      order: r.order || "",
+    })));
+    showToast("Riders exported", "success");
+  }, [riders, showToast]);
 
   return (
     <div className="space-y-4">
+      <div className="sheet-toolbar">
+        <div />
+        <button type="button" className="sheet-button" onClick={exportRiders}><Download size={14} /> Export CSV</button>
+      </div>
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
         <KPICard title="Online" value={online} icon={Activity} color={COLORS.success} />
         <KPICard title="On Delivery" value={busy} icon={Truck} color={COLORS.warning} />
@@ -1463,9 +1677,24 @@ function PartnersPage({ showToast }) {
     approved: { color:"#22c55e", bg:"#dcfce7" },
     rejected: { color:"#ef4444", bg:"#fee2e2" },
   };
+  const exportPartners = useCallback(() => {
+    downloadCSV(`partners-${new Date().toISOString().slice(0,10)}.csv`, partners.map((p, index) => ({
+      row: index + 1,
+      name: p.name,
+      type: p.type,
+      since: p.since,
+      contact: p.contact,
+      status: p.status,
+    })));
+    showToast("Partners exported", "success");
+  }, [partners, showToast]);
 
   return (
     <div className="space-y-4">
+      <div className="sheet-toolbar">
+        <div />
+        <button type="button" className="sheet-button" onClick={exportPartners}><Download size={14} /> Export CSV</button>
+      </div>
       <GlassCard>
         <div className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: 520 }}>
@@ -1837,6 +2066,12 @@ const PAGES = {
   analytics: AnalyticsPage, lostsales: LostSalesPage, settlements: SettlementsPage,
   notifications: NotificationsPage, feedback: FeedbackPage, livetracker: LiveTrackerPage, settings: SettingsPage,
 };
+const VALID_PAGE_IDS = new Set(Object.keys(PAGES));
+const STORAGE_KEYS = {
+  page: "foodhubbie-admin-page",
+  theme: "foodhubbie-admin-theme",
+  sidebar: "foodhubbie-admin-sidebar-collapsed",
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ROOT APP
@@ -1844,14 +2079,18 @@ const PAGES = {
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [page, setPage] = useState("dashboard");
-  const [dark, setDark] = useState(false);
+  const [page, setPage] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.page);
+    return VALID_PAGE_IDS.has(saved) ? saved : "dashboard";
+  });
+  const [dark, setDark] = useState(() => localStorage.getItem(STORAGE_KEYS.theme) === "dark");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEYS.sidebar) === "true");
   const [toast, setToast] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const [outletInfo, setOutletInfo] = useState(null);
 
   useEffect(() => {
@@ -1859,11 +2098,27 @@ function App() {
     return unsub;
   }, []);
 
-  const handleLogin = useCallback(async () => {
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.page, page);
+  }, [page]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.theme, dark ? "dark" : "light");
+  }, [dark]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.sidebar, String(collapsed));
+  }, [collapsed]);
+
+  const handleLogin = useCallback(async (event) => {
+    event?.preventDefault();
+    if (loginLoading) return;
     setLoginError("");
-    try { await signInWithEmailAndPassword(auth, loginEmail, loginPassword); }
+    setLoginLoading(true);
+    try { await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword); }
     catch (e) { setLoginError(e.message.replace("Firebase: ", "")); }
-  }, [loginEmail, loginPassword]);
+    finally { setLoginLoading(false); }
+  }, [loginEmail, loginPassword, loginLoading]);
 
   const handleLogout = useCallback(async () => {
     await signOut(auth); setUser(null); setOutletInfo(null);
@@ -1888,7 +2143,22 @@ function App() {
     setToast({ msg, type }); setTimeout(() => setToast(null), 3500);
   }, []);
 
-  if (authLoading) return null;
+  if (authLoading) {
+    return (
+      <div style={{ minHeight:"100vh", display:"grid", placeItems:"center", background:"#f8fafc", color:"#1e293b" }}>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:14 }}>
+          <div style={{ width:42, height:42, borderRadius:14, background:`linear-gradient(135deg,${ORANGE},#e85d1a)`, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 12px 28px rgba(243,107,33,0.25)" }}>
+            <Store size={21} color="white" />
+          </div>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:16, fontWeight:800, color:"#0f172a" }}>FoodHubbie Admin</div>
+            <div style={{ fontSize:12, color:"#64748b", marginTop:4 }}>Preparing your workspace...</div>
+          </div>
+          <div aria-label="Loading dashboard" role="status" style={{ width:34, height:34, border:"3px solid #fed7aa", borderTopColor:ORANGE, borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -1909,14 +2179,14 @@ function App() {
         <GlassCard style={{ width: "100%", maxWidth: 400, padding: 32 }}>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Welcome Back</h2>
           <p style={{ fontSize: 14, color: "#64748b", marginBottom: 24 }}>Sign in to manage your outlet</p>
-          {loginError && <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 16, background: "#fef2f2", color: "#ef4444", fontSize: 13, fontWeight: 500 }}>{loginError}</div>}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <input placeholder="Email address" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()}
+          {loginError && <div role="alert" style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 16, background: "#fef2f2", color: "#ef4444", fontSize: 13, fontWeight: 500 }}>{loginError}</div>}
+          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <input aria-label="Email address" autoComplete="email" inputMode="email" placeholder="Email address" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
               style={{ padding: "12px 16px", borderRadius: 12, border: "1.5px solid #e2e8f0", fontSize: 14, color: "#1e293b", background: "#f8fafc" }} />
-            <input type="password" placeholder="Password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()}
+            <input aria-label="Password" autoComplete="current-password" type="password" placeholder="Password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
               style={{ padding: "12px 16px", borderRadius: 12, border: "1.5px solid #e2e8f0", fontSize: 14, color: "#1e293b", background: "#f8fafc" }} />
-            <BtnPrimary onClick={handleLogin} style={{ width: "100%", padding: "12px 0" }}>Sign In</BtnPrimary>
-          </div>
+            <BtnPrimary type="submit" disabled={loginLoading} style={{ width: "100%", padding: "12px 0" }}>{loginLoading ? "Signing In..." : "Sign In"}</BtnPrimary>
+          </form>
         </GlassCard>
       </div>
     );
@@ -1942,7 +2212,7 @@ function App() {
           <div style={{ width:32, height:32, borderRadius:10, background:`linear-gradient(135deg,${ORANGE},#e85d1a)`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Store size={16} color="white" /></div>
           {!collapsed && <div><div style={{ fontSize:15, fontWeight:800, color:dark?"#f1f5f9":"#1e293b", lineHeight:1.2 }}>FoodHubbie</div><div style={{ fontSize:10, color:"#64748b", fontWeight:500 }}>Admin Panel</div></div>}
         </div>
-        <div onClick={()=>setCollapsed(!collapsed)} style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"8px 0", cursor:"pointer", color:"#94a3b8", borderBottom:dark?"1px solid #334155":"1px solid #f1f5f9" }} className="collapse-toggle">{collapsed?<ChevronRight size={16}/>:<ChevronLeft size={16}/>}</div>
+        <button type="button" onClick={()=>setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"8px 0", cursor:"pointer", color:"#94a3b8", borderBottom:dark?"1px solid #334155":"1px solid #f1f5f9", background:"transparent", borderTop:0, borderLeft:0, borderRight:0 }} className="collapse-toggle shell-button">{collapsed?<ChevronRight size={16}/>:<ChevronLeft size={16}/>}</button>
         {outletInfo&&!collapsed&&<div style={{ margin:"8px 12px", padding:"10px 12px", borderRadius:10, background:dark?"#0f172a":"#fff7ed", border:dark?"1px solid #334155":"1px solid rgba(243,107,33,0.15)" }}>
           <div style={{ fontSize:11, color:"#94a3b8", fontWeight:600, textTransform:"uppercase", letterSpacing:0.5, marginBottom:2 }}>OUTLET</div>
           <div style={{ fontSize:13, fontWeight:600, color:ORANGE }}>{outletInfo.name}</div>
@@ -1955,46 +2225,46 @@ function App() {
               {!collapsed&&<div style={{ fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:0.8, color:"#94a3b8", padding:"12px 18px 6px" }}>{group.label}</div>}
               {group.items.map(item => {
                 const Icon = item.icon; const active = page === item.id;
-                return <div key={item.id} onClick={()=>{setPage(item.id);setSidebarOpen(false);}} style={{ display:"flex", alignItems:"center", gap:10, padding:collapsed?"10px 0":"8px 16px", margin:collapsed?"2px 0":"2px 8px", borderRadius:8, cursor:"pointer", justifyContent:collapsed?"center":"flex-start", background:active?ORANGE:"transparent", color:active?"white":(dark?"#cbd5e1":"#475569"), transition:"all 0.2s" }} title={collapsed?item.label:undefined}>
+                return <button type="button" key={item.id} onClick={()=>{setPage(item.id);setSidebarOpen(false);}} aria-current={active ? "page" : undefined} style={{ display:"flex", alignItems:"center", gap:10, padding:collapsed?"10px 0":"8px 16px", margin:collapsed?"2px 0":"2px 8px", borderRadius:8, cursor:"pointer", justifyContent:collapsed?"center":"flex-start", background:active?ORANGE:"transparent", color:active?"white":(dark?"#cbd5e1":"#475569"), transition:"all 0.2s", border:0, width:collapsed?"100%":"calc(100% - 16px)", textAlign:"left" }} title={collapsed?item.label:undefined} className="shell-button">
                   <Icon size={collapsed?20:18} style={{ flexShrink:0 }} />
                   {!collapsed&&<><span style={{ fontSize:13, fontWeight:active?600:500, whiteSpace:"nowrap" }}>{item.label}</span>{item.badge&&<span style={{ marginLeft:"auto", fontSize:10, fontWeight:700, padding:"1px 7px", borderRadius:99, background:active?"rgba(255,255,255,0.25)":ORANGE, color:"white" }}>{item.badge}</span>}</>}
-                </div>;
+                </button>;
               })}
             </div>
           ))}
         </nav>
         <div style={{ borderTop:dark?"1px solid #334155":"1px solid #f1f5f9", padding:collapsed?"8px 0":"8px 12px", display:"flex", flexDirection:"column", gap:2 }}>
-          <div onClick={()=>setDark(!dark)} style={{ display:"flex", alignItems:"center", gap:10, padding:collapsed?"10px 0":"8px 12px", borderRadius:8, cursor:"pointer", justifyContent:collapsed?"center":"flex-start", color:dark?"#cbd5e1":"#475569" }} title={collapsed?"Toggle theme":undefined}>
+          <button type="button" onClick={()=>setDark(!dark)} style={{ display:"flex", alignItems:"center", gap:10, padding:collapsed?"10px 0":"8px 12px", borderRadius:8, cursor:"pointer", justifyContent:collapsed?"center":"flex-start", color:dark?"#cbd5e1":"#475569", background:"transparent", border:0, width:"100%" }} title={collapsed?"Toggle theme":undefined} aria-label="Toggle theme" className="shell-button">
             {dark?<Sun size={collapsed?20:18}/>:<Moon size={collapsed?20:18}/>}
             {!collapsed&&<span style={{ fontSize:13, fontWeight:500 }}>{dark?"Light Mode":"Dark Mode"}</span>}
-          </div>
-          <div onClick={handleLogout} style={{ display:"flex", alignItems:"center", gap:10, padding:collapsed?"10px 0":"8px 12px", borderRadius:8, cursor:"pointer", justifyContent:collapsed?"center":"flex-start", color:"#ef4444" }} title={collapsed?"Logout":undefined}>
+          </button>
+          <button type="button" onClick={handleLogout} style={{ display:"flex", alignItems:"center", gap:10, padding:collapsed?"10px 0":"8px 12px", borderRadius:8, cursor:"pointer", justifyContent:collapsed?"center":"flex-start", color:"#ef4444", background:"transparent", border:0, width:"100%" }} title={collapsed?"Logout":undefined} className="shell-button">
             <LogOut size={collapsed?20:18}/>
             {!collapsed&&<span style={{ fontSize:13, fontWeight:500 }}>Logout</span>}
-          </div>
+          </button>
         </div>
       </aside>
       <div style={{ flex:1, display:"flex", flexDirection:"column", marginLeft:collapsed?56:224, transition:"margin-left 0.3s", minHeight:"100vh" }} className="main-wrapper">
         <header style={{ position:"sticky", top:0, zIndex:30, display:"flex", alignItems:"center", gap:12, padding:"12px 24px", background:dark?"#0f172a":"white", borderBottom:dark?"1px solid #1e293b":"1px solid #e2e8f0" }}>
-          <div className="hamburger-mobile" onClick={()=>setSidebarOpen(true)} style={{ cursor:"pointer", color:dark?"#f1f5f9":"#475569" }}><Menu size={22}/></div>
+          <button type="button" className="hamburger-mobile shell-button" onClick={()=>setSidebarOpen(true)} aria-label="Open navigation" style={{ cursor:"pointer", color:dark?"#f1f5f9":"#475569", background:"transparent", border:0, padding:6, borderRadius:8 }}><Menu size={22}/></button>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:20, fontWeight:700, color:dark?"#f1f5f9":"#0f172a" }}>{PAGE_TITLES[page]||"Dashboard"}</div>
             {outletInfo&&<div style={{ fontSize:12, color:"#94a3b8", display:"flex", alignItems:"center", gap:4 }}><Store size={12}/> {outletInfo.name}</div>}
           </div>
-          <div style={{ position:"relative", cursor:"pointer", color:dark?"#94a3b8":"#64748b" }}><Bell size={20}/><div style={{ position:"absolute", top:-2, right:-2, width:8, height:8, borderRadius:"50%", background:"#ef4444" }}/></div>
+          <button type="button" aria-label="Open notifications" className="shell-button" style={{ position:"relative", cursor:"pointer", color:dark?"#94a3b8":"#64748b", background:"transparent", border:0, padding:6, borderRadius:8 }}><Bell size={20}/><div style={{ position:"absolute", top:4, right:4, width:8, height:8, borderRadius:"50%", background:"#ef4444" }}/></button>
           {outletInfo&&<Avatar name={outletInfo.name} size={32}/>}
         </header>
-        <main style={{ flex:1, padding:24, overflow:"auto" }}>
+        <main style={{ flex:1, padding:"24px 24px 88px", overflow:"auto" }}>
           {PageComponent && <PageComponent showToast={showToast} />}
         </main>
       </div>
       <div className="mobile-bottom-nav" style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:30, display:"flex", alignItems:"center", justifyContent:"space-around", padding:"6px 0 env(safe-area-inset-bottom,6px)", background:dark?"#1e293b":"white", borderTop:dark?"1px solid #334155":"1px solid #e2e8f0" }}>
         {MOBILE_NAV.map(item => {
           const Icon = item.icon; const active = page === item.id;
-          return <div key={item.id} onClick={()=>setPage(item.id)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"4px 8px", cursor:"pointer", position:"relative", color:active?ORANGE:(dark?"#64748b":"#94a3b8") }}>
+          return <button type="button" key={item.id} onClick={()=>setPage(item.id)} aria-current={active ? "page" : undefined} className="shell-button" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"4px 8px", cursor:"pointer", position:"relative", color:active?ORANGE:(dark?"#64748b":"#94a3b8"), background:"transparent", border:0, minWidth:54 }}>
             <Icon size={20}/><span style={{ fontSize:10, fontWeight:active?600:500 }}>{item.label}</span>
             {active&&<div style={{ position:"absolute", top:-6, width:4, height:4, borderRadius:"50%", background:ORANGE }}/>}
-          </div>;
+          </button>;
         })}
       </div>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}

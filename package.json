@@ -5,6 +5,7 @@
   "private": true,
   "workspaces": [
     "Marketplace",
+    "admin-dashboard",
     "bot",
     "shared",
     "config"
@@ -13,6 +14,7 @@
     "install:all": "npm install --workspaces",
     "dev:bot": "cd bot && npm run dev",
     "dev:marketplace": "cd Marketplace && npm run dev",
+    "dev:admin-dashboard": "cd admin-dashboard && npm run dev",
     "deploy:hosting": "firebase deploy --only hosting",
     "deploy:rules": "firebase deploy --only database,storage",
     "test:path-resolution": "node scripts/test-paths.js"
