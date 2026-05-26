@@ -107,7 +107,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>Onboarding Requests</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Business</th><th>Owner</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Business</th><th>Owner</th><th>Email</th><th>Phone</th><th>Address</th><th>Outlet</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="onboardingBody"></tbody>
           </table>
         </div>
@@ -154,7 +154,7 @@
         <div class="pro-card" id="ordersTableView">
           <div class="table-header"><h3>Orders</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Order ID</th><th>Customer</th><th>Outlet</th><th>Items</th><th>Total</th><th>Status</th><th>Time</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Order ID</th><th>Business</th><th>Customer</th><th>Total</th><th>Status</th><th>Time</th><th>Actions</th></tr></thead>
             <tbody id="liveOrdersBody"></tbody>
           </table>
         </div>
@@ -400,17 +400,12 @@
             <div class="kpi-card"><div class="kpi-value" id="kpiPartnerPayouts">₹0</div><div class="kpi-label">Partner Payouts</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiTakeRate">0%</div><div class="kpi-label">Take Rate</div></div>
           </div>
-          <div class="pro-card">
-            <div class="card-header"><h3>Daily Revenue Trend</h3></div>
-            <div class="card-body"><canvas id="dailyRevenueTrendChart"></canvas></div>
-          </div>
           <div class="pro-card" style="margin-top:20px">
             <div class="table-header"><h3>Top Performing Outlets</h3></div>
             <table class="pro-table">
               <thead><tr><th>#</th><th>Outlet</th><th>Orders</th><th>Revenue</th><th>Rating</th></tr></thead>
               <tbody id="topOutletsBody"></tbody>
             </table>
-          </div>
           </div>
           <div class="pro-card">
             <div class="card-header"><h3>Daily Revenue Trend</h3></div>

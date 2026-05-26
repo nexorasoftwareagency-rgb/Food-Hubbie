@@ -10,12 +10,12 @@ const KPICard = ({ title, value, sub, icon: Icon, trend, color = ORANGE }) => (
         <Icon size={15} style={{ color }} />
       </span>
     </div>
-    <div className="text-2xl font-bold text-slate-800" style={{ fontFamily: "'Outfit', sans-serif" }}>{value}</div>
+    <div className="text-2xl font-bold" style={{ fontFamily: "'Outfit', sans-serif", color }}>{value}</div>
     {sub && <div className="text-xs text-slate-500 leading-tight">{sub}</div>}
     {trend !== undefined && (
-      <div className="flex items-center gap-1 text-xs">
-        {trend >= 0 ? <ArrowUp size={11} className="text-emerald-500" /> : <ArrowDown size={11} className="text-red-500" />}
-        <span className={trend >= 0 ? "text-emerald-600" : "text-red-500"}>{Math.abs(trend)}% vs yesterday</span>
+      <div className="flex items-center gap-1 text-xs" style={{ color }}>
+        {trend >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+        <span>{Math.abs(trend)}% vs yesterday</span>
       </div>
     )}
   </GlassCard>

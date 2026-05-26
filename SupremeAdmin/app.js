@@ -83,7 +83,7 @@ document.querySelectorAll('.tab-content').forEach((el) => {
   document.querySelectorAll('.nav-link').forEach((el) => {
     el.classList.remove('active');
   });
-  const tabEl = $(tabName);
+  const tabEl = $('tab-' + tabName);
   if (tabEl) tabEl.style.display = 'block';
   const navLink = document.querySelector(`.nav-link[data-tab="${tabName}"]`);
   if (navLink) navLink.classList.add('active');
@@ -91,12 +91,12 @@ document.querySelectorAll('.tab-content').forEach((el) => {
     dashboard: initDashboard,
     onboarding: initOnboarding,
     businesses: initBusinesses,
-    'live-orders': initLiveOrders,
+    liveorders: initLiveOrders,
     riders: initRiders,
     users: initUsers,
     promotions: initPromotions,
     settlements: initSettlements,
-    'delivery-slabs': initDeliverySlabs,
+    delivery: initDeliverySlabs,
     inventory: initInventory,
     reviews: initReviews,
     broadcast: initBroadcast,
@@ -711,7 +711,7 @@ function initLiveOrders() {
 }
 
 function renderLiveOrders() {
-  const viewMode = document.querySelector('.orders-view-toggle .active')?.dataset?.view || 'table';
+  const viewMode = document.querySelector('#ordersViewToggle .btn-view.active')?.dataset?.view || 'table';
   const filtered = ordersFilterStatus === 'All'
     ? allOrdersData : allOrdersData.filter((o) => o.status === ordersFilterStatus);
 
@@ -796,25 +796,25 @@ window.onKanbanDrop = (e, newStatus) => {
 };
 
 $('ordersViewToggle')?.addEventListener('click', (e) => {
-  const btn = e.target.closest('.view-toggle-btn');
+  const btn = e.target.closest('.btn-view');
   if (!btn) return;
-  document.querySelectorAll('.orders-view-toggle .view-toggle-btn').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('#ordersViewToggle .btn-view').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   renderLiveOrders();
 });
 
-$('ordersViewToggle')?.querySelectorAll('.view-toggle-btn').forEach((btn) => {
+$('ordersViewToggle')?.querySelectorAll('.btn-view').forEach((btn) => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.orders-view-toggle .view-toggle-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('#ordersViewToggle .btn-view').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     renderLiveOrders();
   });
 });
 
 // Status filter buttons for live orders
-document.querySelectorAll('.order-status-filter').forEach((btn) => {
+document.querySelectorAll('.filter-bar .btn-filter').forEach((btn) => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.order-status-filter').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.filter-bar .btn-filter').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     ordersFilterStatus = btn.dataset.status || 'All';
     renderLiveOrders();
@@ -1118,28 +1118,27 @@ $('walletSave').addEventListener('click', async () => {
 
 window.viewWalletHistory = async (uid) => {
   const user = allUsers[uid];
-  $('walletHistoryModal').querySelector('.modal-title').textContent =
+  $('walletHistoryModal').querySelector('.modal-header h2').textContent =
     `Wallet History: ${user?.name || uid}`;
-  const listEl = $('walletHistoryModal').querySelector('.wallet-history-list');
-  listEl.innerHTML = '<p class="text-muted">Loading...</p>';
+  const tbody = $('walletHistoryBody');
+  tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Loading...</td></tr>';
   $('walletHistoryModal').style.display = 'flex';
   try {
     const snap = await db.ref(`users/${uid}/walletHistory`).limitToLast(5).once('value');
     const data = snap.val() || {};
-    const entries = Object.values(data).reverse();
-    listEl.innerHTML = entries.length
-      ? entries.map((e) =>
-          `<div class="wallet-history-item">
-            <span class="${e.type === 'credit' ? 'text-success' : 'text-danger'}">
-              ${e.type === 'credit' ? '+' : '-'}\u20B9${Math.abs(e.amount).toLocaleString('en-IN')}
-            </span>
-            <span>${escapeHtml(e.reason || '')}</span>
-            <span class="text-muted">${formatDate(e.timestamp)}</span>
-          </div>`
+    const entries = Object.entries(data).reverse();
+    tbody.innerHTML = entries.length
+      ? entries.map(([key, e]) =>
+          `<tr>
+            <td>${formatDate(e.timestamp)}</td>
+            <td class="${e.type === 'credit' ? 'text-success' : 'text-danger'}">${e.type === 'credit' ? '+' : '-'}\u20B9${Math.abs(e.amount).toLocaleString('en-IN')}</td>
+            <td>${escapeHtml(e.type || '')}</td>
+            <td>${escapeHtml(e.reason || '')}</td>
+          </tr>`
         ).join('')
-      : '<p class="text-muted">No transactions</p>';
+      : '<tr><td colspan="4" class="text-muted">No transactions</td></tr>';
   } catch (err) {
-    listEl.innerHTML = '<p class="text-danger">Failed to load history</p>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-danger">Failed to load history</td></tr>';
   }
 };
 
@@ -1202,6 +1201,34 @@ $('btnApplySurge').addEventListener('click', async () => {
       updatedAt: firebase.database.ServerValue.TIMESTAMP
     });
     showToast('Surge pricing updated', 'success');
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+  }
+});
+
+$('btnApplyDiscount').addEventListener('click', async () => {
+  try {
+    await db.ref('system/promotions/globalDiscount').set({
+      percent: parseFloat($('discountPercent').value) || 0,
+      maxAmount: parseFloat($('discountMaxAmount').value) || 0,
+      minOrder: parseFloat($('discountMinOrder').value) || 0,
+      active: $('discountActive').checked,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    showToast('Global discount updated', 'success');
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+  }
+});
+
+$('btnSetPlatformFee').addEventListener('click', async () => {
+  try {
+    await db.ref('system/config/platformFee').set({
+      amount: parseFloat($('platformFee').value) || 0,
+      active: $('platformFeeActive').checked,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    showToast('Platform fee updated', 'success');
   } catch (err) {
     showToast('Failed: ' + err.message, 'error');
   }
@@ -1428,6 +1455,7 @@ function initSettlements() {
 $('settlementDateFrom')?.addEventListener('change', initSettlements);
 $('settlementDateTo')?.addEventListener('change', initSettlements);
 $('settlementStatusFilter')?.addEventListener('change', initSettlements);
+$('btnFilterSettlements')?.addEventListener('click', initSettlements);
 
 window.settleOrder = async (bid, oid, orderId, netAmount) => {
   confirmAction(`Settle this order for \u20B9${netAmount.toLocaleString('en-IN')}?`, async () => {
@@ -1495,6 +1523,10 @@ function renderSlabs() {
 
 $('btnAddSlab').addEventListener('click', () => {
   showSlabEditor(null);
+});
+
+$('btnSaveDeliveryFlow')?.addEventListener('click', () => {
+  saveSlabs();
 });
 
 function showSlabEditor(idx) {
@@ -1958,7 +1990,7 @@ $('btnVerifyTFA')?.addEventListener('click', async () => {
   if (!code) { showToast('Enter verification code', 'error'); return; }
   const secret = $('tfaSecretInput')?.value;
   if (!secret) { showToast('Secret not found', 'error'); return; }
-  const expected = generateTOTP(secret);
+  const expected = await generateTOTP(secret);
   if (code === expected) {
     $('tfaSetupModal').style.display = 'none';
     $('tfaVerifyCode').value = '';
@@ -2002,7 +2034,16 @@ function generateTOTP(secret) {
   if (!cryptoObj?.subtle) {
     return String(epoch).slice(-6).padStart(6, '0');
   }
-  return '000000';
+  return cryptoObj.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+    .then((cryptoKey) => cryptoObj.subtle.sign('HMAC', cryptoKey, counter))
+    .then((sig) => {
+      const hash = new Uint8Array(sig);
+      const offset = hash[hash.length - 1] & 0xf;
+      const binary = ((hash[offset] & 0x7f) << 24) | ((hash[offset + 1] & 0xff) << 16) |
+                     ((hash[offset + 2] & 0xff) << 8) | (hash[offset + 3] & 0xff);
+      return String(binary % 1000000).padStart(6, '0');
+    })
+    .catch(() => String(epoch).slice(-6).padStart(6, '0'));
 }
 
 function base32Decode(s) {

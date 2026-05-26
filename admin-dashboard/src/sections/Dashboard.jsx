@@ -1,5 +1,5 @@
-﻿import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, Clock, Bike, ShoppingCart, Bell, Zap } from "lucide-react";
+﻿import { useState, useEffect } from "react";
+import { TrendingUp, Clock, Bike, ShoppingCart, Bell } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import GlassCard from "../components/GlassCard";
 import KPICard from "../components/KPICard";
@@ -7,6 +7,7 @@ import StatusBadge from "../components/StatusBadge";
 import Pill from "../components/Pill";
 import Avatar from "../components/Avatar";
 import SectionHeader from "../components/SectionHeader";
+import StarRating from "../components/StarRating";
 import { ORANGE, COLORS } from "../utils/constants";
 import { fmt } from "../utils/formatters";
 
@@ -56,11 +57,22 @@ const Dashboard = ({ showToast }) => {
     return () => clearTimeout(t);
   }, []);
 
+  const revenue = { value: 42680, trend: 12.4 };
+  const pendingOrders = { count: 8 };
+  const activeRiders = { online: 3, total: 4 };
+  const avgOrderValue = { value: 628, trend: 7.5 };
+
+  const revColor = revenue.trend >= 0 ? COLORS.success : COLORS.error;
+  const pendingColor = COLORS.error;
+  const ridersRatio = activeRiders.online / activeRiders.total;
+  const ridersColor = ridersRatio >= 0.75 ? COLORS.success : ridersRatio >= 0.5 ? COLORS.warning : COLORS.error;
+  const aovColor = avgOrderValue.trend >= 0 ? COLORS.success : COLORS.error;
+
   return (
     <div className="space-y-5">
       {incoming && (
-        <div className="rounded-2xl p-4 flex items-center gap-4 text-white"
-          style={{ background: `linear-gradient(135deg, ${ORANGE}, #c45a18)`, animation: "pulse 2s infinite" }}>
+        <div className="rounded-2xl p-4 flex items-center gap-4 text-white animate-pulse"
+          style={{ background: `linear-gradient(135deg, ${ORANGE}, #c45a18)` }}>
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
             <Bell size={18} />
           </div>
@@ -78,10 +90,10 @@ const Dashboard = ({ showToast }) => {
       )}
 
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
-        <KPICard title="Today's Revenue" value="42,680" sub="68 orders completed" icon={TrendingUp} trend={12.4} />
-        <KPICard title="Pending Orders" value="8" sub="3 urgent, 5 normal" icon={Clock} trend={-4} color={COLORS.warning} />
-        <KPICard title="Active Riders" value="3/4" sub="2 on delivery, 1 free" icon={Bike} color={COLORS.info} />
-        <KPICard title="Avg Order Value" value="628" sub="vs 584 yesterday" icon={ShoppingCart} trend={7.5} color={COLORS.success} />
+        <KPICard title="Today's Revenue" value={revenue.value.toLocaleString("en-IN")} sub="68 orders completed" icon={TrendingUp} trend={revenue.trend} color={revColor} />
+        <KPICard title="Pending Orders" value={String(pendingOrders.count)} sub="3 urgent, 5 normal" icon={Clock} trend={-4} color={pendingColor} />
+        <KPICard title="Active Riders" value={`${activeRiders.online}/${activeRiders.total}`} sub="2 on delivery, 1 free" icon={Bike} color={ridersColor} />
+        <KPICard title="Avg Order Value" value={avgOrderValue.value.toLocaleString("en-IN")} sub="vs 584 yesterday" icon={ShoppingCart} trend={avgOrderValue.trend} color={aovColor} />
       </div>
 
       <GlassCard className="p-4">
@@ -156,6 +168,7 @@ const Dashboard = ({ showToast }) => {
                 <span className="text-2xl">{m.emoji}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-slate-800 truncate">{m.name}</div>
+                  <StarRating rating={m.rating} />
                 </div>
                 <span className="text-sm font-bold" style={{ color: ORANGE }}>{fmt(m.price)}</span>
               </div>
