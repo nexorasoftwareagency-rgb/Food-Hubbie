@@ -3,7 +3,8 @@ import {
   getDatabase, ref, get, child, onValue, off, update, push, set, remove, serverTimestamp, query, orderByChild, equalTo
 } from "firebase/database";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  getAuth, setPersistence, browserLocalPersistence,
+  onAuthStateChanged, signInWithEmailAndPassword, signOut
 } from "firebase/auth";
 import {
   getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject
@@ -22,8 +23,21 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const auth = getAuth(app);
 const storage = getStorage(app);
+
+let _auth = null;
+let _authInitPromise = null;
+
+export function getAuthInstance() {
+  if (_auth) return Promise.resolve(_auth);
+  if (_authInitPromise) return _authInitPromise;
+  _authInitPromise = (async () => {
+    _auth = getAuth(app);
+    await setPersistence(_auth, browserLocalPersistence);
+    return _auth;
+  })();
+  return _authInitPromise;
+}
 
 let _currentBusinessId = null;
 let _currentOutletId = null;
@@ -58,7 +72,7 @@ export async function deleteImage(url) {
 }
 
 export {
-  db, auth, storage,
+  db, storage,
   ref, get, child, onValue, off, update, push, set, remove, serverTimestamp,
   query, orderByChild, equalTo,
   onAuthStateChanged, signInWithEmailAndPassword, signOut,

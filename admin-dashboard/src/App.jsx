@@ -10,7 +10,7 @@ import {
   Activity, Navigation, Truck, Eye, Download, Send, Star, XCircle
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref, update, push, set, remove, serverTimestamp, onValue, off, query, orderByChild, equalTo, uploadImage } from "./firebase";
+import { getAuthInstance, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref, update, push, set, remove, serverTimestamp, onValue, off, query, orderByChild, equalTo, uploadImage } from "./firebase";
 import "./App.css";
 
 const ORANGE = "#f36b21";
@@ -2610,16 +2610,22 @@ function App() {
   const [outletInfo, setOutletInfo] = useState(null);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      const unsub = onAuthStateChanged(auth, (u) => {
-        setUser((prev) => {
-          if ((u?.uid || null) === (prev?.uid || null)) return prev;
-          return u;
+    const t = setTimeout(async () => {
+      try {
+        const auth = await getAuthInstance();
+        const unsub = onAuthStateChanged(auth, (u) => {
+          setUser((prev) => {
+            if ((u?.uid || null) === (prev?.uid || null)) return prev;
+            return u;
+          });
+          setAuthLoading((prev) => prev ? false : prev);
         });
-        setAuthLoading((prev) => prev ? false : prev);
-      });
-      authUnsubRef.current = unsub;
-    }, 0);
+        authUnsubRef.current = unsub;
+      } catch (e) {
+        console.warn("Auth init failed", e);
+        setAuthLoading(false);
+      }
+    }, 100);
     return () => { clearTimeout(t); if (authUnsubRef.current) { authUnsubRef.current(); authUnsubRef.current = null; } };
   }, []);
 
@@ -2640,13 +2646,20 @@ function App() {
     if (loginLoading) return;
     setLoginError("");
     setLoginLoading(true);
-    try { await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword); }
+    try {
+      const auth = await getAuthInstance();
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+    }
     catch (e) { setLoginError(e.message.replace("Firebase: ", "")); }
     finally { setLoginLoading(false); }
   }, [loginEmail, loginPassword, loginLoading]);
 
   const handleLogout = useCallback(async () => {
-    await signOut(auth); setUser(null); setOutletInfo(null);
+    try {
+      const auth = await getAuthInstance();
+      await signOut(auth);
+    } catch (e) { console.warn("Sign-out failed", e); }
+    setUser(null); setOutletInfo(null);
   }, []);
 
   useEffect(() => {
