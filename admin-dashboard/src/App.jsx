@@ -2594,6 +2594,7 @@ const STORAGE_KEYS = {
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const authUnsubRef = useRef(null);
   const [page, setPage] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.page);
     return VALID_PAGE_IDS.has(saved) ? saved : "dashboard";
@@ -2609,8 +2610,17 @@ function App() {
   const [outletInfo, setOutletInfo] = useState(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setAuthLoading(false); });
-    return unsub;
+    const t = setTimeout(() => {
+      const unsub = onAuthStateChanged(auth, (u) => {
+        setUser((prev) => {
+          if ((u?.uid || null) === (prev?.uid || null)) return prev;
+          return u;
+        });
+        setAuthLoading((prev) => prev ? false : prev);
+      });
+      authUnsubRef.current = unsub;
+    }, 0);
+    return () => { clearTimeout(t); if (authUnsubRef.current) { authUnsubRef.current(); authUnsubRef.current = null; } };
   }, []);
 
   useEffect(() => {
