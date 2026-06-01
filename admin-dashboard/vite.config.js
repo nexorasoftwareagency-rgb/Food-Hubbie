@@ -7,9 +7,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'recharts', 'lucide-react'],
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/database', 'firebase/storage'],
+        manualChunks(id) {
+          if (id.includes('firebase/') || id.includes('@firebase/')) return 'firebase';
+          if (id.includes('node_modules/react') || id.includes('node_modules/scheduler') || id.includes('node_modules/recharts') || id.includes('node_modules/lucide-react') || id.includes('node_modules/d3-')) return 'vendor';
         },
       },
     },
