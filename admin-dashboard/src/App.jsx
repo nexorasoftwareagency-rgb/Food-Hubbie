@@ -837,6 +837,25 @@ function POSPage({ showToast, outletInfo }) {
     return () => { off(r,"value",u1); off(r2,"value",u2); };
   }, []);
 
+  const addToCart = () => {
+    if (!selModal||!selSize) return showToast("Select a size first","warning");
+    const sizes = selModal.sizes||{};
+    const basePrice = sizes[selSize] ?? selModal.price ?? 0;
+    const addonTotal = Object.values(selAddons).reduce((a,b)=>a+Number(b),0);
+    const pricePerItem = Number(basePrice) + addonTotal;
+    const key = `${selModal.id}::${selSize}::${Object.keys(selAddons).sort().join("|")}`;
+    setCart(prev => {
+      let next = {...prev};
+      if (editKey) delete next[editKey];
+      if (next[key]) next[key] = {...next[key], qty: next[key].qty + selQty};
+      else next[key] = { id:selModal.id, name:selModal.name, size:selSize, price:pricePerItem, qty:selQty, addons:Object.entries(selAddons).map(([n,p])=>({name:n,price:Number(p)})) };
+      return next;
+    });
+    setEditKey(null);
+    setSelModal(null);
+    showToast(`${selQty}x ${selModal.name} ${editKey?"updated":"added"}`,"success");
+  };
+
   const addToCartRef = useRef(addToCart);
   addToCartRef.current = addToCart;
 
@@ -876,25 +895,6 @@ function POSPage({ showToast, outletInfo }) {
     (item.addons||[]).forEach(a => { addonsMap[a.name] = a.price; });
     setSelAddons(addonsMap);
     setSelQty(item.qty);
-  };
-
-  const addToCart = () => {
-    if (!selModal||!selSize) return showToast("Select a size first","warning");
-    const sizes = selModal.sizes||{};
-    const basePrice = sizes[selSize] ?? selModal.price ?? 0;
-    const addonTotal = Object.values(selAddons).reduce((a,b)=>a+Number(b),0);
-    const pricePerItem = Number(basePrice) + addonTotal;
-    const key = `${selModal.id}::${selSize}::${Object.keys(selAddons).sort().join("|")}`;
-    setCart(prev => {
-      let next = {...prev};
-      if (editKey) delete next[editKey];
-      if (next[key]) next[key] = {...next[key], qty: next[key].qty + selQty};
-      else next[key] = { id:selModal.id, name:selModal.name, size:selSize, price:pricePerItem, qty:selQty, addons:Object.entries(selAddons).map(([n,p])=>({name:n,price:Number(p)})) };
-      return next;
-    });
-    setEditKey(null);
-    setSelModal(null);
-    showToast(`${selQty}x ${selModal.name} ${editKey?"updated":"added"}`,"success");
   };
 
   const updateCartQty = (key, delta) => {
