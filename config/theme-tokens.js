@@ -15,7 +15,7 @@
  * ============================================================
  */
 
-const TOKENS = {
+export const TOKENS = {
   // ─── Per-App Default Palettes ───────────────────────────
   marketplace: {
     brandName: "Foodhubbie",
@@ -97,7 +97,7 @@ const TOKENS = {
  * Resolve a tenant's theme by businessId. Returns the base
  * Marketplace palette merged with any tenant overrides.
  */
-function resolveMarketplaceTheme(businessId) {
+export function resolveMarketplaceTheme(businessId) {
   const base = { ...TOKENS.marketplace };
   if (!businessId) return base;
   const override = TOKENS.tenants[businessId];
