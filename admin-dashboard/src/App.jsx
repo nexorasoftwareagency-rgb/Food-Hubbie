@@ -1348,8 +1348,23 @@ function SettingsPage({ showToast }) {
         <GlassCard className="p-5 mb-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-semibold text-slate-800">Enable Inventory Tracking</div>
-              <div className="text-xs text-slate-500 mt-1">Track stock quantities for menu items. Auto-deducts on sales.</div>
+              <div className="font-semibold text-slate-800">Menu Availability</div>
+              <div className="text-xs text-slate-500 mt-1">Mark dishes as Available or Out of Stock on the menu.</div>
+            </div>
+            <label className="toggle-switch" style={{ position:"relative", display:"inline-block", width:44, height:24 }}>
+              <input type="checkbox" checked={!!inv.availability} onChange={e => setInv(p => ({...p, availability: e.target.checked}))}
+                style={{ opacity:0, width:0, height:0 }} />
+              <span style={{ position:"absolute", cursor:"pointer", inset:0, borderRadius:12, background:inv.availability?ORANGE:"#cbd5e1", transition:".2s" }}>
+                <span style={{ position:"absolute", height:18, width:18, borderRadius:"50%", background:"white", top:3, left:inv.availability?23:3, transition:".2s" }} />
+              </span>
+            </label>
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-slate-800">Stock Inventory Tracking</div>
+              <div className="text-xs text-slate-500 mt-1">Track quantity in stock for each item. Auto-deducts on sales.</div>
             </div>
             <label className="toggle-switch" style={{ position:"relative", display:"inline-block", width:44, height:24 }}>
               <input type="checkbox" checked={!!inv.stockTracking} onChange={e => setInv(p => ({...p, stockTracking: e.target.checked}))}
