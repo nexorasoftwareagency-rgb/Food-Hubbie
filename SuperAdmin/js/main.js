@@ -1,5 +1,5 @@
-// Initialize Firebase (Using the production food-hubbie config)
-const firebaseConfig = {
+const _env = typeof window !== "undefined" && window.__FOODHUBBIE_FIREBASE_CONFIG__;
+const firebaseConfig = _env || {
     apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
     authDomain: "food-hubbie.firebaseapp.com",
     projectId: "food-hubbie",

@@ -16,14 +16,14 @@ import {
 } from "firebase/app-check";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
-  authDomain: "food-hubbie.firebaseapp.com",
-  databaseURL: "https://food-hubbie-default-rtdb.firebaseio.com",
-  projectId: "food-hubbie",
-  storageBucket: "food-hubbie.firebasestorage.app",
-  messagingSenderId: "952017160550",
-  appId: "1:952017160550:web:80bbb75933f431ab54e0a7",
-  measurementId: "G-SQK852HT4W"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "food-hubbie.firebaseapp.com",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://food-hubbie-default-rtdb.firebaseio.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "food-hubbie",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "food-hubbie.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "952017160550",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:952017160550:web:80bbb75933f431ab54e0a7",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-SQK852HT4W"
 };
 
 // reCAPTCHA v3 site key (paired with food-hubbie Firebase project in console).
@@ -31,6 +31,7 @@ const firebaseConfig = {
 // this module loads.
 const RECAPTCHA_SITE_KEY =
   (typeof window !== "undefined" && window.__FOODHUBBIE_RECAPTCHA_SITE_KEY__) ||
+  import.meta.env.VITE_RECAPTCHA_SITE_KEY ||
   "6LeblvYsAAAAAPhR4Uw4kHZLsW50dxE8o2D2XIo3";
 
 const app = initializeApp(firebaseConfig);

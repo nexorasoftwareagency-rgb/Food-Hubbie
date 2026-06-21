@@ -1,30 +1,24 @@
-/**
- * ============================================================
- * FOODHUBBIE SAAS — Firebase Configuration
- * ============================================================
- * PROJECT: food-hubbie
- * ============================================================
- */
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8";
+const FIREBASE_AUTH_DOMAIN = process.env.FIREBASE_AUTH_DOMAIN || "food-hubbie.firebaseapp.com";
+const FIREBASE_DATABASE_URL = process.env.FIREBASE_DATABASE_URL || "https://food-hubbie-default-rtdb.firebaseio.com";
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "food-hubbie";
+const FIREBASE_STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || "food-hubbie.firebasestorage.app";
+const FIREBASE_MESSAGING_SENDER_ID = process.env.FIREBASE_MESSAGING_SENDER_ID || "952017160550";
+const FIREBASE_APP_ID = process.env.FIREBASE_APP_ID || "1:952017160550:web:80bbb75933f431ab54e0a7";
+const FIREBASE_MEASUREMENT_ID = process.env.FIREBASE_MEASUREMENT_ID || "G-SQK852HT4W";
+const RECAPTCHA_SITE_KEY = process.env.RECAPTCHA_SITE_KEY || "6LeblvYsAAAAAPhR4Uw4kHZLsW50dxE8o2D2XIo3";
 
-// Browser-side Firebase config (for Admin, Rider, Marketplace)
 const FOODHUBBIE_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
-  authDomain: "food-hubbie.firebaseapp.com",
-  databaseURL: "https://food-hubbie-default-rtdb.firebaseio.com",
-  projectId: "food-hubbie",
-  storageBucket: "food-hubbie.firebasestorage.app",
-  messagingSenderId: "952017160550",
-  appId: "1:952017160550:web:80bbb75933f431ab54e0a7",
-  measurementId: "G-SQK852HT4W"
+  apiKey: FIREBASE_API_KEY,
+  authDomain: FIREBASE_AUTH_DOMAIN,
+  databaseURL: FIREBASE_DATABASE_URL,
+  projectId: FIREBASE_PROJECT_ID,
+  storageBucket: FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: FIREBASE_MESSAGING_SENDER_ID,
+  appId: FIREBASE_APP_ID,
+  measurementId: FIREBASE_MEASUREMENT_ID
 };
 
-// Server-side Firebase URL (for Bot / Node.js)
-const FIREBASE_DATABASE_URL = "https://food-hubbie-default-rtdb.firebaseio.com";
-
-// App Check (reCAPTCHA v3 for browser clients)
-const RECAPTCHA_SITE_KEY = "6LeblvYsAAAAAPhR4Uw4kHZLsW50dxE8o2D2XIo3";
-
-// Standard CJS Export
 module.exports = {
   FOODHUBBIE_FIREBASE_CONFIG,
   FIREBASE_DATABASE_URL,

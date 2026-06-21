@@ -15,7 +15,8 @@ window.haptic = (pattern) => {
 
 // Firebase Database modular SDK does not export enablePersistence for RTDB on Web
 
-const firebaseConfig = {
+const _env = typeof window !== "undefined" && window.__FOODHUBBIE_FIREBASE_CONFIG__;
+const firebaseConfig = _env || {
     apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
     authDomain: "food-hubbie.firebaseapp.com",
     databaseURL: "https://food-hubbie-default-rtdb.firebaseio.com",

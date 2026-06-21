@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
-const firebaseConfig = {
+const _env = typeof window !== "undefined" && window.__FOODHUBBIE_FIREBASE_CONFIG__;
+const firebaseConfig = _env || {
   apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
   authDomain: "food-hubbie.firebaseapp.com",
   databaseURL: "https://food-hubbie-default-rtdb.firebaseio.com",
@@ -8,7 +9,7 @@ const firebaseConfig = {
   storageBucket: "food-hubbie.firebasestorage.app",
   messagingSenderId: "952017160550",
   appId: "1:952017160550:web:80bbb75933f431ab54e0a7",
-  measurementId: "G-SQ852HT4W"
+  measurementId: "G-SQK852HT4W"
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();

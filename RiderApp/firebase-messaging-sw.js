@@ -1,7 +1,9 @@
+importScripts('env-config.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-firebase.initializeApp({
+var _cfg = self.__FOODHUBBIE_FIREBASE_CONFIG__;
+firebase.initializeApp(_cfg || {
   apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
   authDomain: "food-hubbie.firebaseapp.com",
   databaseURL: "https://food-hubbie-default-rtdb.firebaseio.com",

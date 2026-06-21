@@ -58,6 +58,7 @@ scratch/
 # Legacy artifacts to prune (these should not be committed)
 Pizza-bot/
 Cake-bot/
+roshani-pizza-bot/
 rider_old/
 graphify-out/
 Replit files/
@@ -71,6 +72,10 @@ Replit files/
 debug_test.js
 button_audit.js
 add_nilesh.js
+
+# Runtime Firebase config (not tracked — contains keys)
+env-config.js
+**/env-config.js
 
 # Credentials & site info (not secrets, but convenience file)
 Credentials.md

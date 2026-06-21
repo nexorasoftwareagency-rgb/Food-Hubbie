@@ -1,20 +1,4 @@
 {
-  "_docs": [
-    "APP CHECK ENFORCEMENT: This file does NOT have an `appCheckEnforced`",
-    "directive (RTDB does not support it in rules.json). Enable App Check",
-    "enforcement for the RTDB in the Firebase Console → App Check → RTDB →",
-    "Enforce. The client-side init in admin-dashboard/src/firebase.js (Step 3)",
-    "already attaches an App Check token to every SDK call; once enforcement",
-    "is on, any request without a valid token will be rejected with 401.",
-    "",
-    "PATH COVERAGE ADDED IN STEPS 1/5/7/9:",
-    "  - businesses/.../metadata/orderSequence    (bot atomic order IDs)",
-    "  - businesses/.../broadcasts                (admin notifications write)",
-    "  - businesses/.../logs/audit                (admin audit trail)",
-    "  - system/partners                          (admin partners CRUD)",
-    "  - system/report_logs                       (bot reports cron)",
-    "  - system/bot_routing                       (multi-tenant.js reads)"
-  ],
   "rules": {
     "admins": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).child('isSuper').val() == true || auth.token.superadmin === true)",
@@ -186,7 +170,7 @@
               "audit": {
                 ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
                 ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.superadmin === true)",
-                ".indexOn": ["ts", "action", "actor.uid"]
+                ".indexOn": ["ts", "action", "actor/uid"]
               }
             }
           }

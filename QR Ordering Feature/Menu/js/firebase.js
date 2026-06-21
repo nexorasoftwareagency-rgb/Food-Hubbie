@@ -14,7 +14,8 @@ import {
     getDatabase, ref, get, onValue, set, push, update, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-const firebaseConfig = {
+const _env = typeof window !== "undefined" && window.__FOODHUBBIE_FIREBASE_CONFIG__;
+const firebaseConfig = _env || {
     apiKey: "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
     authDomain: "food-hubbie.firebaseapp.com",
     databaseURL: "https://food-hubbie-default-rtdb.firebaseio.com",
