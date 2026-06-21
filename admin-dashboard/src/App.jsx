@@ -654,6 +654,10 @@ function POSPage({ showToast, outletInfo }) {
   const [custName, setCustName] = useState("");
   const [custPhone, setCustPhone] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [discFlat, setDiscFlat] = useState(0);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState(null);
+  const [tableNo, setTableNo] = useState("");
   const [payMethod, setPayMethod] = useState("Cash");
   const [orderType, setOrderType] = useState("Dine-in");
   const [orderNotes, setOrderNotes] = useState("");
@@ -746,30 +750,38 @@ function POSPage({ showToast, outletInfo }) {
   };
 
   const clearCart = () => {
-    setCart({}); setDiscount(0); setCustName(""); setCustPhone(""); setOrderNotes(""); setOrderType("Dine-in");
+    setCart({}); setDiscount(0); setDiscFlat(0); setCouponCode(""); setCouponApplied(null); setCustName(""); setCustPhone(""); setOrderNotes(""); setOrderType("Dine-in"); setTableNo("");
   };
 
   const [autoDisc, setAutoDisc] = useState(null);
   const cartItems = Object.entries(cart);
   const subtotal = cartItems.reduce((s,[_,i])=>s+i.price*i.qty,0);
-  const discVal = autoDisc ? (autoDisc.type === "flat" ? autoDisc.value : Math.min(subtotal * autoDisc.value / 100, autoDisc.maxCap || Infinity)) : (discount > 0 ? subtotal * discount / 100 : 0);
-  const taxVal = (subtotal - discVal) * 0.05;
-  const total = Math.max(0, subtotal - discVal + taxVal);
+  const manualDiscVal = Number(discFlat) > 0 ? Number(discFlat) : (discount > 0 ? subtotal * discount / 100 : 0);
+  const discVal = autoDisc ? (autoDisc.type === "flat" ? autoDisc.value : Math.min(subtotal * autoDisc.value / 100, autoDisc.maxCap || Infinity)) : manualDiscVal;
+  const couponDiscVal = couponApplied ? (couponApplied.type === "flat" ? couponApplied.value : Math.min(subtotal * Number(couponApplied.value) / 100, Number(couponApplied.maxCap) || Infinity)) : 0;
+  const totalDisc = discVal + couponDiscVal;
+  const taxVal = (subtotal - totalDisc) * 0.05;
+  const total = Math.max(0, subtotal - totalDisc + taxVal);
 
-  const printReceiptHtml = useCallback((orderData) => {
+  const printReceiptHtml = useCallback((orderData, discLabel) => {
     const itemsHtml = Object.values(orderData.cart).map(i =>
       `<tr><td style="padding:4px 8px;border-bottom:1px dashed #ddd">${i.qty}x ${i.name}${i.size ? ` (${i.size})` : ""}</td><td style="padding:4px 8px;border-bottom:1px dashed #ddd;text-align:right">₹${(i.price * i.qty).toLocaleString("en-IN")}</td></tr>`
     ).join("");
-    const discLine = orderData.discount > 0 ? `<tr><td style="padding:4px 8px">Discount</td><td style="padding:4px 8px;text-align:right;color:#ef4444">-₹${Number(orderData.discount).toLocaleString("en-IN")}</td></tr>` : "";
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt</title><style>body{font-family:monospace;font-size:12px;width:280px;margin:0 auto;padding:16px;color:#1e293b}h2{font-size:16px;text-align:center;margin:0 0 4px}.addr{font-size:10px;text-align:center;color:#64748b;margin-bottom:12px}hr{border:none;border-top:1px dashed #94a3b8;margin:8px 0}table{width:100%;border-collapse:collapse}.total td{padding:6px 8px;font-weight:700;font-size:14px}.pay td{padding:4px 8px}.footer{text-align:center;font-size:10px;color:#94a3b8;margin-top:12px}</style></head><body>
-      <h2>${outletInfo?.name || "FoodHubbie"}</h2>${outletInfo?.address ? `<div class="addr">${outletInfo.address}</div>` : ""}
-      <div style="text-align:center;font-size:11px;color:#64748b;margin-bottom:4px">#${orderData.orderId}</div>
-      <div style="text-align:center;font-size:11px;color:#64748b;margin-bottom:8px">${orderData.customerName}${orderData.phone !== "Walk-in" ? ` · ${orderData.phone}` : ""}</div>
-      <hr>${itemsHtml}<hr>${discLine}
+    const taxLine = orderData.tax > 0 ? `<tr><td style="padding:4px 8px">Tax (5%)</td><td style="padding:4px 8px;text-align:right">₹${Number(orderData.tax).toLocaleString("en-IN")}</td></tr>` : "";
+    const discLine = orderData.discount > 0 ? `<tr><td style="padding:4px 8px">Discount${discLabel ? ` (${discLabel})` : ""}</td><td style="padding:4px 8px;text-align:right;color:#ef4444">-₹${Number(orderData.discount).toLocaleString("en-IN")}</td></tr>` : "";
+    const tableLine = orderData.tableNo ? `<div style="text-align:center;font-size:11px;color:#64748b;margin-bottom:4px">Table ${orderData.tableNo}</div>` : "";
+    const storeLine = outletInfo?.name ? `<h2>${esc(outletInfo.name)}</h2>` : `<h2>FoodHubbie</h2>`;
+    const addrLine = outletInfo?.address ? `<div class="addr">${esc(outletInfo.address)}</div>` : "";
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt</title><style>body{font-family:monospace;font-size:12px;width:280px;margin:0 auto;padding:16px;color:#1e293b}h2{font-size:16px;text-align:center;margin:0 0 4px}.addr{font-size:10px;text-align:center;color:#64748b;margin-bottom:12px}hr{border:none;border-top:1px dashed #94a3b8;margin:8px 0}table{width:100%;border-collapse:collapse}.total td{padding:6px 8px;font-weight:700;font-size:14px}.footer{text-align:center;font-size:10px;color:#94a3b8;margin-top:12px}</style></head><body>
+      ${storeLine}${addrLine}
+      <div style="text-align:center;font-size:11px;color:#64748b;margin-bottom:2px">#${orderData.orderId}</div>
+      ${tableLine}
+      <div style="text-align:center;font-size:11px;color:#64748b;margin-bottom:8px">${esc(orderData.customerName)}${orderData.phone !== "Walk-in" ? ` · ${orderData.phone}` : ""}</div>
+      <hr>${itemsHtml}<hr>
       <tr><td style="padding:4px 8px">Subtotal</td><td style="padding:4px 8px;text-align:right">₹${Number(orderData.subtotal).toLocaleString("en-IN")}</td></tr>
-      <tr><td style="padding:4px 8px">Tax (5%)</td><td style="padding:4px 8px;text-align:right">₹${Number(orderData.tax).toLocaleString("en-IN")}</td></tr>
+      ${discLine}${taxLine}
       <tr class="total"><td style="padding:6px 8px">TOTAL</td><td style="padding:6px 8px;text-align:right;font-size:16px">₹${Number(orderData.total).toLocaleString("en-IN")}</td></tr>
-      <hr><div style="text-align:center;font-size:11px;color:#64748b">${orderData.paymentMethod} · ${orderData.type}</div>
+      <hr><div style="text-align:center;font-size:11px;color:#64748b">${orderData.paymentMethod} · ${orderData.paymentStatus}</div>
       <div class="footer">Thank you for your order!</div></body></html>`;
   }, [outletInfo]);
 
@@ -832,29 +844,73 @@ function POSPage({ showToast, outletInfo }) {
       const cleanPhone = custPhone ? custPhone.replace(/\D/g, "") : "";
       const isFirstOrder = cleanPhone && cleanPhone !== "Walk-in" && !Object.values(allOrders).some(o => o.phone && o.phone.replace(/\D/g, "") === cleanPhone);
       const custOrders = Object.values(allOrders).filter(o => o.phone && o.phone.replace(/\D/g, "") === cleanPhone);
+      let discSource = "";
 
+      // Manual flat discount takes highest priority
+      const hasManualFlat = Number(discFlat) > 0;
+      const hasManualPct = !hasManualFlat && discount > 0;
+
+      if (!hasManualFlat && !hasManualPct) {
+        for (const d of Object.values(discounts)) {
+          if (!d.enabled) continue;
+          if (d.startsAt && new Date(d.startsAt).getTime() > now) continue;
+          if (d.endsAt && new Date(d.endsAt).getTime() < now) continue;
+          if (d.applicableTo !== "all" && d.applicableTo !== orderType.toLowerCase()) continue;
+          if (d.minSubtotal && subtotal < Number(d.minSubtotal)) continue;
+          if (d.globalLimit && (d.stats?.usedCount || 0) >= d.globalLimit) continue;
+          if (d.perCustomerLimit && cleanPhone) {
+            const custUsed = custOrders.filter(o => o.discountApplied === d.name || o.discountId === d.id).length;
+            if (custUsed >= d.perCustomerLimit) continue;
+          }
+          if (d.type === "first_order" && !isFirstOrder) continue;
+          if (d.type === "coupon" && (!couponCode || !d.couponCode || d.couponCode.toLowerCase() !== couponCode.toLowerCase())) continue;
+          if (d.type === "bogo") continue; // BOGO handled separately
+          if (!appliedDisc || (d.priority || 0) > (appliedDisc.priority || 0)) {
+            appliedDisc = d;
+            discSource = d.type === "coupon" ? `coupon:${d.couponCode}` : d.type === "first_order" ? "firstOrder" : `auto:${d.type}`;
+          }
+        }
+      }
+
+      // Resolve coupon separately if entered and not already matched
+      if (couponCode && !appliedDisc) {
+        for (const d of Object.values(discounts)) {
+          if (!d.enabled || d.type !== "coupon") continue;
+          if (!d.couponCode || d.couponCode.toLowerCase() !== couponCode.toLowerCase()) continue;
+          if (d.startsAt && new Date(d.startsAt).getTime() > now) continue;
+          if (d.endsAt && new Date(d.endsAt).getTime() < now) continue;
+          if (d.globalLimit && (d.stats?.usedCount || 0) >= d.globalLimit) continue;
+          if (d.perCustomerLimit && cleanPhone) {
+            const custUsed = custOrders.filter(o => o.discountApplied === d.name || o.discountId === d.id).length;
+            if (custUsed >= d.perCustomerLimit) continue;
+          }
+          appliedDisc = d;
+          discSource = `coupon:${d.couponCode}`;
+          break;
+        }
+      }
+
+      // BOGO: find best BOGO discount
+      let bogoDisc = null;
       for (const d of Object.values(discounts)) {
-        if (!d.enabled) continue;
+        if (!d.enabled || d.type !== "bogo") continue;
         if (d.startsAt && new Date(d.startsAt).getTime() > now) continue;
         if (d.endsAt && new Date(d.endsAt).getTime() < now) continue;
-        if (d.applicableTo !== "all" && d.applicableTo !== orderType.toLowerCase()) continue;
-        if (d.minSubtotal && subtotal < Number(d.minSubtotal)) continue;
-        if (d.globalLimit && (d.stats?.usedCount || 0) >= d.globalLimit) continue;
-        if (d.perCustomerLimit && cleanPhone) {
-          const custUsed = custOrders.filter(o => o.discountApplied === d.name || o.discountId === d.id).length;
-          if (custUsed >= d.perCustomerLimit) continue;
-        }
-        if (d.type === "first_order" && !isFirstOrder) continue;
-        if (d.type === "coupon") continue;
-        if (d.type === "bogo") continue;
-        if (!appliedDisc || (d.priority || 0) > (appliedDisc.priority || 0)) appliedDisc = d;
+        if (!bogoDisc || (d.priority || 0) > (bogoDisc.priority || 0)) bogoDisc = d;
+      }
+      let bogoVal = 0;
+      if (bogoDisc) {
+        const cheapest = cartItems.reduce((min, [, item]) => Math.min(min, item.price), Infinity);
+        bogoVal = cheapest * Math.floor(cartItems.reduce((s, [, item]) => s + item.qty, 0) / 2);
       }
 
       if (appliedDisc) setAutoDisc(appliedDisc);
 
-      const finalDiscVal = appliedDisc
+      const autoDiscVal = appliedDisc
         ? (appliedDisc.type === "flat" ? Number(appliedDisc.value) : Math.min(subtotal * Number(appliedDisc.value) / 100, Number(appliedDisc.maxCap) || Infinity))
-        : (discount > 0 ? subtotal * discount / 100 : 0);
+        : 0;
+      const finalDiscVal = hasManualFlat ? Number(discFlat) : hasManualPct ? subtotal * discount / 100 : Math.max(autoDiscVal, bogoVal);
+      const discLabel = hasManualFlat ? `Flat ₹${discFlat}` : hasManualPct ? `${discount}%` : appliedDisc?.name || (bogoDisc?.name || "");
       const finalTotal = Math.max(0, subtotal - finalDiscVal + taxVal);
 
       // Atomic order ID via runTransaction
@@ -867,10 +923,12 @@ function POSPage({ showToast, outletInfo }) {
 
       const orderData = {
         orderId, cart:Object.values(cart), subtotal, discount:finalDiscVal, tax:taxVal, total:finalTotal,
-        paymentMethod:payMethod, customerName:custName||"Walk-in", phone:custPhone||"Walk-in",
+        paymentMethod:payMethod, paymentStatus:"Paid", customerName:custName||"Walk-in", phone:custPhone||"Walk-in",
         status: orderType === "Dine-in" ? "Confirmed" : "Placed", type:orderType, notes:orderNotes,
-        discountId: appliedDisc?.id || null, discountName: appliedDisc?.name || null,
-        outletAddress: outletInfo?.address || "", createdAt:new Date().toISOString(), outlet:_outletId
+        discountId: appliedDisc?.id || (bogoDisc?.id || null), discountName: discLabel || null, discountSource: discSource || null,
+        couponCode: couponCode || null, tableNo: tableNo || null, stockDeducted: true,
+        outletAddress: outletInfo?.address || "", createdAt:new Date().toISOString(), outlet:_outletId,
+        createdBy: getCurrentAdminActor()?.email || null
       };
 
       await set(Outlet(`orders/${orderId}`), orderData);
@@ -905,15 +963,27 @@ function POSPage({ showToast, outletInfo }) {
         await set(usageRef, { discountId: appliedDisc.id, discountName: appliedDisc.name, orderId, customer: custName || "Walk-in", total: finalTotal, usedAt: new Date().toISOString() });
       }
 
+      // Customer LTV tracking
+      if (cleanPhone && cleanPhone !== "Walk-in") {
+        try {
+          const custRef = Outlet(`customers/${cleanPhone}`);
+          await runTransaction(custRef, (cur) => {
+            const data = cur || { phone: cleanPhone, orderCount: 0, totalSpent: 0, firstOrder: cleanPhone };
+            return { ...data, name: custName || data.name || "", phone: cleanPhone, orderCount: (data.orderCount || 0) + 1, totalSpent: (data.totalSpent || 0) + finalTotal, lastSeen: new Date().toISOString(), lastOrderId: orderId, lastOrderTotal: finalTotal };
+          });
+        } catch (_) {}
+      }
+
       logAudit(_bizId, _outletId, "pos_checkout", {
         orderId, total: finalTotal, paymentMethod: payMethod, type: orderType, autoDisc: appliedDisc?.name || null,
         items: Object.values(cart).map(i => ({ id: i.id, name: i.name, size: i.size, qty: i.qty, price: i.price }))
       }, getCurrentAdminActor());
 
-      showToast(`Sale #${orderId} completed!${appliedDisc ? ` (${appliedDisc.name})` : ""}`,"success");
-      printReceipt(printReceiptHtml(orderData));
+      showToast(`Sale #${orderId} completed!${discLabel ? ` (${discLabel})` : ""}`,"success");
+      printReceipt(printReceiptHtml(orderData, discLabel));
       clearCart();
       setAutoDisc(null);
+      setCouponApplied(null);
     } catch(e) { showToast("Checkout failed: "+e.message,"error"); }
     finally { setLoading(false); }
   };
@@ -956,7 +1026,8 @@ function POSPage({ showToast, outletInfo }) {
         <div style={{ padding:12, borderBottom:"1px solid #f1f5f9" }}>
           <div style={{ fontSize:14, fontWeight:700, color:"#0f172a", marginBottom:8 }}>Walk-in Cart ({cartItems.length})</div>
           <Input placeholder="Customer phone" value={custPhone} onChange={e=>setCustPhone(e.target.value)} style={{ marginBottom:6, fontSize:12, padding:"6px 10px" }} />
-          <Input placeholder="Customer name" value={custName} onChange={e=>setCustName(e.target.value)} style={{ fontSize:12, padding:"6px 10px", marginBottom:8 }} />
+          <Input placeholder="Customer name" value={custName} onChange={e=>setCustName(e.target.value)} style={{ fontSize:12, padding:"6px 10px", marginBottom:4 }} />
+          <Input placeholder="Table number (optional)" value={tableNo} onChange={e=>setTableNo(e.target.value)} style={{ fontSize:12, padding:"6px 10px", marginBottom:8 }} />
           <div style={{ fontSize:12, fontWeight:600, color:"#64748b", marginBottom:6 }}>Order Type</div>
           <div style={{ display:"flex", gap:8, marginBottom:12 }}>
             {["Dine-in", "Takeaway"].map(t => (
@@ -994,12 +1065,34 @@ function POSPage({ showToast, outletInfo }) {
           </div>
           {autoDisc && <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6, padding:"4px 8px", borderRadius:6, background:"#fef3c7" }}>
             <span style={{ fontSize:11, fontWeight:600, color:"#92400e" }}>🎉 {autoDisc.name} applied</span>
-            <span style={{ fontSize:11, fontWeight:700, color:"#ef4444" }}>-₹{discVal.toLocaleString()}</span>
+            <span style={{ fontSize:11, fontWeight:700, color:"#ef4444" }}>-₹{totalDisc.toLocaleString()}</span>
           </div>}
+          {couponApplied && <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6, padding:"4px 8px", borderRadius:6, background:"#dbeafe" }}>
+            <span style={{ fontSize:11, fontWeight:600, color:"#1e40af" }}>🎫 Coupon "{couponCode}"</span>
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:"#ef4444" }}>-₹{couponDiscVal.toLocaleString()}</span>
+              <span onClick={() => { setCouponApplied(null); setCouponCode(""); }} style={{ fontSize:13, cursor:"pointer", color:"#ef4444", fontWeight:700 }}>×</span>
+            </div>
+          </div>}
+          <div style={{ display:"flex", gap:4, marginBottom:6, flexWrap:"wrap" }}>
+            <span style={{ fontSize:11, color:"#64748b", alignSelf:"center" }}>Flat:</span>
+            {[50, 100, 200].map(amt => (
+              <div key={amt} onClick={() => { setDiscFlat(discFlat === amt ? 0 : amt); setDiscount(0); setAutoDisc(null); }} style={{ padding:"3px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:600, color:discFlat === amt ? "white" : "#64748b", background:discFlat === amt ? ORANGE : "#f1f5f9", border:"none" }}>₹{amt}</div>
+            ))}
+            <span style={{ fontSize:11, color:"#64748b", alignSelf:"center" }}>%:</span>
+            {[5, 10, 20].map(pct => (
+              <div key={pct} onClick={() => { setDiscount(discount === pct ? 0 : pct); setDiscFlat(0); setAutoDisc(null); }} style={{ padding:"3px 10px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:600, color:discount === pct && !discFlat ? "white" : "#64748b", background:discount === pct && !discFlat ? ORANGE : "#f1f5f9", border:"none" }}>{pct}%</div>
+            ))}
+            <input type="number" placeholder="₹" value={discFlat > 0 && ![50,100,200].includes(discFlat) ? discFlat : ""} onChange={e => { const v = Number(e.target.value); setDiscFlat(v > 0 ? v : 0); setDiscount(0); setAutoDisc(null); }} min="0" style={{ width:50, padding:"3px 6px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:11, textAlign:"center" }} />
+          </div>
+          {!discFlat && discount === 0 && (
+            <div style={{ display:"flex", gap:4, marginBottom:6 }}>
+              <input placeholder="Coupon code" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} style={{ flex:1, padding:"4px 8px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:11, textTransform:"uppercase" }} />
+              <button type="button" onClick={async () => { if (!couponCode.trim()) return; setLoading(true); try { const snap = await get(Outlet("discounts")); const ds = snap.val() || {}; const found = Object.values(ds).find(d => d.enabled && d.type === "coupon" && d.couponCode && d.couponCode.toLowerCase() === couponCode.toLowerCase()); if (found) { setCouponApplied(found); showToast(`Coupon ${couponCode} applied!`,"success"); } else showToast("Invalid or expired coupon","error"); } catch(e) { showToast("Coupon check failed","error"); } finally { setLoading(false); } }} disabled={loading} style={{ padding:"4px 10px", borderRadius:6, border:"none", background:"#3b82f6", color:"white", fontSize:11, fontWeight:600, cursor:"pointer" }}>Apply</button>
+            </div>
+          )}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-            <span style={{ fontSize:11, color:"#64748b" }}>Disc %</span>
-            <input type="number" value={discount} onChange={e=>{setDiscount(Math.max(0, Math.min(100, Number(e.target.value)))); setAutoDisc(null);}} min="0" max="100" style={{ width:60, padding:"4px 8px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, textAlign:"center" }} />
-            {!autoDisc && discVal>0 && <span style={{ fontSize:11, color:"#ef4444", fontWeight:500 }}>-₹{discVal.toLocaleString()}</span>}
+            {!autoDisc && totalDisc > 0 && !couponApplied && <span style={{ fontSize:11, color:"#ef4444", fontWeight:500 }}>-₹{totalDisc.toLocaleString()}</span>}
           </div>
           {taxVal>0&&<div className="flex justify-between mb-2" style={{ display:"flex", justifyContent:"space-between", marginBottom:8, fontSize:12 }}>
             <span style={{ color:"#64748b" }}>Tax (5%)</span><span style={{ fontWeight:600 }}>₹{taxVal.toLocaleString()}</span>

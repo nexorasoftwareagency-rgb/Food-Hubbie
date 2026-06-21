@@ -166,7 +166,7 @@
     },
     {
       "target": "menu",
-      "public": "QR Ordering Feature/Menu",
+      "public": "roshani-pizza-bot/QR Ordering Feature/Menu",
       "ignore": [
         "firebase.json",
         "**/.*",
