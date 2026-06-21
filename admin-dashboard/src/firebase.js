@@ -14,6 +14,9 @@ import {
 import {
   initializeAppCheck, ReCaptchaV3Provider, ReCaptchaEnterpriseProvider
 } from "firebase/app-check";
+import {
+  getMessaging, getToken, onMessage, isSupported as isMessagingSupported
+} from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
@@ -37,6 +40,23 @@ const RECAPTCHA_SITE_KEY =
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
+
+// ── Connection watcher ──────────────────────────────────────────────
+let _fbConnected = false;
+const _connWatchers = [];
+onValue(ref(db, ".info/connected"), (snap) => {
+  const c = snap.val() === true;
+  if (c === _fbConnected) return;
+  _fbConnected = c;
+  if (c) console.log("[firebase] Connection restored.");
+  else console.warn("[firebase] Lost connection.");
+  _connWatchers.slice().forEach(fn => { try { fn(c); } catch (_) {} });
+});
+function isConnected() { return _fbConnected; }
+function onConnectionChange(fn) {
+  _connWatchers.push(fn);
+  return () => { const i = _connWatchers.indexOf(fn); if (i >= 0) _connWatchers.splice(i, 1); };
+}
 
 // App Check (reCAPTCHA v3). On localhost we install a debug token so the
 // reCAPTCHA iframe doesn't try to render in dev. Override via
@@ -112,13 +132,43 @@ export async function deleteImage(url) {
   }
 }
 
+// ── Bot status watcher ───────────────────────────────────────────────
+let _botStatusUnsub = null;
+export function startBotStatusWatcher() {
+  if (_botStatusUnsub) { try { _botStatusUnsub(); } catch (_) {} _botStatusUnsub = null; }
+  const outletId = _currentOutletId;
+  if (!outletId) return;
+  const statusRef = ref(db, `bot/${outletId}/status`);
+  try {
+    _botStatusUnsub = onValue(statusRef, (snap) => {
+      const val = snap.val() || {};
+      const seen = val.lastSeen || 0;
+      const fresh = (Date.now() - seen) < 90 * 1000;
+      const online = val.status === "Online" && fresh;
+      window._botOnline = online;
+      window._botLastSeen = seen;
+      window.dispatchEvent(new CustomEvent("botStatusChange", { detail: { online, lastSeen: seen } }));
+    }, (err) => {
+      window._botOnline = false;
+      window._botLastSeen = 0;
+      window.dispatchEvent(new CustomEvent("botStatusChange", { detail: { online: false, lastSeen: 0 } }));
+    });
+  } catch (err) {
+    window._botOnline = false;
+    window._botLastSeen = 0;
+    window.dispatchEvent(new CustomEvent("botStatusChange", { detail: { online: false, lastSeen: 0 } }));
+  }
+}
+
 export {
   db, storage,
   ref, get, child, onValue, off, update, push, set, remove, serverTimestamp,
   query, orderByChild, equalTo, runTransaction,
   onAuthStateChanged, signInWithEmailAndPassword, signOut,
   EmailAuthProvider, reauthenticateWithCredential,
-  storageRef, getDownloadURL
+  storageRef, getDownloadURL,
+  getMessaging, getToken, onMessage, isMessagingSupported,
+  isConnected, onConnectionChange
 };
 
 // Audit log helper. Writes to `businesses/{bid}/outlets/{oid}/logs/audit/{pushId}`.

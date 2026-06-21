@@ -2,6 +2,7 @@
 // Strategy: network-first for navigations and the app shell (so updates roll
 // out fast), cache-first for hashed Vite assets and the offline fallback.
 // Never caches Firebase API calls — those are auth-gated and must always be live.
+// Also handles push notifications and notification clicks for FCM.
 
 const CACHE_VERSION = "fh-admin-v3";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
@@ -75,6 +76,37 @@ self.addEventListener("fetch", (event) => {
           return res;
         })
         .catch(() => cached || new Response("", { status: 504, statusText: "offline" }));
+    })
+  );
+});
+
+// Push event — displays notification from FCM or Web Push
+self.addEventListener("push", (event) => {
+  let payload;
+  try { payload = event.data ? event.data.json() : {}; } catch (_) { payload = {}; }
+  const title = payload.notification?.title || payload.title || "FoodHubbie";
+  const options = {
+    body: payload.notification?.body || payload.body || "",
+    icon: payload.notification?.icon || "/favicon.svg",
+    badge: "/favicon.svg",
+    vibrate: [200, 100, 200],
+    data: payload.data || { url: "/" }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Notification click — focuses existing tab or opens new one
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
     })
   );
 });

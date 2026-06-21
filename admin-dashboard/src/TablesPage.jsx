@@ -21,7 +21,7 @@ function secureToken() {
   return Array.from(bytes, b => b.toString(36)).join("").slice(0, 16).toUpperCase();
 }
 
-function TablesPage({ showToast, outletInfo }) {
+function TablesPage({ showToast, outletInfo, setPage, setSelOrder }) {
   const [tables, setTables] = useState({});
   const [sessions, setSessions] = useState({});
   const [orders, setOrders] = useState({});
@@ -297,63 +297,87 @@ function TablesPage({ showToast, outletInfo }) {
     }, 150);
   }, [tables, ensureQrLib, showToast]);
 
-  const printKOT = useCallback((tableId) => {
+  const printKOT = useCallback((tableId, opts = {}) => {
+    const { isReprint, copyCount = 1 } = opts;
     const t = tables[tableId];
     const sess = sessionForTable(tableId);
     if (!t || !sess) { showToast("No active session to print", "warning"); return; }
     const orders = ordersForSession(sess.sessionId || t.currentSession);
     const allItems = [];
     orders.forEach(o => Object.values(o.items || {}).forEach(it => allItems.push(it)));
-    const itemRows = allItems.map(it => `<div class="kot-item-row"><span>${it.qty || 1} ×</span><span>${esc(it.name || "Item")}</span></div>`).join("");
-    const w = window.open("", "_blank", "width=380,height=600");
-    w.document.write(`<html><head><title>KOT — Table ${esc(t.number)}</title><style>
-      body{font-family:'Courier New',monospace;padding:16px;width:280px;}
-      h2{text-align:center;margin-bottom:2px;font-size:18px;}
-      .sub{text-align:center;font-size:11px;color:#555;margin-bottom:14px;border-bottom:1px dashed #000;padding-bottom:10px;}
-      .kot-item-row{display:flex;gap:8px;font-size:14px;padding:4px 0;border-bottom:1px dotted #ccc;}
-      .kot-item-row span:first-child{font-weight:700;min-width:30px;}
-      .foot{margin-top:14px;font-size:11px;text-align:center;color:#777;}
-      </style></head><body>
-      <h2>KOT — TABLE ${esc(t.number)}</h2>
-      <div class="sub">${new Date().toLocaleString("en-IN")} · Session ${esc(sess.sessionId || "")}</div>
-      ${itemRows || "<p>No items</p>"}
-      <div class="foot">FoodHubbie — Kitchen Copy</div>
-      <script>window.onload=function(){window.print();};</script></body></html>`);
-    w.document.close();
+    const itemRows = allItems.map(it => {
+      const sizeStr = it.size ? ` (${esc(it.size)})` : "";
+      const addonStr = it.addons && Array.isArray(it.addons) && it.addons.length
+        ? `<div class="kot-addon">+ ${it.addons.map(a => a.name || a).join(", ")}</div>`
+        : "";
+      return `<div class="kot-item-row"><span>${it.qty || 1}×</span><span>${esc(it.name || "Item")}${sizeStr}<span class="kot-price">₹${Number(it.price || 0).toFixed(2)}</span></span></div>${addonStr}`;
+    }).join("");
+    const reprintLabel = isReprint ? '<div class="reprint-label">** KOT REPRINT **</div>' : "";
+    for (let c = 0; c < copyCount; c++) {
+      const w = window.open("", "_blank", "width=380,height=600");
+      w.document.write(`<html><head><title>KOT — Table ${esc(t.number)}</title><style>
+        body{font-family:'Courier New',monospace;padding:16px;width:280px;font-size:13px;}
+        h2{text-align:center;margin-bottom:2px;font-size:18px;}
+        .sub{text-align:center;font-size:11px;color:#555;margin-bottom:14px;border-bottom:1px dashed #000;padding-bottom:10px;}
+        .kot-item-row{display:flex;gap:6px;font-size:13px;padding:5px 0;border-bottom:1px dotted #ccc;align-items:baseline;}
+        .kot-item-row span:first-child{font-weight:700;min-width:28px;}
+        .kot-item-row .kot-price{margin-left:auto;font-weight:600;}
+        .kot-addon{font-size:11px;color:#666;padding:0 0 4px 34px;}
+        .reprint-label{text-align:center;font-size:14px;font-weight:700;color:#ef4444;margin-bottom:8px;padding:6px;border:2px solid #ef4444;}
+        .foot{margin-top:14px;font-size:11px;text-align:center;color:#777;}
+        </style></head><body>
+        ${reprintLabel}
+        <h2>KOT — TABLE ${esc(t.number)}</h2>
+        <div class="sub">${new Date().toLocaleString("en-IN")} · Session ${esc(sess.sessionId || "")}</div>
+        ${itemRows || "<p>No items</p>"}
+        <div class="foot">FoodHubbie — Kitchen Copy${copyCount > 1 ? ` (${c + 1}/${copyCount})` : ""}</div>
+        <script>window.onload=function(){window.print();};</script></body></html>`);
+      w.document.close();
+    }
+    if (isReprint && copyCount > 1) showToast(`Reprinted ${copyCount} KOT copies`, "success");
+    else if (isReprint) showToast("KOT reprinted", "success");
   }, [tables, sessions, orders, showToast]);
 
-  const printBill = useCallback((tableId) => {
+  const printBill = useCallback((tableId, opts = {}) => {
+    const { isReprint, copyCount = 1 } = opts;
     const t = tables[tableId];
     const sess = sessionForTable(tableId);
     if (!t || !sess) { showToast("No active session to print bill", "warning"); return; }
     const orders = ordersForSession(sess.sessionId || t.currentSession);
     const allItems = [];
     orders.forEach(o => Object.values(o.items || {}).forEach(it => allItems.push(it)));
-    const itemRows = allItems.map(it => `<tr><td>${it.qty || 1} × ${esc(it.name || "Item")}</td><td style="text-align:right">₹${Number(it.price || 0).toFixed(2)}</td></tr>`).join("");
+    const itemRows = allItems.map(it => `<tr><td>${it.qty || 1} × ${esc(it.name || "Item")}${it.size ? ` (${esc(it.size)})` : ""}</td><td style="text-align:right">₹${Number(it.price || 0).toFixed(2)}</td></tr>`).join("");
     const total = Number(sess.grandTotal || sess.runningTotal || 0);
-    const w = window.open("", "_blank", "width=380,height=600");
-    w.document.write(`<html><head><title>Bill — Table ${esc(t.number)}</title><style>
-      body{font-family:'Courier New',monospace;padding:16px;width:280px;margin:0 auto;}
-      h2{text-align:center;margin-bottom:2px;font-size:20px;letter-spacing:1px;}
-      .sub{text-align:center;font-size:11px;color:#555;margin-bottom:4px;}
-      .divider{border-top:1px dashed #000;margin:10px 0;}
-      table{width:100%;border-collapse:collapse;font-size:13px;}
-      td{padding:4px 0;}
-      .total-row td{font-weight:700;font-size:15px;padding-top:8px;border-top:2px solid #000;}
-      .foot{text-align:center;font-size:11px;color:#777;margin-top:14px;padding-top:10px;border-top:1px dashed #000;}
-      .thank-you{text-align:center;font-size:14px;font-weight:700;margin:8px 0;}
-      </style></head><body>
-      <h2>FOODHUBBIE</h2>
-      <div class="sub">${new Date().toLocaleString("en-IN")}</div>
-      <div class="sub">Table ${esc(t.number)} · Session ${esc(sess.sessionId || "").slice(-6).toUpperCase()}</div>
-      <div class="divider"></div>
-      <table>${itemRows}</table>
-      <div class="divider"></div>
-      <table><tr class="total-row"><td>Total</td><td style="text-align:right">₹${total.toFixed(2)}</td></tr></table>
-      <div class="thank-you">Thank You!</div>
-      <div class="foot">FoodHubbie — Bill Copy</div>
-      <script>window.onload=function(){window.print();};</script></body></html>`);
-    w.document.close();
+    const reprintLabel = isReprint ? '<div class="reprint-label">** REPRINT **</div>' : "";
+    for (let c = 0; c < copyCount; c++) {
+      const w = window.open("", "_blank", "width=380,height=600");
+      w.document.write(`<html><head><title>Bill — Table ${esc(t.number)}</title><style>
+        body{font-family:'Courier New',monospace;padding:16px;width:280px;margin:0 auto;}
+        h2{text-align:center;margin-bottom:2px;font-size:20px;letter-spacing:1px;}
+        .sub{text-align:center;font-size:11px;color:#555;margin-bottom:4px;}
+        .divider{border-top:1px dashed #000;margin:10px 0;}
+        table{width:100%;border-collapse:collapse;font-size:13px;}
+        td{padding:4px 0;}
+        .total-row td{font-weight:700;font-size:15px;padding-top:8px;border-top:2px solid #000;}
+        .reprint-label{text-align:center;font-size:14px;font-weight:700;color:#ef4444;margin-bottom:8px;padding:6px;border:2px solid #ef4444;}
+        .foot{text-align:center;font-size:11px;color:#777;margin-top:14px;padding-top:10px;border-top:1px dashed #000;}
+        .thank-you{text-align:center;font-size:14px;font-weight:700;margin:8px 0;}
+        </style></head><body>
+        ${reprintLabel}
+        <h2>FOODHUBBIE</h2>
+        <div class="sub">${new Date().toLocaleString("en-IN")}</div>
+        <div class="sub">Table ${esc(t.number)} · Session ${esc(sess.sessionId || "").slice(-6).toUpperCase()}</div>
+        <div class="divider"></div>
+        <table>${itemRows}</table>
+        <div class="divider"></div>
+        <table><tr class="total-row"><td>Total</td><td style="text-align:right">₹${total.toFixed(2)}</td></tr></table>
+        <div class="thank-you">Thank You!</div>
+        <div class="foot">FoodHubbie — Bill Copy${copyCount > 1 ? ` (${c + 1}/${copyCount})` : ""}</div>
+        <script>window.onload=function(){window.print();};</script></body></html>`);
+      w.document.close();
+    }
+    if (isReprint && copyCount > 1) showToast(`Reprinted ${copyCount} bill copies`, "success");
+    else if (isReprint) showToast("Bill reprinted", "success");
   }, [tables, sessions, orders, showToast]);
 
   const exportCsv = useCallback(() => {
@@ -563,7 +587,7 @@ function TablesPage({ showToast, outletInfo }) {
                             <div style={{ fontSize:11, fontWeight:600, color:"#475569", marginBottom:6 }}>Orders ({sess.orders?.length || 0})</div>
                             {ordersForSession(sess.sessionId).map(o => (
                               <div key={o.id} style={{ padding:"8px 10px", borderRadius:8, background:"#f8fafc", marginBottom:6 }}>
-                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer" }} onClick={() => { if (setPage && setSelOrder) { setSelOrder(o); setPage("orders"); } }}>
                                   <span style={{ fontSize:11, fontWeight:600, color:"#475569" }}>#{String(o.id).slice(-6).toUpperCase()}</span>
                                   <span style={{ padding:"1px 6px", borderRadius:4, fontSize:9, fontWeight:700, background:ORD_ST[o.status]?.bg||"#f1f5f9", color:ORD_ST[o.status]?.color||"#64748b" }}>{o.status}</span>
                                 </div>
@@ -597,11 +621,19 @@ function TablesPage({ showToast, outletInfo }) {
                                 <CheckCheck size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Close Table (Paid)
                               </button>
                             )}
-                            <button type="button" onClick={() => printBill(drawerTableId)} style={{ padding:"8px 0", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                            <button type="button" onClick={() => printBill(drawerTableId)} style={{ flex:1, padding:"8px 0", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
                               <Printer size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Print Bill
                             </button>
-                            <button type="button" onClick={() => printKOT(drawerTableId)} style={{ padding:"8px 0", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                            <button type="button" onClick={() => { const n = prompt("Copies:", "1"); if (n && Number(n) > 0) printBill(drawerTableId, { isReprint: true, copyCount: Number(n) }); }} style={{ padding:"8px 0", borderRadius:8, border:"1.5px solid #fecaca", background:"#fef2f2", color:"#ef4444", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                              <Printer size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Reprint
+                            </button>
+                          </div>
+                          <div style={{ display:"flex", gap:6 }}>
+                            <button type="button" onClick={() => printKOT(drawerTableId)} style={{ flex:1, padding:"8px 0", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
                               <Printer size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Print KOT
+                            </button>
+                            <button type="button" onClick={() => { const n = prompt("Copies:", "1"); if (n && Number(n) > 0) printKOT(drawerTableId, { isReprint: true, copyCount: Number(n) }); }} style={{ padding:"8px 0", borderRadius:8, border:"1.5px solid #fecaca", background:"#fef2f2", color:"#ef4444", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                              <Printer size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Reprint
                             </button>
                             <button type="button" onClick={() => openQrModal(drawerTableId)} style={{ padding:"8px 0", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
                               <QrCode size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> View QR

@@ -11,7 +11,7 @@ import {
   WifiOff, RefreshCw, Smartphone, History
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { getAuthInstance, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref, update, push, set, remove, serverTimestamp, onValue, off, query, orderByChild, equalTo, uploadImage, runTransaction, logAudit, getCurrentAdminActor, createRiderAuthAccount, deleteRiderAuthAccount, resetRiderPassword, EmailAuthProvider, reauthenticateWithCredential } from "./firebase";
+import { getAuthInstance, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref, update, push, set, remove, serverTimestamp, onValue, off, query, orderByChild, equalTo, uploadImage, deleteImage, runTransaction, logAudit, getCurrentAdminActor, createRiderAuthAccount, deleteRiderAuthAccount, resetRiderPassword, EmailAuthProvider, reauthenticateWithCredential, getMessaging, getToken, onMessage as onFcmMessage, isMessagingSupported, isConnected, onConnectionChange, startBotStatusWatcher } from "./firebase";
 import { ORANGE, COLORS, ORD_ST, ORDER_STATUSES, SEQ, LIVE_ST, KITCHEN_ST, PIE_COLORS, HOURS_8_TO_23, DAY_KEYS, TRANSLATIONS, APP_VERSION, NAV_GROUPS, MOBILE_NAV, PAGE_TITLES, DISC_TYPES, DISC_STATUS, DISC_CHANNELS, PAYMENT_PAGE_SIZE, PAGE_GUIDES, STORAGE_KEYS, PARTNERS_REF, statusColors, stockStatus } from "./constants";
 import TablesPage from "./TablesPage";
 import { fmt, esc, csvValue, downloadCSV, orderItemsCount, orderItemsText, validateGSTIN, validateFSSAI, validateCoords, handleImageError, buildTodayRevenue, buildWeekRevenue, normalizeRider, aggregateByDay, aggregateByHour, aggregateByCategory, aggregateByDish, aggregateByCustomer, relTime, fmtDate, toLocalInput, toMs, discTypeStyle } from "./utils";
@@ -30,11 +30,20 @@ function DashboardPage({ showToast }) {
   const [orders, setOrders] = useState([]);
   const [riderCount, setRiderCount] = useState(0);
   const [tab, setTab] = useState("today");
+  const [loaded, setLoaded] = useState(false);
+  const [botOnline, setBotOnline] = useState(typeof window._botOnline !== "undefined" ? window._botOnline : true);
+
+  useEffect(() => {
+    const h = (e) => setBotOnline(e.detail.online);
+    window.addEventListener("botStatusChange", h);
+    if (window._botOnline !== undefined) setBotOnline(window._botOnline);
+    return () => window.removeEventListener("botStatusChange", h);
+  }, []);
 
   useEffect(() => {
     const r = Outlet("orders");
     if (!r) return;
-    const unsub = onValue(r, snap => { const v=snap.val(); setOrders(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); });
+    const unsub = onValue(r, snap => { const v=snap.val(); setOrders(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); setLoaded(true); });
     const r2 = ref(db,"riders");
     const unsub2 = onValue(r2, snap => { let c=0; snap.forEach(ch=>{const v=ch.val();if(v.status==="Online"||v.status==="On Delivery")c++;}); setRiderCount(c); });
     return () => { off(r,"value",unsub); off(r2,"value",unsub2); };
@@ -55,6 +64,8 @@ function DashboardPage({ showToast }) {
 
   const priority = liveOrd.sort((a,b)=>{const w={Placed:6,Confirmed:5,Preparing:4,Cooked:3,Ready:2,"Out for Delivery":1};return(w[b.status]||0)-(w[a.status]||0);}).slice(0,6);
 
+  if (!loaded) return <SkeletonPage kpi={4} table={4} cards={0} />;
+
   return (
     <div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px,1fr))", gap:16, marginBottom:24 }}>
@@ -62,6 +73,7 @@ function DashboardPage({ showToast }) {
         <StatCard label="Pending" value={todayOrd.filter(o=>o.status==="Placed").length} icon={Clock} color="#f59e0b" bg="rgba(245,158,11,0.1)" sub="Awaiting action" />
         <StatCard label="In Progress" value={pending} icon={TrendingUp} color="#8b5cf6" bg="rgba(139,92,246,0.1)" sub="Being prepared" />
         <StatCard label="Active Riders" value={riderCount} icon={Bike} color={ORANGE} bg="rgba(232, 73, 8,0.1)" sub="On the road" />
+        <StatCard label="Bot Status" value={botOnline ? "Online" : "Offline"} icon={botOnline ? CheckCircle : XCircle} color={botOnline ? "#22c55e" : "#ef4444"} bg={botOnline ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)"} sub={botOnline ? "Responding" : "Unreachable"} />
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:24 }}>
         <GlassCard style={{ padding:20 }}>
@@ -439,10 +451,12 @@ function OrdersPage({ showToast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // CATEGORIES PAGE (CRUD with addons)
 // ═══════════════════════════════════════════════════════════════════════════
-function CategoriesPage({ showToast }) {
+function CategoriesPage({ showToast, requireAdminReauth }) {
   const [cats, setCats] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [name, setName] = useState(""); const [order, setOrder] = useState(0); const [img, setImg] = useState("");
+  const [catAddonList, setCatAddonList] = useState([]);
 
   useEffect(() => {
     const r = Outlet("categories");
@@ -450,14 +464,30 @@ function CategoriesPage({ showToast }) {
     return onValue(r, snap => { const v=snap.val(); setCats(v?Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(a.order||0)-(b.order||0)):[]); });
   }, []);
 
+  const openForm = (cat) => {
+    if (cat) {
+      setEditId(cat.id); setName(cat.name||""); setOrder(cat.order||0); setImg(cat.image||"");
+      setCatAddonList(cat.addons ? Object.entries(cat.addons).map(([n,p])=>({name:n,price:Number(p)})) : [{name:"",price:0}]);
+    } else {
+      setEditId(null); setName(""); setOrder(0); setImg(""); setCatAddonList([]);
+    }
+    setShowForm(true);
+  };
+
   const handleSave = async () => {
     if (!name.trim()) return showToast("Enter category name","warning");
-    try { await push(Outlet("categories"), { name:name.trim(), image:img, order:Number(order), addons:null }); setName(""); setOrder(0); setImg(""); setShowForm(false); showToast("Category added","success"); }
-    catch(e) { showToast("Failed: "+e.message,"error"); }
+    const addons = catAddonList.filter(a=>a.name.trim()).reduce((a,{name:n,price:p})=>({...a,[n.trim()]:Number(p)}),{});
+    const data = { name:name.trim(), image:img, order:Number(order), addons: Object.keys(addons).length > 0 ? addons : null };
+    try {
+      if (editId) { await update(Outlet(`categories/${editId}`), data); showToast("Category updated","success"); }
+      else { await push(Outlet("categories"), data); showToast("Category added","success"); }
+      setShowForm(false);
+    } catch(e) { showToast("Failed: "+e.message,"error"); }
   };
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this category and associated dishes?")) return;
+    if (requireAdminReauth && !(await requireAdminReauth())) return;
     try {
       await remove(Outlet(`categories/${id}`));
       logAudit(_bizId, _outletId, "delete_category", { categoryId: id }, getCurrentAdminActor());
@@ -466,11 +496,37 @@ function CategoriesPage({ showToast }) {
     catch(e) { showToast("Delete failed","error"); }
   };
 
+  const migrateAddons = async () => {
+    if (!confirm("Move all dish-level addons to their parent categories?")) return;
+    try {
+      const [dishesSnap, catsSnap] = await Promise.all([get(Outlet("dishes")), get(Outlet("categories"))]);
+      const dishes = dishesSnap.val() || {}; const catsData = catsSnap.val() || {};
+      const catAddons = {};
+      Object.values(dishes).forEach(d => {
+        if (d.category && d.addons) {
+          if (!catAddons[d.category]) catAddons[d.category] = {};
+          Object.entries(d.addons).forEach(([n, p]) => { catAddons[d.category][n] = p; });
+        }
+      });
+      const updates = {};
+      Object.entries(catsData).forEach(([catId, c]) => {
+        if (catAddons[c.name]) updates[`categories/${catId}/addons`] = catAddons[c.name];
+      });
+      if (Object.keys(updates).length > 0) {
+        await update(ref(db, `businesses/${_bizId}/outlets/${_outletId}`), updates);
+        showToast("Addons migrated to categories!","success");
+      } else showToast("No addons to migrate","info");
+    } catch(e) { showToast("Migrate failed: "+e.message,"error"); }
+  };
+
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", margin:0 }}>Categories ({cats.length})</h3>
-        <BtnPrimary onClick={()=>setShowForm(true)}><Plus size={14} /> Add Category</BtnPrimary>
+        <div style={{ display:"flex", gap:8 }}>
+          <BtnSecondary onClick={migrateAddons} style={{ padding:"6px 12px", fontSize:11 }}>Migrate Addons</BtnSecondary>
+          <BtnPrimary onClick={()=>openForm(null)}><Plus size={14} /> Add Category</BtnPrimary>
+        </div>
       </div>
       <GlassCard>
         {cats.map(c => (
@@ -480,18 +536,32 @@ function CategoriesPage({ showToast }) {
               <div style={{ fontSize:13, fontWeight:600, color:"#0f172a" }}>{c.name}</div>
               <div style={{ fontSize:11, color:"#94a3b8" }}>Serial: {c.order||0}{c.addons?` · ${Object.keys(c.addons).length} addons`:""}</div>
             </div>
+            <Edit3 size={14} color="#3b82f6" style={{ cursor:"pointer" }} onClick={()=>openForm(c)} />
             <Trash2 size={14} color="#ef4444" style={{ cursor:"pointer" }} onClick={()=>handleDelete(c.id)} />
           </div>
         ))}
         {cats.length===0&&<div style={{ textAlign:"center", padding:40, color:"#94a3b8", fontSize:13 }}>No categories yet</div>}
       </GlassCard>
       <Modal open={showForm} onClose={()=>setShowForm(false)}>
-        <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", marginBottom:16 }}>Add Category</h3>
+        <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", marginBottom:16 }}>{editId?"Edit Category":"Add Category"}</h3>
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           <Input placeholder="Category name" value={name} onChange={e=>setName(e.target.value)} />
           <Input placeholder="Image URL" value={img} onChange={e=>setImg(e.target.value)} />
           <Input type="number" placeholder="Display order (0,1,2...)" value={order} onChange={e=>setOrder(e.target.value)} />
-          <BtnPrimary onClick={handleSave} style={{ width:"100%" }}>Save Category</BtnPrimary>
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <span style={{ fontSize:12, fontWeight:600, color:"#475569" }}>Category Addons</span>
+              <button type="button" onClick={()=>setCatAddonList([...catAddonList,{name:"",price:0}])} style={{ fontSize:11, color:ORANGE, background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>+ Add Addon</button>
+            </div>
+            {catAddonList.map((a,i)=>(
+              <div key={i} style={{ display:"flex", gap:6, marginBottom:6, alignItems:"center" }}>
+                <input placeholder="Addon name" value={a.name} onChange={e=>{const c=[...catAddonList];c[i]={...c[i],name:e.target.value};setCatAddonList(c);}} style={{ flex:1, padding:"6px 8px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, outline:"none" }} />
+                <input type="number" placeholder="Price" value={a.price} onChange={e=>{const c=[...catAddonList];c[i]={...c[i],price:Number(e.target.value)};setCatAddonList(c);}} style={{ width:80, padding:"6px 8px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, outline:"none" }} />
+                {catAddonList.length>1&&<div onClick={()=>setCatAddonList(catAddonList.filter((_,j)=>j!==i))} style={{ cursor:"pointer", color:"#ef4444", fontSize:16, lineHeight:1, padding:"0 2px" }}>✕</div>}
+              </div>
+            ))}
+          </div>
+          <BtnPrimary onClick={handleSave} style={{ width:"100%" }}>{editId?"Update":"Save"} Category</BtnPrimary>
         </div>
       </Modal>
     </div>
@@ -501,23 +571,33 @@ function CategoriesPage({ showToast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // MENU PAGE (CRUD with sizes, addons)
 // ═══════════════════════════════════════════════════════════════════════════
-function MenuPage({ showToast }) {
+function MenuPage({ showToast, requireAdminReauth }) {
   const [dishes, setDishes] = useState([]);
   const [cats, setCats] = useState([]);
+  const [menuLoaded, setMenuLoaded] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [f, setF] = useState({ name:"", category:"", price:0, image:"", order:0, stock:0, threshold:5, sizes:"", addons:"" });
+  const [f, setF] = useState({ name:"", category:"", price:0, image:"", order:0, stock:0, threshold:5 });
   const [sizeList, setSizeList] = useState([]);
+  const [addonList, setAddonList] = useState([]);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [search, setSearch] = useState("");
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkAction, setBulkAction] = useState("price_flat");
+  const [bulkValue, setBulkValue] = useState("");
+  const imgRef = useRef(null);
 
   useEffect(() => {
+    let loadCount = 0;
     const r = Outlet("dishes");
     const r2 = Outlet("categories");
     if (!r||!r2) return;
     const u1 = onValue(r, snap => { 
       const v=snap.val(); 
       const dishesData = v?Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(a.order||0)-(b.order||0)):[];
-      // Auto-migrate old stock:boolean to stock:numeric
       dishesData.forEach(d => {
         if (typeof d.stock === "boolean") {
           update(Outlet(`dishes/${d.id}`), { stock: 0, threshold: 5 });
@@ -528,9 +608,10 @@ function MenuPage({ showToast }) {
         }
         d.threshold = Number(d.threshold) || 5;
       });
-      setDishes(dishesData); 
+      setDishes(dishesData);
+      loadCount++; if (loadCount >= 2) setMenuLoaded(true);
     });
-    const u2 = onValue(r2, snap => { const v=snap.val(); setCats(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); });
+    const u2 = onValue(r2, snap => { const v=snap.val(); setCats(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); loadCount++; if (loadCount >= 2) setMenuLoaded(true); });
     return () => { off(r,"value",u1); off(r2,"value",u2); };
   }, []);
 
@@ -541,8 +622,10 @@ function MenuPage({ showToast }) {
   }, [dishes, search]);
 
   const openForm = (d) => {
-    if (d) { setEditId(d.id); setF({ name:d.name||"", category:d.category||"", price:d.price||0, image:d.image||"", order:d.order||0, stock:typeof d.stock==="number"?d.stock:0, threshold:Number(d.threshold)||5, sizes:d.sizes?JSON.stringify(d.sizes):"", addons:d.addons?JSON.stringify(d.addons):"" }); setSizeList(d.sizes?Object.entries(d.sizes).map(([n,p])=>({name:n,price:Number(p)})):[{name:"Regular",price:d.price||0}]); }
-    else { setEditId(null); setF({ name:"", category:cats[0]?.name||"", price:0, image:"", order:0, stock:0, threshold:5, sizes:"", addons:"" }); setSizeList([{name:"Regular",price:0}]); }
+    setImageFile(null);
+    setImagePreview(null);
+    if (d) { setEditId(d.id); setF({ name:d.name||"", category:d.category||"", price:d.price||0, image:d.image||"", order:d.order||0, stock:typeof d.stock==="number"?d.stock:0, threshold:Number(d.threshold)||5 }); setSizeList(d.sizes?Object.entries(d.sizes).map(([n,p])=>({name:n,price:Number(p)})):[{name:"Regular",price:d.price||0}]); setAddonList(d.addons?Object.entries(d.addons).map(([n,p])=>({name:n,price:Number(p)})):[]); setImagePreview(d.image||null); }
+    else { setEditId(null); setF({ name:"", category:cats[0]?.name||"", price:0, image:"", order:0, stock:0, threshold:5 }); setSizeList([{name:"Regular",price:0}]); setAddonList([]); setImagePreview(null); }
     setShowForm(true);
   };
 
@@ -550,9 +633,14 @@ function MenuPage({ showToast }) {
     if (!f.name.trim()||!f.category) return showToast("Fill name & category","warning");
     let sizes = null, addons = null;
     if (sizeList.some(s=>s.name.trim())) sizes = sizeList.filter(s=>s.name.trim()).reduce((a,{name:n,price:p})=>({...a,[n.trim()]:Number(p)}),{});
-    try { if (f.addons.trim()) addons = JSON.parse(f.addons); } catch(e) { return showToast("Invalid addons JSON","error"); }
-    const data = { name:f.name.trim(), category:f.category, price:Number(f.price), image:f.image, order:Number(f.order), stock:Number(f.stock), threshold:Number(f.threshold), sizes, addons };
+    if (addonList.some(s=>s.name.trim())) addons = addonList.filter(s=>s.name.trim()).reduce((a,{name:n,price:p})=>({...a,[n.trim()]:Number(p)}),{});
+    let image = f.image;
     try {
+      if (imageFile) {
+        image = await uploadImage(imageFile, `dishes/${Date.now()}_${imageFile.name}`);
+        if (editId && f.image) deleteImage(f.image).catch(()=>{});
+      }
+      const data = { name:f.name.trim(), category:f.category, price:Number(f.price), image, order:Number(f.order), stock:Number(f.stock), threshold:Number(f.threshold), sizes, addons };
       if (editId) { await update(Outlet(`dishes/${editId}`), data); showToast("Dish updated","success"); }
       else { await push(Outlet("dishes"), data); showToast("Dish added","success"); }
       setShowForm(false);
@@ -561,6 +649,7 @@ function MenuPage({ showToast }) {
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this dish?")) return;
+    if (requireAdminReauth && !(await requireAdminReauth())) return;
     try {
       await remove(Outlet(`dishes/${id}`));
       logAudit(_bizId, _outletId, "delete_dish", { dishId: id }, getCurrentAdminActor());
@@ -569,7 +658,7 @@ function MenuPage({ showToast }) {
   };
 
 
-  return (
+  if (!menuLoaded) return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, gap:12 }}>
         <div style={{ flex:1, position:"relative", maxWidth:300 }}>
@@ -578,9 +667,47 @@ function MenuPage({ showToast }) {
         </div>
         <BtnPrimary onClick={()=>openForm(null)}><Plus size={14} /> Add Dish</BtnPrimary>
       </div>
+      <SkeletonGrid cards={6} />
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, gap:12 }}>
+        <div style={{ flex:1, position:"relative", maxWidth:300 }}>
+          <Search size={14} style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#94a3b8" }} />
+          <input placeholder="Search dishes..." value={search} onChange={e=>setSearch(e.target.value)} style={{ padding:"8px 10px 8px 32px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:13, width:"100%", background:"#f8fafc", outline:"none" }} />
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <button type="button" onClick={() => { setBulkMode(!bulkMode); if (bulkMode) setBulkSelected(new Set()); }} style={{ padding:"8px 14px", borderRadius:8, border:bulkMode?"2px solid #3b82f6":"1.5px solid #e2e8f0", background:bulkMode?"#eff6ff":"white", color:bulkMode?"#3b82f6":"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+            {bulkMode ? `Done (${bulkSelected.size})` : "Bulk Edit"}
+          </button>
+          <BtnPrimary onClick={()=>openForm(null)}><Plus size={14} /> Add Dish</BtnPrimary>
+        </div>
+      </div>
+      {bulkMode && bulkSelected.size > 0 && (
+        <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:12, padding:"8px 12px", borderRadius:10, background:"#eff6ff", border:"1px solid #bfdbfe", fontSize:12 }}>
+          <span style={{ fontWeight:600, color:"#3b82f6" }}>{bulkSelected.size} selected</span>
+          <button onClick={() => setBulkSelected(new Set(filtered.map(d => d.id)))} style={{ padding:"3px 8px", borderRadius:4, border:"none", background:"#3b82f6", color:"white", fontSize:10, fontWeight:600, cursor:"pointer" }}>Select All</button>
+          <button onClick={() => setBulkSelected(new Set())} style={{ padding:"3px 8px", borderRadius:4, border:"1px solid #e2e8f0", background:"white", color:"#64748b", fontSize:10, fontWeight:600, cursor:"pointer" }}>Clear</button>
+          <select value={bulkAction} onChange={e => setBulkAction(e.target.value)} style={{ padding:"4px 6px", borderRadius:4, border:"1px solid #e2e8f0", fontSize:11 }}>
+            <option value="price_flat">Set Price (flat)</option>
+            <option value="price_pct">Adjust Price (%)</option>
+            <option value="stock">Set Stock</option>
+            <option value="category">Set Category</option>
+          </select>
+          <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder={bulkAction === "category" ? "Category name" : bulkAction === "price_pct" ? "+/- %" : "Value"} style={{ width:100, padding:"4px 6px", borderRadius:4, border:"1px solid #e2e8f0", fontSize:11 }} />
+          <button onClick={() => { if (bulkValue === "") return showToast("Enter a value","warning"); setShowBulkModal(true); }} style={{ padding:"4px 12px", borderRadius:4, border:"none", background:"#22c55e", color:"white", fontSize:11, fontWeight:600, cursor:"pointer" }}>Apply</button>
+        </div>
+      )}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px,1fr))", gap:16 }}>
         {filtered.map(d => (
-          <GlassCard key={d.id} style={{ overflow:"hidden" }}>
+          <GlassCard key={d.id} style={{ overflow:"hidden", position:"relative" }}>
+            {bulkMode && (
+              <div style={{ position:"absolute", top:8, left:8, zIndex:10 }}>
+                <input type="checkbox" checked={bulkSelected.has(d.id)} onChange={e => { const s = new Set(bulkSelected); e.target.checked ? s.add(d.id) : s.delete(d.id); setBulkSelected(s); }} style={{ width:18, height:18, cursor:"pointer", accentColor:"#3b82f6" }} />
+              </div>
+            )}
             <div style={{ position:"relative" }}>
               <img src={d.image||"https://placehold.co/240/orange/white?text=Dish"} alt="" style={{ width:"100%", height:150, objectFit:"cover" }} />
               <div style={{ position:"absolute", top:8, right:8, padding:"4px 10px", borderRadius:6, fontSize:11, fontWeight:600, background:d.stock===0?"rgba(239,68,68,0.9)":d.stock<=(d.threshold||5)?"rgba(251,146,60,0.9)":"rgba(34,197,94,0.9)", color:"white" }}>
@@ -617,7 +744,10 @@ function MenuPage({ showToast }) {
             {cats.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
           </Select>
           <Input type="number" placeholder="Base price" value={f.price} onChange={e=>setF({...f,price:e.target.value})} />
-          <Input placeholder="Image URL" value={f.image} onChange={e=>setF({...f,image:e.target.value})} />
+          <div onClick={()=>imgRef.current?.click()} style={{ border:"1.5px dashed #e2e8f0", borderRadius:10, padding:8, cursor:"pointer", textAlign:"center", minHeight:80, display:"flex", alignItems:"center", justifyContent:"center", background:"#fafafa" }}>
+            {imagePreview ? <img src={imagePreview} alt="preview" style={{ maxHeight:80, borderRadius:6 }} /> : <span style={{ fontSize:12, color:"#94a3b8" }}>Click to upload image</span>}
+            <input ref={imgRef} type="file" accept="image/*" hidden onChange={e=>{const file=e.target.files[0];if(file){setImageFile(file);setImagePreview(URL.createObjectURL(file));}}} />
+          </div>
            <Input type="number" placeholder="Display order" value={f.order} onChange={e=>setF({...f,order:e.target.value})} />
            <Input type="number" placeholder="Stock quantity" value={f.stock} onChange={e=>setF({...f,stock:e.target.value})} min="0" />
            <Input type="number" placeholder="Low stock threshold" value={f.threshold} onChange={e=>setF({...f,threshold:e.target.value})} min="1" />
@@ -634,12 +764,158 @@ function MenuPage({ showToast }) {
               </div>
             ))}
           </div>
+          <div style={{ gridColumn:"1/-1" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <span style={{ fontSize:12, fontWeight:600, color:"#475569" }}>Addons</span>
+              <button type="button" onClick={()=>setAddonList([...addonList,{name:"",price:0}])} style={{ fontSize:11, color:ORANGE, background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>+ Add Addon</button>
+            </div>
+            {addonList.map((a,i)=>(
+              <div key={i} style={{ display:"flex", gap:6, marginBottom:6, alignItems:"center" }}>
+                <input placeholder="Addon name" value={a.name} onChange={e=>{const c=[...addonList];c[i]={...c[i],name:e.target.value};setAddonList(c);}} style={{ flex:1, padding:"6px 8px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, outline:"none" }} />
+                <input type="number" placeholder="Price" value={a.price} onChange={e=>{const c=[...addonList];c[i]={...c[i],price:Number(e.target.value)};setAddonList(c);}} style={{ width:80, padding:"6px 8px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, outline:"none" }} />
+                {addonList.length>1&&<div onClick={()=>setAddonList(addonList.filter((_,j)=>j!==i))} style={{ cursor:"pointer", color:"#ef4444", fontSize:16, lineHeight:1, padding:"0 2px" }}>✕</div>}
+              </div>
+            ))}
+          </div>
         </div>
-        <Input placeholder='Addons JSON: {"Extra Cheese":30}' value={f.addons} onChange={e=>setF({...f,addons:e.target.value})} style={{ marginTop:12 }} />
         <BtnPrimary onClick={handleSave} style={{ width:"100%", marginTop:16 }}>{editId?"Update":"Save"} Dish</BtnPrimary>
+      </Modal>
+
+      <Modal open={showBulkModal} onClose={()=>setShowBulkModal(false)}>
+        <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", marginBottom:12 }}>Confirm Bulk Update</h3>
+        <div style={{ fontSize:13, color:"#475569", marginBottom:16 }}>
+          Apply <strong>{bulkAction === "price_flat" ? "new price" : bulkAction === "price_pct" ? "price adjustment" : bulkAction}</strong> = <strong>{bulkValue}</strong> to <strong>{bulkSelected.size}</strong> dish{bulkSelected.size > 1 ? "es" : ""}?
+        </div>
+        <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+          <button onClick={() => setShowBulkModal(false)} style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#64748b", fontSize:12, fontWeight:600, cursor:"pointer" }}>Cancel</button>
+          <button onClick={async () => {
+            setShowBulkModal(false);
+            const ids = [...bulkSelected];
+            let success = 0, fail = 0;
+            for (const id of ids) {
+              try {
+                const dish = dishes.find(d => d.id === id);
+                if (!dish) continue;
+                const updates = {};
+                if (bulkAction === "price_flat") {
+                  updates.price = Number(bulkValue);
+                  updates.sizes = null;
+                } else if (bulkAction === "price_pct") {
+                  const pct = Number(bulkValue);
+                  if (dish.sizes) {
+                    const newSizes = {};
+                    Object.entries(dish.sizes).forEach(([sz, pr]) => { newSizes[sz] = Math.max(0, Math.round(Number(pr) * (1 + pct / 100))); });
+                    updates.sizes = newSizes;
+                  } else {
+                    updates.price = Math.max(0, Math.round(Number(dish.price) * (1 + pct / 100)));
+                  }
+                } else if (bulkAction === "stock") {
+                  updates.stock = Math.max(0, Number(bulkValue));
+                } else if (bulkAction === "category") {
+                  updates.category = bulkValue.trim();
+                }
+                if (Object.keys(updates).length) {
+                  await update(Outlet(`dishes/${id}`), updates);
+                  success++;
+                }
+              } catch (e) { fail++; }
+            }
+            showToast(`Updated ${success} dish${success !== 1 ? "es" : ""}${fail ? `, ${fail} failed` : ""}`, fail ? "warning" : "success");
+            setBulkSelected(new Set());
+          }} style={{ padding:"8px 16px", borderRadius:8, border:"none", background:"#22c55e", color:"white", fontSize:12, fontWeight:600, cursor:"pointer" }}>Apply to All</button>
+        </div>
       </Modal>
     </div>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DISCOUNT EVALUATOR (shared by POS checkout + reactive preview)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DISC_CACHE_TTL = 30000;
+let _discCache = { data: null, fetchedAt: 0 };
+
+async function fetchDiscounts() {
+  const now = Date.now();
+  if (_discCache.data && now - _discCache.fetchedAt < DISC_CACHE_TTL) return _discCache.data;
+  const snap = await get(Outlet("discounts"));
+  _discCache.data = snap.val() || {};
+  _discCache.fetchedAt = now;
+  return _discCache.data;
+}
+
+function cartHasCategory(cart, categoryIds) {
+  if (!Array.isArray(cart) || !Array.isArray(categoryIds) || !categoryIds.length) return false;
+  return cart.some(([, item]) => categoryIds.includes(item.category));
+}
+
+function discountAmount(d, subtotal) {
+  let amt = d.type === "percentage" ? subtotal * Number(d.value) / 100 : Number(d.value) || 0;
+  if (d.maxCap && amt > Number(d.maxCap)) amt = Number(d.maxCap);
+  return Math.round(amt);
+}
+
+const DISC_PRIORITY = { first_order: 4, coupon: 3, category: 2, percentage: 1, flat: 1, bogo: 0 };
+
+function evaluateDiscounts(discounts, ctx) {
+  const { subtotal, cart, customer, couponCode, orderType, now = Date.now() } = ctx;
+  if (!subtotal || subtotal <= 0 || !discounts) return null;
+
+  const list = Object.entries(discounts)
+    .filter(([, d]) => d && d.type && d.value != null)
+    .map(([id, d]) => ({ id, ...d }));
+
+  const candidates = list.filter(d =>
+    d.enabled !== false
+    && now >= (d.startsAt || 0)
+    && (!d.endsAt || now <= d.endsAt)
+    && (!d.minSubtotal || subtotal >= Number(d.minSubtotal))
+    && (!d.globalLimit || (d.stats?.usedCount || 0) < d.globalLimit)
+    && (!d.applicableTo || d.applicableTo === "all" || d.applicableTo === orderType?.toLowerCase())
+  );
+
+  const applicable = candidates.filter(d => {
+    if (d.type === "percentage" || d.type === "flat") return true;
+    if (d.type === "first_order") return !customer?.firstOrderDiscountUsed;
+    if (d.type === "category") return cartHasCategory(cart, d.categoryIds);
+    if (d.type === "coupon") return !!couponCode && String(couponCode).toLowerCase() === String(d.couponCode || "").toLowerCase();
+    return false;
+  });
+
+  if (!applicable.length) return null;
+
+  const byGroup = new Map();
+  for (const d of applicable) {
+    const g = d.exclusiveGroup || "__none__";
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g).push(d);
+  }
+
+  const pickBest = (group) => group.slice().sort((a, b) => {
+    const pa = DISC_PRIORITY[a.type] || 0, pb = DISC_PRIORITY[b.type] || 0;
+    if (pa !== pb) return pb - pa;
+    return discountAmount(b, subtotal) - discountAmount(a, subtotal);
+  })[0];
+
+  const bestPerGroup = [...byGroup.values()].map(g => pickBest(g));
+  const exclusive = bestPerGroup.filter(d => !d.stackable);
+  const stackable = bestPerGroup.filter(d => d.stackable);
+  const chosen = exclusive.length > 0 ? [pickBest(exclusive, subtotal), ...stackable] : bestPerGroup;
+
+  let total = 0;
+  for (const d of chosen) total += discountAmount(d, subtotal);
+  total = Math.min(total, subtotal);
+  if (total <= 0) return null;
+
+  const primary = chosen[0];
+  return {
+    discount: primary,
+    allApplied: chosen,
+    amount: total,
+    label: primary.name || (primary.type === "first_order" ? "New Customer Discount" : "Discount"),
+    source: primary.type === "coupon" ? `coupon:${primary.couponCode}` : primary.type === "first_order" ? "firstOrder" : `auto:${primary.type}`,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -668,14 +944,80 @@ function POSPage({ showToast, outletInfo }) {
   const [editKey, setEditKey] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showMobileCart, setShowMobileCart] = useState(false);
+  const [posDiscounts, setPosDiscounts] = useState(null);
+  const [posAllOrders, setPosAllOrders] = useState([]);
+  const [posLoaded, setPosLoaded] = useState(false);
+  const [posOffline, setPosOffline] = useState(false);
+  const [deliverySettings, setDeliverySettings] = useState(null);
+  const [deliveryDist, setDeliveryDist] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState(0);
 
   useEffect(() => {
-    const r = Outlet("dishes"); const r2 = Outlet("categories");
+    const r = Outlet("dishes"); const r2 = Outlet("categories"); const r3 = Outlet("discounts"); const r4 = Outlet("orders");
     if (!r||!r2) return;
-     const u1 = onValue(r, snap => { const v=snap.val(); setDishes(v?Object.keys(v).map(k=>({id:k,...v[k]})).filter(d=>(d.stock||0)>0):[]); });
+    if (!isConnected()) { setPosOffline(true); return; }
+    const u1 = onValue(r, snap => { const v=snap.val(); setDishes(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); setPosLoaded(true); });
     const u2 = onValue(r2, snap => { const v=snap.val(); setCats(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); });
-    return () => { off(r,"value",u1); off(r2,"value",u2); };
+    const u3 = r3 ? onValue(r3, snap => setPosDiscounts(snap.val() || {})) : null;
+    const u4 = r4 ? onValue(r4, snap => { const v=snap.val(); setPosAllOrders(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); }) : null;
+    return () => { off(r,"value",u1); off(r2,"value",u2); if (u3) off(r3,"value",u3); if (u4) off(r4,"value",u4); };
   }, []);
+
+  // Load delivery settings for fee calculation
+  useEffect(() => {
+    const r = Outlet("settings/Delivery");
+    if (!r) return;
+    const u = onValue(r, snap => setDeliverySettings(snap.val() || {}));
+    return () => off(r, "value", u);
+  }, []);
+
+  // Recalculate delivery fee when distance or slabs change
+  useEffect(() => {
+    const dist = Number(deliveryDist);
+    if (orderType !== "Delivery" || !dist || dist <= 0 || !deliverySettings?.slabs) {
+      setDeliveryFee(0);
+      return;
+    }
+    const slabs = deliverySettings.slabs;
+    // Find the highest slab where distance >= km threshold
+    let fee = 0;
+    for (const s of slabs) {
+      if (dist >= Number(s.km)) fee = Number(s.fee) || 0;
+    }
+    setDeliveryFee(fee);
+  }, [deliveryDist, deliverySettings, orderType]);
+
+  // Auto-retry POS load on connection restore
+  useEffect(() => {
+    if (!posOffline) return;
+    const unsub = onConnectionChange((online) => {
+      if (!online) return;
+      setPosOffline(false);
+      setPosLoaded(false);
+      const r = Outlet("dishes"); const r2 = Outlet("categories"); const r3 = Outlet("discounts"); const r4 = Outlet("orders");
+      if (!r||!r2) return;
+      const u1 = onValue(r, snap => { const v=snap.val(); setDishes(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); setPosLoaded(true); });
+      const u2 = onValue(r2, snap => { const v=snap.val(); setCats(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); });
+      const u3 = r3 ? onValue(r3, snap => setPosDiscounts(snap.val() || {})) : null;
+      const u4 = r4 ? onValue(r4, snap => { const v=snap.val(); setPosAllOrders(v?Object.keys(v).map(k=>({id:k,...v[k]})):[]); }) : null;
+      unsub();
+    });
+    return unsub;
+  }, [posOffline]);
+
+  // Reactive auto-discount evaluation on cart/customer/coupon change
+  useEffect(() => {
+    const hasManual = Number(discFlat) > 0 || discount > 0 || couponApplied;
+    if (!posDiscounts || !cartItems.length || hasManual) { setAutoDisc(null); return; }
+    const cleanPhone = custPhone ? custPhone.replace(/\D/g, "") : "";
+    const hasPrevOrder = cleanPhone && cleanPhone !== "Walk-in" && posAllOrders.some(o => o.phone && o.phone.replace(/\D/g, "") === cleanPhone);
+    const customer = cleanPhone && cleanPhone !== "Walk-in" ? { firstOrderDiscountUsed: hasPrevOrder } : null;
+    const result = evaluateDiscounts(posDiscounts, {
+      subtotal: cartItems.reduce((s,[_,i])=>s+i.price*i.qty,0), cart: cartItems,
+      customer, couponCode: couponCode || null, orderType, now: Date.now(),
+    });
+    setAutoDisc(result);
+  }, [cartItems, custPhone, couponCode, orderType, posDiscounts, discFlat, discount, couponApplied]);
 
   const addToCart = () => {
     if (!selModal||!selSize) return showToast("Select a size first","warning");
@@ -688,7 +1030,7 @@ function POSPage({ showToast, outletInfo }) {
       let next = {...prev};
       if (editKey) delete next[editKey];
       if (next[key]) next[key] = {...next[key], qty: next[key].qty + selQty};
-      else next[key] = { id:selModal.id, name:selModal.name, size:selSize, price:pricePerItem, qty:selQty, addons:Object.entries(selAddons).map(([n,p])=>({name:n,price:Number(p)})) };
+      else next[key] = { id:selModal.id, name:selModal.name, category:selModal.category, size:selSize, price:pricePerItem, qty:selQty, addons:Object.entries(selAddons).map(([n,p])=>({name:n,price:Number(p)})) };
       return next;
     });
     setEditKey(null);
@@ -757,11 +1099,11 @@ function POSPage({ showToast, outletInfo }) {
   const cartItems = Object.entries(cart);
   const subtotal = cartItems.reduce((s,[_,i])=>s+i.price*i.qty,0);
   const manualDiscVal = Number(discFlat) > 0 ? Number(discFlat) : (discount > 0 ? subtotal * discount / 100 : 0);
-  const discVal = autoDisc ? (autoDisc.type === "flat" ? autoDisc.value : Math.min(subtotal * autoDisc.value / 100, autoDisc.maxCap || Infinity)) : manualDiscVal;
+  const discVal = autoDisc?.amount || manualDiscVal;
   const couponDiscVal = couponApplied ? (couponApplied.type === "flat" ? couponApplied.value : Math.min(subtotal * Number(couponApplied.value) / 100, Number(couponApplied.maxCap) || Infinity)) : 0;
   const totalDisc = discVal + couponDiscVal;
   const taxVal = (subtotal - totalDisc) * 0.05;
-  const total = Math.max(0, subtotal - totalDisc + taxVal);
+  const total = Math.max(0, subtotal - totalDisc + taxVal + (orderType === "Delivery" ? deliveryFee : 0));
 
   const printReceiptHtml = useCallback((orderData, discLabel) => {
     const itemsHtml = Object.values(orderData.cart).map(i =>
@@ -838,80 +1180,58 @@ function POSPage({ showToast, outletInfo }) {
         }
       }
 
-      // Auto-discount evaluation
-      let appliedDisc = null;
-      const now = Date.now();
       const cleanPhone = custPhone ? custPhone.replace(/\D/g, "") : "";
-      const isFirstOrder = cleanPhone && cleanPhone !== "Walk-in" && !Object.values(allOrders).some(o => o.phone && o.phone.replace(/\D/g, "") === cleanPhone);
-      const custOrders = Object.values(allOrders).filter(o => o.phone && o.phone.replace(/\D/g, "") === cleanPhone);
-      let discSource = "";
 
-      // Manual flat discount takes highest priority
+      // Resolve final discount: manual overrides auto
       const hasManualFlat = Number(discFlat) > 0;
       const hasManualPct = !hasManualFlat && discount > 0;
+      let finalDiscVal, discLabel, finalDiscId, discSource;
 
-      if (!hasManualFlat && !hasManualPct) {
-        for (const d of Object.values(discounts)) {
-          if (!d.enabled) continue;
-          if (d.startsAt && new Date(d.startsAt).getTime() > now) continue;
-          if (d.endsAt && new Date(d.endsAt).getTime() < now) continue;
-          if (d.applicableTo !== "all" && d.applicableTo !== orderType.toLowerCase()) continue;
-          if (d.minSubtotal && subtotal < Number(d.minSubtotal)) continue;
-          if (d.globalLimit && (d.stats?.usedCount || 0) >= d.globalLimit) continue;
-          if (d.perCustomerLimit && cleanPhone) {
-            const custUsed = custOrders.filter(o => o.discountApplied === d.name || o.discountId === d.id).length;
-            if (custUsed >= d.perCustomerLimit) continue;
-          }
-          if (d.type === "first_order" && !isFirstOrder) continue;
-          if (d.type === "coupon" && (!couponCode || !d.couponCode || d.couponCode.toLowerCase() !== couponCode.toLowerCase())) continue;
-          if (d.type === "bogo") continue; // BOGO handled separately
-          if (!appliedDisc || (d.priority || 0) > (appliedDisc.priority || 0)) {
-            appliedDisc = d;
-            discSource = d.type === "coupon" ? `coupon:${d.couponCode}` : d.type === "first_order" ? "firstOrder" : `auto:${d.type}`;
-          }
+      if (hasManualFlat) {
+        finalDiscVal = Number(discFlat);
+        discLabel = `Flat ₹${discFlat}`;
+        finalDiscId = null; discSource = "manual:flat";
+      } else if (hasManualPct) {
+        finalDiscVal = subtotal * discount / 100;
+        discLabel = `${discount}%`;
+        finalDiscId = null; discSource = "manual:percent";
+      } else {
+        // Use shared evaluator
+        const hasPrevOrder = cleanPhone && cleanPhone !== "Walk-in" && Object.values(allOrders).some(o => o.phone && o.phone.replace(/\D/g, "") === cleanPhone);
+        const evalResult = evaluateDiscounts(discounts, {
+          subtotal, cart: cartItems,
+          customer: cleanPhone ? { firstOrderDiscountUsed: hasPrevOrder } : null,
+          couponCode: couponCode || null, orderType, now: Date.now(),
+        });
+
+        // Also check BOGO
+        let bogoVal = 0;
+        const bogoDisc = Object.values(discounts).find(d => d.enabled && d.type === "bogo" && (!d.startsAt || Date.now() >= d.startsAt) && (!d.endsAt || Date.now() <= d.endsAt));
+        if (bogoDisc) {
+          const cheapest = cartItems.reduce((min, [, item]) => Math.min(min, item.price), Infinity);
+          bogoVal = cheapest * Math.floor(cartItems.reduce((s, [, item]) => s + item.qty, 0) / 2);
+        }
+
+        const evalAmt = evalResult?.amount || 0;
+        if (bogoVal > evalAmt) {
+          finalDiscVal = bogoVal;
+          discLabel = bogoDisc?.name || "BOGO";
+          finalDiscId = bogoDisc?.id || null;
+          discSource = "auto:bogo";
+        } else if (evalResult) {
+          finalDiscVal = evalAmt;
+          discLabel = evalResult.label;
+          finalDiscId = evalResult.discount?.id || null;
+          discSource = evalResult.source;
+        } else {
+          finalDiscVal = 0;
+          discLabel = "";
+          finalDiscId = null;
+          discSource = "none";
         }
       }
 
-      // Resolve coupon separately if entered and not already matched
-      if (couponCode && !appliedDisc) {
-        for (const d of Object.values(discounts)) {
-          if (!d.enabled || d.type !== "coupon") continue;
-          if (!d.couponCode || d.couponCode.toLowerCase() !== couponCode.toLowerCase()) continue;
-          if (d.startsAt && new Date(d.startsAt).getTime() > now) continue;
-          if (d.endsAt && new Date(d.endsAt).getTime() < now) continue;
-          if (d.globalLimit && (d.stats?.usedCount || 0) >= d.globalLimit) continue;
-          if (d.perCustomerLimit && cleanPhone) {
-            const custUsed = custOrders.filter(o => o.discountApplied === d.name || o.discountId === d.id).length;
-            if (custUsed >= d.perCustomerLimit) continue;
-          }
-          appliedDisc = d;
-          discSource = `coupon:${d.couponCode}`;
-          break;
-        }
-      }
-
-      // BOGO: find best BOGO discount
-      let bogoDisc = null;
-      for (const d of Object.values(discounts)) {
-        if (!d.enabled || d.type !== "bogo") continue;
-        if (d.startsAt && new Date(d.startsAt).getTime() > now) continue;
-        if (d.endsAt && new Date(d.endsAt).getTime() < now) continue;
-        if (!bogoDisc || (d.priority || 0) > (bogoDisc.priority || 0)) bogoDisc = d;
-      }
-      let bogoVal = 0;
-      if (bogoDisc) {
-        const cheapest = cartItems.reduce((min, [, item]) => Math.min(min, item.price), Infinity);
-        bogoVal = cheapest * Math.floor(cartItems.reduce((s, [, item]) => s + item.qty, 0) / 2);
-      }
-
-      if (appliedDisc) setAutoDisc(appliedDisc);
-
-      const autoDiscVal = appliedDisc
-        ? (appliedDisc.type === "flat" ? Number(appliedDisc.value) : Math.min(subtotal * Number(appliedDisc.value) / 100, Number(appliedDisc.maxCap) || Infinity))
-        : 0;
-      const finalDiscVal = hasManualFlat ? Number(discFlat) : hasManualPct ? subtotal * discount / 100 : Math.max(autoDiscVal, bogoVal);
-      const discLabel = hasManualFlat ? `Flat ₹${discFlat}` : hasManualPct ? `${discount}%` : appliedDisc?.name || (bogoDisc?.name || "");
-      const finalTotal = Math.max(0, subtotal - finalDiscVal + taxVal);
+      const finalTotal = Math.max(0, subtotal - finalDiscVal + taxVal + (orderType === "Delivery" ? deliveryFee : 0));
 
       // Atomic order ID via runTransaction
       const today = new Date();
@@ -925,10 +1245,12 @@ function POSPage({ showToast, outletInfo }) {
         orderId, cart:Object.values(cart), subtotal, discount:finalDiscVal, tax:taxVal, total:finalTotal,
         paymentMethod:payMethod, paymentStatus:"Paid", customerName:custName||"Walk-in", phone:custPhone||"Walk-in",
         status: orderType === "Dine-in" ? "Confirmed" : "Placed", type:orderType, notes:orderNotes,
-        discountId: appliedDisc?.id || (bogoDisc?.id || null), discountName: discLabel || null, discountSource: discSource || null,
+        discountId: finalDiscId, discountName: discLabel || null, discountSource: discSource || null,
         couponCode: couponCode || null, tableNo: tableNo || null, stockDeducted: true,
         outletAddress: outletInfo?.address || "", createdAt:new Date().toISOString(), outlet:_outletId,
-        createdBy: getCurrentAdminActor()?.email || null
+        createdBy: getCurrentAdminActor()?.email || null,
+        deliveryFee: orderType === "Delivery" ? deliveryFee : 0,
+        deliveryDistance: orderType === "Delivery" ? Number(deliveryDist) || 0 : 0
       };
 
       await set(Outlet(`orders/${orderId}`), orderData);
@@ -958,9 +1280,15 @@ function POSPage({ showToast, outletInfo }) {
         }
       } catch (e) { console.warn("[Inventory] Auto-deduct error:", e); }
 
-      if (appliedDisc) {
+      if (finalDiscId && finalDiscVal > 0) {
         const usageRef = Outlet(`discountsUsage/${orderId}`);
-        await set(usageRef, { discountId: appliedDisc.id, discountName: appliedDisc.name, orderId, customer: custName || "Walk-in", total: finalTotal, usedAt: new Date().toISOString() });
+        await set(usageRef, { discountId: finalDiscId, discountLabel: discLabel, orderId, customerPhone: custPhone || "Walk-in", customerName: custName || "", amountGiven: Math.round(finalDiscVal), channel: "pos", source: discSource || "", appliedAt: Date.now() });
+        try {
+          await runTransaction(Outlet(`discounts/${finalDiscId}/stats`), (cur) => {
+            cur = cur || {};
+            return { usedCount: (cur.usedCount || 0) + 1, totalDiscountGiven: (cur.totalDiscountGiven || 0) + Math.round(finalDiscVal), lastUsedAt: Date.now() };
+          });
+        } catch (_) {}
       }
 
       // Customer LTV tracking
@@ -975,7 +1303,7 @@ function POSPage({ showToast, outletInfo }) {
       }
 
       logAudit(_bizId, _outletId, "pos_checkout", {
-        orderId, total: finalTotal, paymentMethod: payMethod, type: orderType, autoDisc: appliedDisc?.name || null,
+        orderId, total: finalTotal, paymentMethod: payMethod, type: orderType, autoDisc: discLabel,
         items: Object.values(cart).map(i => ({ id: i.id, name: i.name, size: i.size, qty: i.qty, price: i.price }))
       }, getCurrentAdminActor());
 
@@ -989,6 +1317,24 @@ function POSPage({ showToast, outletInfo }) {
   };
 
   const catAddons = selModal ? (cats.find(c=>c.name===selModal.category)?.addons||{}) : {};
+
+  if (posOffline) return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"calc(100vh - 140px)", gap:16, color:"#64748b" }}>
+      <div style={{ width:64, height:64, borderRadius:16, background:"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <WifiOff size={28} color="#94a3b8" />
+      </div>
+      <div style={{ fontSize:16, fontWeight:700, color:"#0f172a" }}>Waiting for connection</div>
+      <div style={{ fontSize:13, textAlign:"center", maxWidth:300 }}>The POS menu will load automatically when the connection is restored.</div>
+      <button type="button" onClick={() => { setPosOffline(false); setPosLoaded(false); window.location.reload(); }} style={{ padding:"10px 24px", borderRadius:10, background:ORANGE, color:"white", border:"none", cursor:"pointer", fontSize:13, fontWeight:600, marginTop:8 }}>Retry Now</button>
+    </div>
+  );
+
+  if (!posLoaded) return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 360px", gap:16, height:"calc(100vh - 140px)" }}>
+      <SkeletonGrid cards={8} />
+      <div />
+    </div>
+  );
 
   return (
     <div style={{ display:"grid", gridTemplateColumns:"1fr 360px", gap:16, height:"calc(100vh - 140px)" }}>
@@ -1007,17 +1353,19 @@ function POSPage({ showToast, outletInfo }) {
         </div>
         <div style={{ flex:1, overflow:"auto", display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px,1fr))", gap:12, alignContent:"start", minHeight:0 }}>
            {filtered.map(d => {
-             const price = d.sizes ? Object.values(d.sizes)[0] : (d.price||0);
-             const isLow = d.stock <= (d.threshold || 5);
-             return <div key={d.id} onClick={()=>openSelection(d)} style={{ background:"white", borderRadius:12, cursor:"pointer", border:"1px solid #f1f5f9", transition:"transform 0.15s", display:"flex", flexDirection:"column", minHeight:260, position:"relative" }}>
-               {isLow && <div style={{ position:"absolute", top:8, right:8, padding:"2px 8px", borderRadius:6, fontSize:9, fontWeight:700, background:"rgba(251,146,60,0.9)", color:"white", zIndex:10 }}>⚠ {d.stock}</div>}
-               <img src={d.image||"https://placehold.co/300/fff7ed/ccc?text=🍽️"} alt="" style={{ width:"100%", height:160, objectFit:"cover", flexShrink:0 }} />
-               <div style={{ flex:1, padding:"14px 14px 18px", minHeight:90, display:"flex", flexDirection:"column", justifyContent:"center" }}>
-                 <div style={{ fontSize:14, fontWeight:600, color:"#0f172a", lineHeight:1.4, wordBreak:"break-word" }}>{d.name||"(no name)"}</div>
-                 <div style={{ fontSize:13, color:ORANGE, fontWeight:700, marginTop:4 }}>₹{price}</div>
-               </div>
-             </div>;
-           })}
+              const price = d.sizes ? Object.values(d.sizes)[0] : (d.price||0);
+              const isOos = (d.stock||0) === 0;
+              const isLow = !isOos && d.stock <= (d.threshold || 5);
+              return <div key={d.id} onClick={()=>!isOos && openSelection(d)} style={{ background:"white", borderRadius:12, cursor:isOos?"not-allowed":"pointer", border:"1px solid #f1f5f9", transition:"transform 0.15s", display:"flex", flexDirection:"column", minHeight:260, position:"relative", opacity:isOos?0.5:1 }}>
+                {isOos && <div style={{ position:"absolute", inset:0, zIndex:5, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(255,255,255,0.3)", borderRadius:12 }}><div style={{ padding:"4px 12px", borderRadius:6, background:"rgba(100,116,139,0.85)", color:"white", fontSize:11, fontWeight:700, letterSpacing:0.5 }}>Currently Unavailable</div></div>}
+                {isLow && <div style={{ position:"absolute", top:8, right:8, padding:"2px 8px", borderRadius:6, fontSize:9, fontWeight:700, background:"rgba(251,146,60,0.9)", color:"white", zIndex:10 }}>⚠ {d.stock}</div>}
+                <img src={d.image||"https://placehold.co/300/fff7ed/ccc?text=🍽️"} alt="" style={{ width:"100%", height:160, objectFit:"cover", flexShrink:0 }} />
+                <div style={{ flex:1, padding:"14px 14px 18px", minHeight:90, display:"flex", flexDirection:"column", justifyContent:"center" }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:"#0f172a", lineHeight:1.4, wordBreak:"break-word" }}>{d.name||"(no name)"}</div>
+                  <div style={{ fontSize:13, color:ORANGE, fontWeight:700, marginTop:4 }}>₹{price}</div>
+                </div>
+              </div>;
+            })}
         </div>
       </div>
 
@@ -1030,10 +1378,17 @@ function POSPage({ showToast, outletInfo }) {
           <Input placeholder="Table number (optional)" value={tableNo} onChange={e=>setTableNo(e.target.value)} style={{ fontSize:12, padding:"6px 10px", marginBottom:8 }} />
           <div style={{ fontSize:12, fontWeight:600, color:"#64748b", marginBottom:6 }}>Order Type</div>
           <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-            {["Dine-in", "Takeaway"].map(t => (
+            {["Dine-in", "Takeaway", "Delivery"].map(t => (
               <div key={t} onClick={()=>setOrderType(t)} style={{ flex:1, padding:"8px 0", borderRadius:8, textAlign:"center", fontSize:12, fontWeight:600, cursor:"pointer", color:orderType===t?"white":"#64748b", background:orderType===t?ORANGE:"#f1f5f9" }}>{t}</div>
             ))}
           </div>
+          {orderType === "Delivery" && (
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:"#64748b", marginBottom:6 }}>Delivery Distance (km)</div>
+              <input type="number" min="0" step="0.1" value={deliveryDist} onChange={e => setDeliveryDist(e.target.value)} placeholder="e.g. 5" style={{ width:"100%", padding:"6px 10px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              {deliveryFee > 0 && <div style={{ fontSize:11, color:"#64748b", marginTop:4 }}>Delivery fee: {fmt(deliveryFee)}</div>}
+            </div>
+          )}
           <textarea placeholder="Order notes (kitchen instructions)" value={orderNotes} onChange={e=>setOrderNotes(e.target.value)} style={{ width:"100%", minHeight:50, padding:"6px 10px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, fontFamily:"inherit", outline:"none", resize:"none" }} />
         </div>
         <div style={{ flex:1, overflow:"auto", padding:12 }}>
@@ -1096,6 +1451,9 @@ function POSPage({ showToast, outletInfo }) {
           </div>
           {taxVal>0&&<div className="flex justify-between mb-2" style={{ display:"flex", justifyContent:"space-between", marginBottom:8, fontSize:12 }}>
             <span style={{ color:"#64748b" }}>Tax (5%)</span><span style={{ fontWeight:600 }}>₹{taxVal.toLocaleString()}</span>
+          </div>}
+          {orderType === "Delivery" && deliveryFee > 0 && <div className="flex justify-between mb-2" style={{ display:"flex", justifyContent:"space-between", marginBottom:8, fontSize:12 }}>
+            <span style={{ color:"#64748b" }}>Delivery Fee</span><span style={{ fontWeight:600 }}>₹{deliveryFee.toLocaleString()}</span>
           </div>}
           <div className="flex gap-2 mb-3" style={{ display:"flex", gap:6, marginBottom:12 }}>
             {["Cash","UPI","Card"].map(m => (
@@ -1167,6 +1525,9 @@ function POSPage({ showToast, outletInfo }) {
               {taxVal>0&&<div className="flex justify-between mb-2" style={{ display:"flex", justifyContent:"space-between", marginBottom:8, fontSize:12 }}>
                 <span style={{ color:"#64748b" }}>Tax (5%)</span><span style={{ fontWeight:600 }}>₹{taxVal.toLocaleString()}</span>
               </div>}
+              {orderType === "Delivery" && deliveryFee > 0 && <div className="flex justify-between mb-2" style={{ display:"flex", justifyContent:"space-between", marginBottom:8, fontSize:12 }}>
+                <span style={{ color:"#64748b" }}>Delivery Fee</span><span style={{ fontWeight:600 }}>₹{deliveryFee.toLocaleString()}</span>
+              </div>}
               <div className="flex gap-2 mb-3" style={{ display:"flex", gap:6, marginBottom:12 }}>
                 {["Cash","UPI","Card"].map(m => (
                   <div key={m} onClick={()=>setPayMethod(m)} style={{ flex:1, padding:"6px 0", borderRadius:8, textAlign:"center", fontSize:11, fontWeight:600, cursor:"pointer", color:payMethod===m?"white":"#64748b", background:payMethod===m?ORANGE:"#f1f5f9" }}>{m}</div>
@@ -1230,6 +1591,8 @@ function CustomersPage({ showToast }) {
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState("");
+  const [creditEdit, setCreditEdit] = useState(null);
+  const [creditVal, setCreditVal] = useState("");
 
   useEffect(() => {
     const r = Outlet("customers"); const r2 = Outlet("orders");
@@ -1248,6 +1611,19 @@ function CustomersPage({ showToast }) {
     return list.sort((a,b)=>b.ltv-a.ltv);
   }, [customers, orders, search]);
 
+  const totalOutstanding = useMemo(() => data.reduce((s,c)=>s+Math.max(0,Number(c.credit||0)),0), [data]);
+
+  const handleSaveCredit = useCallback(async (phone) => {
+    const newVal = Number(creditVal);
+    if (isNaN(newVal)) { showToast("Enter a valid amount","error"); return; }
+    try {
+      await update(Outlet(`customers/${phone}`), { credit: newVal });
+      showToast("Credit updated","success");
+      setCreditEdit(null);
+      setCreditVal("");
+    } catch (e) { showToast("Failed to update credit","error"); }
+  }, [creditVal, showToast]);
+
   const exportCustomers = useCallback(() => {
     downloadCSV(`customers-${new Date().toISOString().slice(0,10)}.csv`, data.map((c, index) => ({
       row: index + 1,
@@ -1255,6 +1631,7 @@ function CustomersPage({ showToast }) {
       phone: c.phone,
       orders: c.orderCount,
       ltv: c.ltv,
+      credit: c.credit || 0,
       registeredAt: c.registeredAt || "",
     })));
     showToast("Customers exported", "success");
@@ -1267,15 +1644,19 @@ function CustomersPage({ showToast }) {
           <Search size={14} style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#94a3b8" }} />
           <input placeholder="Search by name or phone..." value={search} onChange={e=>setSearch(e.target.value)} style={{ padding:"8px 10px 8px 32px", borderRadius:10, border:"1.5px solid #e2e8f0", fontSize:13, width:"100%", background:"#f8fafc", outline:"none" }} />
         </div>
-        <button type="button" className="sheet-button" onClick={exportCustomers}><Download size={14} /> Export CSV</button>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ fontSize:12, color:"#64748b" }}>Outstanding: <strong style={{ color:totalOutstanding>0?"#ef4444":"#22c55e" }}>{fmt(totalOutstanding)}</strong></span>
+          <button type="button" className="sheet-button" onClick={exportCustomers}><Download size={14} /> Export CSV</button>
+        </div>
       </div>
       <GlassCard style={{ overflow:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:600 }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:700 }}>
           <thead><tr style={{ borderBottom:"1px solid #f1f5f9" }}>
             <th style={{ textAlign:"left", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Customer</th>
             <th style={{ textAlign:"left", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Contact</th>
             <th style={{ textAlign:"center", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Orders</th>
             <th style={{ textAlign:"right", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>LTV</th>
+            <th style={{ textAlign:"right", padding:"10px 12px", color:"#94a3b8", fontWeight:600, fontSize:11, textTransform:"uppercase" }}>Credit</th>
           </tr></thead>
           <tbody>
             {data.map(c => (
@@ -1293,6 +1674,20 @@ function CustomersPage({ showToast }) {
                   <div style={{ fontSize:11, color:"#94a3b8" }}>purchases</div>
                 </td>
                 <td style={{ padding:"10px 12px", textAlign:"right", fontWeight:700, color:"#22c55e", fontSize:15 }}>{fmt(c.ltv)}</td>
+                <td style={{ padding:"10px 12px", textAlign:"right" }}>
+                  {creditEdit === c.phone ? (
+                    <div style={{ display:"flex", alignItems:"center", gap:4, justifyContent:"flex-end" }}>
+                      <input type="number" value={creditVal} onChange={e => setCreditVal(e.target.value)} style={{ width:80, padding:"3px 6px", borderRadius:4, border:"1px solid #e2e8f0", fontSize:12, textAlign:"right" }} autoFocus />
+                      <button onClick={() => handleSaveCredit(c.phone)} style={{ padding:"2px 6px", borderRadius:4, border:"none", background:"#22c55e", color:"white", fontSize:10, fontWeight:600, cursor:"pointer" }}>Save</button>
+                      <button onClick={() => setCreditEdit(null)} style={{ padding:"2px 6px", borderRadius:4, border:"none", background:"#e2e8f0", color:"#64748b", fontSize:10, fontWeight:600, cursor:"pointer" }}>X</button>
+                    </div>
+                  ) : (
+                    <div onClick={() => { setCreditEdit(c.phone); setCreditVal(String(c.credit||0)); }} style={{ cursor:"pointer", fontWeight:700, color:Number(c.credit||0)>0?"#ef4444":"#64748b" }}>
+                      {fmt(c.credit||0)}
+                      <span style={{ marginLeft:4, fontSize:10, color:"#94a3b8" }}>(edit)</span>
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1358,7 +1753,7 @@ function LiveTrackerPage() {
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS PAGE (Store, Delivery, Bot, Display tabs)
 // ═══════════════════════════════════════════════════════════════════════════
-function SettingsPage({ showToast }) {
+function SettingsPage({ showToast, notifEnabled, setNotifEnabled, fcmToken }) {
   const [tab, setTab] = useState("store");
   const [s, setS] = useState({}); // store settings
   const [d, setD] = useState({}); // delivery settings
@@ -1436,7 +1831,7 @@ function SettingsPage({ showToast }) {
   return (
     <div>
       <div className="flex gap-2 mb-4" style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {["store","delivery","inventory","display"].map(t => (
+        {["store","delivery","inventory","display","notifications"].map(t => (
           <div key={t} onClick={()=>setTab(t)} style={{ padding:"6px 18px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:600, textTransform:"capitalize", color:tab===t?"white":"#64748b", background:tab===t?ORANGE:"#f1f5f9" }}>{t}</div>
         ))}
       </div>
@@ -1496,6 +1891,38 @@ function SettingsPage({ showToast }) {
       </div>}
       {tab==="display"&&<div>
         <p style={{ fontSize:13, color:"#64748b", marginBottom:12 }}>Display visibility checkboxes coming soon. Check the database for current settings.</p>
+      </div>}
+      {tab==="notifications"&&<div>
+        <GlassCard className="p-5 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-slate-800">Browser Notifications</div>
+              <div className="text-xs text-slate-500 mt-1">Receive desktop notifications for new orders and low-stock alerts when the dashboard is open.</div>
+            </div>
+            <label className="toggle-switch" style={{ position:"relative", display:"inline-block", width:44, height:24 }}>
+              <input type="checkbox" checked={!!notifEnabled} onChange={e => { const v = e.target.checked; setNotifEnabled(v); localStorage.setItem("fh_notif_enabled", String(v)); if (v && Notification.permission === "default") Notification.requestPermission(); }}
+                style={{ opacity:0, width:0, height:0 }} />
+              <span style={{ position:"absolute", cursor:"pointer", inset:0, borderRadius:12, background:notifEnabled?ORANGE:"#cbd5e1", transition:".2s" }}>
+                <span style={{ position:"absolute", height:18, width:18, borderRadius:"50%", background:"white", top:3, left:notifEnabled?23:3, transition:".2s" }} />
+              </span>
+            </label>
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5 mb-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-slate-800">Permission Status</div>
+                <div className="text-xs text-slate-500 mt-1">{typeof Notification === "undefined" ? "Not supported in this browser" : `Current: ${Notification.permission}`}</div>
+              </div>
+              {typeof Notification !== "undefined" && Notification.permission !== "granted" && (
+                <button type="button" onClick={() => Notification.requestPermission().then(p => showToast(`Permission: ${p}`,"info"))} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background:ORANGE, color:"white", border:"none", cursor:"pointer" }}>Request Permission</button>
+              )}
+            </div>
+            {fcmToken && <div style={{ fontSize:11, color:"#94a3b8", wordBreak:"break-all" }}>FCM Token: {fcmToken.slice(0,30)}...</div>}
+            <button type="button" onClick={() => { if (Notification.permission === "granted") { try { new Notification("Test Notification", { body: "Your notifications are working!", icon: "/favicon.svg" }); showToast("Test notification sent","success"); } catch(e) { showToast("Failed: "+e.message,"error"); } } else { showToast("Notification permission not granted","warning"); } }} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background:"#f1f5f9", color:"#475569", border:"1px solid #e2e8f0", cursor:"pointer" }}>Send Test Notification</button>
+          </div>
+        </GlassCard>
       </div>}
     </div>
   );
@@ -1979,7 +2406,7 @@ function KitchenPage({ showToast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // INVENTORY PAGE
 // ═══════════════════════════════════════════════════════════════════════════
-function InventoryPage({ showToast }) {
+function InventoryPage({ showToast, requireAdminReauth }) {
   const [invItems, setInvItems] = useState([]);
   const [dishItems, setDishItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1989,6 +2416,8 @@ function InventoryPage({ showToast }) {
   const [editInvId, setEditInvId] = useState(null);
   const [editInvForm, setEditInvForm] = useState({ name: "", category: "", stock: 0, threshold: 5, unit: "units" });
   const [editInvBusy, setEditInvBusy] = useState(false);
+  const [csvImportBusy, setCsvImportBusy] = useState(false);
+  const csvInputRef = useRef(null);
 
   useEffect(() => {
     const r = Outlet("inventory");
@@ -2145,6 +2574,7 @@ function InventoryPage({ showToast }) {
   const handleDeleteInventory = useCallback(async (item) => {
     if (!item || !item.id) return;
     if (!confirm(`Delete "${item.name}" from inventory?`)) return;
+    if (requireAdminReauth && !(await requireAdminReauth())) return;
     try {
       await remove(Outlet(`inventory/${item.id}`));
       logAudit(_bizId, _outletId, "inventory_delete", {
@@ -2154,6 +2584,43 @@ function InventoryPage({ showToast }) {
     } catch (err) {
       showToast("Failed to delete: " + (err?.message || "unknown error"), "error");
     }
+  }, [showToast, requireAdminReauth]);
+
+  const handleCsvImport = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvImportBusy(true);
+    try {
+      const text = await file.text();
+      const lines = text.trim().split("\n");
+      if (lines.length < 2) { showToast("CSV must have a header row and at least one data row","warning"); setCsvImportBusy(false); return; }
+      const headers = lines[0].toLowerCase().split(",").map(h => h.trim());
+      const nameIdx = headers.findIndex(h => h === "name" || h === "item");
+      const stockIdx = headers.findIndex(h => h === "stock" || h === "quantity" || h === "qty");
+      const catIdx = headers.findIndex(h => h === "category");
+      const threshIdx = headers.findIndex(h => h === "threshold" || h === "min" || h === "alert");
+      const unitIdx = headers.findIndex(h => h === "unit");
+      if (nameIdx === -1) { showToast("CSV must have a 'name' or 'item' column","warning"); setCsvImportBusy(false); return; }
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map(c => c.trim());
+        const name = cols[nameIdx];
+        if (!name) continue;
+        rows.push({
+          name,
+          category: catIdx >= 0 ? cols[catIdx] || "" : "",
+          stock: Math.max(0, Number(cols[stockIdx >= 0 ? stockIdx : nameIdx]) || 0),
+          threshold: Math.max(0, Number(cols[threshIdx >= 0 ? threshIdx : nameIdx]) || 5),
+          unit: unitIdx >= 0 ? cols[unitIdx] || "units" : "units"
+        });
+      }
+      if (rows.length === 0) { showToast("No valid rows found","warning"); setCsvImportBusy(false); return; }
+      const promises = rows.map(r => push(Outlet("inventory"), { ...r, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+      await Promise.all(promises);
+      logAudit(_bizId, _outletId, "inventory_csv_import", { count: rows.length, sample: rows.slice(0,3) }, getCurrentAdminActor());
+      showToast(`Imported ${rows.length} item(s) from CSV`,`success`);
+    } catch (err) { showToast("CSV import failed: "+(err?.message||"unknown error"),"error"); }
+    finally { setCsvImportBusy(false); if (csvInputRef.current) csvInputRef.current.value = ""; }
   }, [showToast]);
 
   if (loading) return <SkeletonPage kpi={3} table={5} />;
@@ -2166,6 +2633,8 @@ function InventoryPage({ showToast }) {
             ? `No raw-materials inventory found — showing dish availability (${dishItems.filter(d => d.stockType === "boolean").length} of ${dishItems.length} use boolean stock)`
             : `Showing raw materials from ${invItems.length} inventory record(s)`}
         </div>
+        <input ref={csvInputRef} type="file" accept=".csv" style={{ display:"none" }} onChange={handleCsvImport} />
+        <button type="button" className="sheet-button" onClick={() => csvInputRef.current?.click()} disabled={csvImportBusy}><Upload size={14} /> {csvImportBusy?"Importing...":"Import CSV"}</button>
         <button type="button" className="sheet-button" onClick={exportInventory}><Download size={14} /> Export CSV</button>
         <button type="button" className="sheet-button" onClick={() => setShowAddInv(true)} style={{ background:ORANGE, color:"white" }}><Plus size={14} /> New Item</button>
       </div>
@@ -3443,7 +3912,7 @@ function DiscountsPage({ showToast }) {
   const [saving, setSaving] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [reportRange, setReportRange] = useState(7);
-  const blankForm = { name:"", type:"percentage", value:"", maxCap:"", startsAt:"", endsAt:"", noEnd:true, minSubtotal:"", applicableTo:"all", couponCode:"", perCustomerLimit:"", globalLimit:"", priority:"", exclusiveGroup:"", stackable:false, enabled:true };
+  const blankForm = { name:"", type:"percentage", value:"", maxCap:"", startsAt:"", endsAt:"", noEnd:true, minSubtotal:"", applicableTo:"all", couponCode:"", perCustomerLimit:"", globalLimit:"", priority:"", exclusiveGroup:"", stackable:false, enabled:true, categoryIds:"" };
   const [form, setForm] = useState(blankForm);
   const setField = useCallback((k, v) => setForm(f => ({ ...f, [k]: v })), []);
 
@@ -3495,7 +3964,7 @@ function DiscountsPage({ showToast }) {
         couponCode: d.couponCode || "", perCustomerLimit: d.perCustomerLimit ?? "",
         globalLimit: d.globalLimit ?? "", priority: d.priority ?? "",
         exclusiveGroup: d.exclusiveGroup || "", stackable: !!d.stackable,
-        enabled: d.enabled !== false,
+        enabled: d.enabled !== false, categoryIds: (d.categoryIds || []).join(", "),
       });
     } else {
       setEditingId(null);
@@ -3516,6 +3985,7 @@ function DiscountsPage({ showToast }) {
     setSaving(true);
     try {
       const id = editingId || `disc_${Date.now().toString(36)}`;
+      const categoryIds = (form.categoryIds || "").split(",").map(s => s.trim()).filter(Boolean);
       const doc = {
         name, type: form.type, value: form.type === "bogo" ? 1 : value,
         maxCap: Number(form.maxCap) || 0,
@@ -3528,6 +3998,7 @@ function DiscountsPage({ showToast }) {
         priority: Number(form.priority) || 0,
         exclusiveGroup: (form.exclusiveGroup || "").trim() || null,
         stackable: !!form.stackable, enabled: form.enabled,
+        categoryIds: categoryIds.length > 0 ? categoryIds : null,
         updatedAt: Date.now(),
       };
       if (!editingId) { doc.createdAt = Date.now(); doc.stats = { usedCount: 0, totalDiscountGiven: 0 }; }
@@ -3632,7 +4103,10 @@ function DiscountsPage({ showToast }) {
                     {d.type === "flat" && <><strong>{fmt(d.value)}</strong> off</>}
                     {d.type === "bogo" && <strong>Buy 1 Get 1 Free</strong>}
                     {d.type === "coupon" && <>Code: <code style={{ background: "#fef3c7", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>{esc(d.couponCode)}</code>{d.value ? <> {"\u2014"} {Number(d.value)}% off</> : ""}</>}
+                    {d.type === "category" && <><strong>{d.value ? `${Number(d.value)}%` : fmt(d.value)}</strong> on categories</>}
+                    {d.type === "first_order" && <strong>New Customer Discount</strong>}
                     {d.minSubtotal ? <> {"\u00B7"} Min order: <strong>{fmt(d.minSubtotal)}</strong></> : ""}
+                    {d.categoryIds?.length > 0 && <div style={{ marginTop: 2 }}>Categories: <strong>{d.categoryIds.join(", ")}</strong></div>}
                   </div>
                   <div style={{ fontSize: 11, color: "#94a3b8" }}>
                     {d.type === "bogo" ? "Always on for new customers" : <>{fmtDate(d.startsAt)} {"\u2192"} {d.endsAt ? fmtDate(d.endsAt) : "No end"}</>}
@@ -3723,6 +4197,10 @@ function DiscountsPage({ showToast }) {
             <label style={_discLabelStyle}>Total Usage Limit</label>
             <Input type="number" placeholder="0 = unlimited" value={form.globalLimit} onChange={e => setField("globalLimit", e.target.value)} />
           </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={_discLabelStyle}>Category Restriction (comma-separated)</label>
+            <Input placeholder="e.g. Pizza, Beverages (leave empty for all categories)" value={form.categoryIds} onChange={e => setField("categoryIds", e.target.value)} />
+          </div>
           <div>
             <label style={_discLabelStyle}>Priority</label>
             <Input type="number" placeholder="Higher = preferred" value={form.priority} onChange={e => setField("priority", e.target.value)} />
@@ -3805,6 +4283,51 @@ function DiscountsPage({ showToast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PROMOTIONS PAGE
 // ═══════════════════════════════════════════════════════════════════════════
+
+const PROMO_TEMPLATES = [
+  { cat:"New Customer Offers", items:[
+    { title:"Welcome Offer", body:"Hi {name},\n\nWelcome to {storeName}! 🎉 Enjoy {offer} on your first order. Use code WELCOME. Order now!", note:"Replace {offer} with the actual welcome discount." },
+    { title:"First Order Discount", body:"Hi {name},\n\nThank you for your first order! Here's a special discount for you: {offer}. Valid until {date}.", note:"Pair with coupon for tracking." },
+    { title:"New Customer Bundle", body:"Hey {name}, 🎉\n\nAs a new customer, get our special combo at just {amount}! Includes {items}. Order now!", note:"List actual combo items in {items}." },
+  ]},
+  { cat:"Discounts & Sales", items:[
+    { title:"Flat Discount", body:"Hi {name},\n\nSave ₹{amount} on your next order of ₹{minOrder}+ at {storeName}. Use code SAVE{amount}.", note:"Set minOrder to drive cart value." },
+    { title:"Percentage Off", body:"Great news {name}! 🎉 Get {percent}% off on orders above ₹{minOrder}. Valid till {date}. Don't miss out!", note:"Use for clearance or seasonal sales." },
+    { title:"B1G1 Free", body:"Hey {name}, Buy 1 Get 1 FREE at {storeName}! 🎉 Order any {item} and get another FREE. Use code BOGO.", note:"Define eligible item in {item}." },
+    { title:"Clearance Sale", body:"Flash sale {name}! 🔥 Select items at just ₹{amount}. Stock limited. Order now at {storeName}.", note:"List specific clearance items." },
+  ]},
+  { cat:"Weekend & Seasonal", items:[
+    { title:"Weekend Special", body:"It's the weekend {name}! 🎉 Enjoy {offer} at {storeName}. Order now and make it special!", note:"Best sent Friday evening or Saturday morning." },
+    { title:"Festival Offer", body:"Happy {festival} {name}! 🎉 Celebrate with {storeName}. Get {offer} on orders above {minOrder}.", note:"Replace {festival} with the actual festival name." },
+    { title:"Monsoon Special", body:"Rainy day {name}! 🌧️ Stay in and order from {storeName}. Get {offer} on all orders. Free delivery!", note:"Best sent on rainy days for higher engagement." },
+    { title:"Summer Cooler", body:"Beat the heat {name}! ☀️ Try our summer specials at {storeName}. Cool drinks and ice creams at just {amount}!", note:"Feature cold items and beverages." },
+  ]},
+  { cat:"Re-engagement", items:[
+    { title:"We Miss You", body:"We miss you {name}! 💔 It's been a while. Come back and enjoy {offer} at {storeName}.", note:"Target customers inactive >30 days." },
+    { title:"Come Back Offer", body:"Hi {name}, it's been {days} days! Here's a special {offer} to welcome you back. Valid for 7 days.", note:"Personalize {days} based on inactivity period." },
+    { title:"Last Order Reminder", body:"Hi {name}, your last order from {lastOrderDate} was delicious! 😋 Ready for another? Enjoy {offer}.", note:"Best paired with their last ordered items." },
+  ]},
+  { cat:"Referral & Loyalty", items:[
+    { title:"Refer a Friend", body:"Hi {name}, refer a friend and you both get {offer}! 🎉 Share your code {code} with them.", note:"Set up coupon code for tracking." },
+    { title:"Loyalty Bonus", body:"Thank you for being a loyal customer {name}! 🌟 Here's {offer} as our special thank you.", note:"Target high-order-count customers." },
+    { title:"VIP Appreciation", body:"Dear VIP {name}, 🌟 You're one of our most valued customers. Enjoy exclusive {offer} at {storeName}.", note:"Send to top 10% customers by spend." },
+  ]},
+  { cat:"New Menu & Launches", items:[
+    { title:"New Item Launch", body:"Exciting news {name}! 🎉 We've launched {item} at {storeName}. Be the first to try it at {offer}!", note:"Add image of the new item." },
+    { title:"Seasonal Menu", body:"Our new {season} menu is here {name}! 🍂 Try {item} and other seasonal delights at {storeName}.", note:"Replace {season} with Spring/Summer/Monsoon/Winter." },
+    { title:"Chef's Special", body:"Hi {name}, our chefs have created something special! 🧑‍🍳 Try {item} — {description}. Only at {storeName}.", note:"Add a mouth-watering description." },
+  ]},
+  { cat:"Birthday & Special Days", items:[
+    { title:"Birthday Offer", body:"Happy Birthday {name}! 🎂🎉 Here's a special {offer} from {storeName}. Celebrate with us!", note:"Best sent on the customer's birthday morning." },
+    { title:"Anniversary Offer", body:"Happy Anniversary {name}! 🎉 Thank you for {years} years with {storeName}. Enjoy {offer}!", note:"Track customer since-date for personalization." },
+  ]},
+  { cat:"Urgent & Flash Deals", items:[
+    { title:"Flash Sale", body:"⚡ FLASH SALE {name}! ⚡ {offer} for the next {hours} hours only at {storeName}. Order fast!", note:"Use for limited-time urgency campaigns." },
+    { title:"Slow Hour Boost", body:"It's quiet right now {name} and we have a deal! Get {offer} on orders in the next {hours} hours.", note:"Target slow hours (3-5 PM weekdays)." },
+    { title:"Last Minute Deal", body:"Last minute offer {name}! Order within {minutes} min and get {offer}. Hurry!", note:"Best for evening dinner rush." },
+  ]},
+];
+
 function PromotionsPage({ showToast }) {
   const [pane, setPane] = useState("compose");
   const [campaigns, setCampaigns] = useState({});
@@ -3837,6 +4360,8 @@ function PromotionsPage({ showToast }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const MAX_RECIPIENTS = 500;
   const MAX_CHARS = 1500;
@@ -4162,6 +4687,19 @@ function PromotionsPage({ showToast }) {
     URL.revokeObjectURL(url);
   };
 
+  const cloneCampaign = (campaign) => {
+    setTemplate(campaign.template || "");
+    setGreeting(campaign.greeting !== false);
+    setAttachMenu(!!campaign.menuText);
+    setMenuText(campaign.menuText || "");
+    setAttachMenuImg(!!campaign.menuImageUrl);
+    setMenuImgUrl(campaign.menuImageUrl || "");
+    setClosingMsg(campaign.closingMessage || "");
+    setSendStop(campaign.sendStopMsg !== false);
+    setPane("compose");
+    showToast("Campaign loaded into composer", "success");
+  };
+
   const canLaunch = template.trim().length > 0 && recipientCount > 0 && botOnline && promoEnabled;
 
   return (
@@ -4214,7 +4752,13 @@ function PromotionsPage({ showToast }) {
               </label>
             </div>
             <div style={{ marginBottom:12 }}>
-              <label style={{ fontSize:11, fontWeight:600, color:"#64748b", display:"block", marginBottom:4 }}>Message Template</label>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                <label style={{ fontSize:11, fontWeight:600, color:"#64748b" }}>Message Template</label>
+                <div style={{ display:"flex", gap:4 }}>
+                  <button type="button" onClick={() => setGuideOpen(true)} style={{ fontSize:10, color:"#64748b", background:"#f1f5f9", border:"1px solid #e2e8f0", borderRadius:6, padding:"2px 8px", cursor:"pointer" }}>Guide</button>
+                  <button type="button" onClick={() => setTemplatePickerOpen(true)} style={{ fontSize:10, color:ORANGE, background:"#fff7ed", border:`1px solid ${ORANGE}`, borderRadius:6, padding:"2px 8px", cursor:"pointer", fontWeight:600 }}>+ Templates</button>
+                </div>
+              </div>
               <textarea value={template} onChange={e => setTemplate(e.target.value.slice(0, MAX_CHARS))}
                 placeholder="Write your promotional message here... Use tokens like {name}, {phone}, {storeName}"
                 style={{ width:"100%", minHeight:140, padding:12, borderRadius:10, border:"1.5px solid #e2e8f0",
@@ -4406,6 +4950,7 @@ function PromotionsPage({ showToast }) {
                     {c.menuText && <span style={{ fontSize:11, color:"#94a3b8" }}>\u2022 menu</span>}
                   </div>
                   <div style={{ display:"flex", gap:6 }}>
+                    <button type="button" onClick={() => cloneCampaign(c)} style={{ padding:"4px 10px", borderRadius:8, fontSize:11, fontWeight:600, cursor:"pointer", background:"#f1f5f9", color:"#64748b", border:"1px solid #e2e8f0" }}>Clone</button>
                     {(c.status === "running" || c.status === "paused") && (
                       <button type="button" onClick={() => stopCampaign(c.id)}
                         className="shell-button" style={{ padding:"4px 12px", borderRadius:8, fontSize:11, fontWeight:600, cursor:"pointer",
@@ -4447,6 +4992,7 @@ function PromotionsPage({ showToast }) {
                   {c.reason && <span style={{ fontSize:11, color:"#94a3b8" }}>{c.reason}</span>}
                 </div>
                 <div style={{ display:"flex", gap:6 }}>
+                  <button type="button" onClick={() => cloneCampaign(c)} style={{ padding:"4px 10px", borderRadius:8, fontSize:11, fontWeight:600, cursor:"pointer", background:"#f1f5f9", color:"#64748b", border:"1px solid #e2e8f0" }}>Clone</button>
                   <button type="button" onClick={() => exportCampaignLog(c.id)} className="btn-secondary"
                     style={{ padding:"4px 12px", fontSize:11, display:"flex", alignItems:"center", gap:4 }}>
                     <Download size={12} />Export CSV
@@ -4485,6 +5031,45 @@ function PromotionsPage({ showToast }) {
           </div>
         )}
         {!sendStop && <div style={{ fontSize:11, color:"#94a3b8", marginTop:8 }}>STOP footer is OFF</div>}
+      </Modal>
+
+      {/* Template Picker Modal */}
+      <Modal open={templatePickerOpen} onClose={() => setTemplatePickerOpen(false)} wide>
+        <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", marginBottom:12 }}>Choose a Template</h3>
+        <div style={{ maxHeight:"60vh", overflow:"auto", display:"flex", flexDirection:"column", gap:12 }}>
+          {PROMO_TEMPLATES.map(({ cat, items }) => (
+            <GlassCard key={cat} style={{ padding:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#0f172a", marginBottom:8 }}>{cat}</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {items.map(t => (
+                  <div key={t.title} onClick={() => { setTemplate(t.body); setTemplatePickerOpen(false); showToast(`Template "${t.title}" loaded`,"success"); }}
+                    style={{ padding:"8px 12px", borderRadius:8, cursor:"pointer", background:"#f8fafc", border:"1px solid #e2e8f0" }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = ORANGE}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = "#e2e8f0"}>
+                    <div style={{ fontSize:12, fontWeight:600, color:ORANGE, marginBottom:2 }}>{t.title}</div>
+                    <div style={{ fontSize:11, color:"#64748b", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.body}</div>
+                    <div style={{ fontSize:10, color:"#94a3b8", marginTop:2 }}>{t.note}</div>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      </Modal>
+
+      {/* Guide Modal */}
+      <Modal open={guideOpen} onClose={() => setGuideOpen(false)}>
+        <h3 style={{ fontSize:16, fontWeight:700, color:"#0f172a", marginBottom:12 }}>Promotions Guide</h3>
+        <div style={{ display:"flex", flexDirection:"column", gap:10, fontSize:13, color:"#475569", lineHeight:1.6 }}>
+          <div><strong style={{ color:"#0f172a" }}>1. Compose</strong> — Write your message. Use <code style={{ background:"#f1f5f9", padding:"1px 5px", borderRadius:4, fontSize:12 }}>{`{name}`}</code>, <code style={{ background:"#f1f5f9", padding:"1px 5px", borderRadius:4, fontSize:12 }}>{`{storeName}`}</code>, etc. for personalization.</div>
+          <div><strong style={{ color:"#0f172a" }}>2. Recipients</strong> — Choose audience or upload CSV. Customers must have promotional consent.</div>
+          <div><strong style={{ color:"#0f172a" }}>3. Preview</strong> — See how the message will look with sample data before sending.</div>
+          <div><strong style={{ color:"#0f172a" }}>4. Send Test</strong> — Send to your own number first to verify formatting.</div>
+          <div><strong style={{ color:"#0f172a" }}>5. Launch</strong> — Send now or schedule. The bot sends messages with a delay between each.</div>
+          <div style={{ background:"#fff7ed", padding:10, borderRadius:8, fontSize:12, color:"#c2410c", marginTop:4 }}>
+            <strong>Tips:</strong> Keep messages under 1500 chars. Use the STOP footer (required by WhatsApp policy). Monitor active campaigns progress.
+          </div>
+        </div>
       </Modal>
     </div>
   );
@@ -4993,6 +5578,8 @@ function App() {
   const reauthResolverRef = useRef(null);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [lowStockDismissed, setLowStockDismissed] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem("fh_notif_enabled") !== "false");
+  const [fcmToken, setFcmToken] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
   const [showVersionBanner, setShowVersionBanner] = useState(false);
   const [badgeCounts, setBadgeCounts] = useState({});
@@ -5037,12 +5624,12 @@ function App() {
     }
   }, []);
 
-  // Firebase connection state
+  // Firebase connection state — uses centralized watcher from firebase.js
   useEffect(() => {
     if (!user) return;
-    const connRef = ref(db, ".info/connected");
-    const unsub = onValue(connRef, (snap) => setIsConnected(snap.val()));
-    return () => off(connRef, "value", unsub);
+    setIsConnected(isConnected());
+    const unsub = onConnectionChange(setIsConnected);
+    return unsub;
   }, [user]);
 
   // Global Escape key — closes all overlays
@@ -5056,7 +5643,7 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [reauthOpen]);
 
-  // New-order sound alert — tracks unacknowledged Placed/New orders
+  // New-order alert — sound + OS notification + toast
   useEffect(() => {
     if (!user || !_bizId || !_outletId) return;
     const r = Outlet("orders");
@@ -5068,13 +5655,26 @@ function App() {
       if (initialLoad) { initialLoad = false; Object.keys(v).forEach(k => unacknowledgedRef.current.add(k)); return; }
       const newPlaced = Object.keys(v).filter(k => !unacknowledgedRef.current.has(k) && v[k] && v[k].status && ["Placed","New","Pending"].includes(v[k].status));
       if (newPlaced.length > 0) {
-        newPlaced.forEach(k => unacknowledgedRef.current.add(k));
+        newPlaced.forEach(k => {
+          unacknowledgedRef.current.add(k);
+          const order = v[k];
+          const name = order.customerName || "Customer";
+          const total = order.total || 0;
+          const items = order.items ? (Array.isArray(order.items) ? order.items.length : typeof order.items === "object" ? Object.keys(order.items).length : 0) : 0;
+          const label = `#${order.id?.slice(-6) || k.slice(-6)}`;
+          // OS notification
+          if (notifEnabled && Notification.permission === "granted") {
+            try { new Notification(`New Order ${label}`, { body: `${name} · ₹${Number(total).toLocaleString()} · ${items} item(s)`, icon: "/favicon.svg" }); } catch (_) {}
+          }
+          // Toast
+          showToastRef.current?.(`${label}: ${name} — ₹${Number(total).toLocaleString()} (${items} items)`, "info");
+        });
         playAlertSound();
         setBadgeCounts(prev => ({ ...prev, liveops: (prev.liveops || 0) + newPlaced.length }));
       }
     });
     return () => off(r, "value", unsub);
-  }, [user, reloadKey, playAlertSound]);
+  }, [user, reloadKey, playAlertSound, notifEnabled]);
 
   // Clear unacknowledged badge when navigating to orders/liveops
   useEffect(() => {
@@ -5236,6 +5836,7 @@ function App() {
           const d = snap.val();
           _bizId = d.businessId; _outletId = d.outletId;
           setOutletContext(d.businessId, d.outletId);
+          startBotStatusWatcher();
           setOutletInfo({ name: d.outletName || "", address: d.outletAddress || "" });
           setReloadKey(k => k + 1);
         }
@@ -5243,12 +5844,70 @@ function App() {
     })();
   }, [user]);
 
+  // FCM init + notification permission + token storage
+  useEffect(() => {
+    if (!user) return;
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission === "granted" || notifEnabled) {
+      if (Notification.permission !== "granted") {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+    (async () => {
+      try {
+        const supported = await isMessagingSupported();
+        if (!supported) return;
+        const messaging = getMessaging();
+        const token = await getToken(messaging, { vapidKey: "BFGSVdKCs_7sXhG5NhFPBTSxoBbsckYqgFfOZQ5D9AiBPL0N10CqQOYc1Zv26cMjxpWCgVh8XIKHZP_YIEbr8T8" });
+        if (token) {
+          setFcmToken(token);
+          await update(ref(db, `admins/${user.uid}`), { fcmToken: token });
+        }
+      } catch (e) {
+        if (e.code === "messaging/permission-blocked") {
+          setNotifEnabled(false);
+          localStorage.setItem("fh_notif_enabled", "false");
+        }
+      }
+    })();
+  }, [user, notifEnabled]);
+
+  // Foreground FCM messages — show toast
+  useEffect(() => {
+    if (!user || !notifEnabled) return;
+    let unsub = null;
+    (async () => {
+      try {
+        const supported = await isMessagingSupported();
+        if (!supported) return;
+        const messaging = getMessaging();
+        unsub = onFcmMessage(messaging, (payload) => {
+          const title = payload.notification?.title || "FoodHubbie";
+          const body = payload.notification?.body || "";
+          showToastRef.current?.(`${title}: ${body}`, "info");
+          if (Notification.permission === "granted") {
+            new Notification(title, { body, icon: "/favicon.svg" });
+          }
+        });
+      } catch (_) {}
+    })();
+    return () => { if (unsub) unsub(); };
+  }, [user, notifEnabled]);
+
   useEffect(() => {
     if (!user || !_bizId || !_outletId) {
       return;
     }
     const counts = { inv: 0, dish: 0 };
-    const mergeCounts = () => setLowStockCount(counts.inv + counts.dish);
+    const mergeCounts = () => {
+      const newCount = counts.inv + counts.dish;
+      setLowStockCount(prev => {
+        if (prev === 0 && newCount > 0 && notifEnabled && Notification.permission === "granted") {
+          try { new Notification("Stock Alert", { body: `${newCount} item(s) need attention — stock is low or out.`, icon: "/favicon.svg" }); } catch (_) {}
+        }
+        return newCount;
+      });
+    };
     const invRef = ref(db, `businesses/${_bizId}/outlets/${_outletId}/inventory`);
     const dishRef = ref(db, `businesses/${_bizId}/outlets/${_outletId}/dishes`);
     const invUnsub = onValue(invRef, (snap) => {
@@ -5273,7 +5932,7 @@ function App() {
       mergeCounts();
     }, () => {});
     return () => { off(invRef, "value", invUnsub); off(dishRef, "value", dishUnsub); };
-  }, [user, reloadKey]);
+  }, [user, reloadKey, notifEnabled]);
 
   useEffect(() => {
     if (lowStockCount > 0) setLowStockDismissed(false);
@@ -5378,6 +6037,7 @@ function App() {
       {!isConnected && (
         <div role="alert" style={{ position:"fixed", top:0, left:0, right:0, zIndex:99999, background:"#dc2626", color:"white", padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontSize:13, fontWeight:500, animation:"slideDown 0.3s ease-out" }}>
           <WifiOff size={16} /> No internet connection — changes may not save
+          <button type="button" onClick={() => window.location.reload()} style={{ marginLeft:12, padding:"4px 14px", borderRadius:6, background:"rgba(255,255,255,0.2)", color:"white", border:"1px solid rgba(255,255,255,0.4)", cursor:"pointer", fontSize:12, fontWeight:600 }}>Retry</button>
         </div>
       )}
       {showVersionBanner && (
@@ -5400,7 +6060,7 @@ function App() {
           {outletSwitcherOpen && (
             <div style={{ position:"absolute", left:0, right:0, top:"100%", marginTop:4, zIndex:50, background:"white", borderRadius:10, boxShadow:"0 12px 40px rgba(0,0,0,0.15)", border:"1px solid #e2e8f0", maxHeight:200, overflow:"auto" }}>
               {Object.keys(outlets).filter(k => k !== _outletId).map(k => (
-                <div key={k} onClick={async (e) => { e.stopPropagation(); setOutletSwitcherOpen(false); const snap = await get(ref(db, `businesses/${_bizId}/outlets/${k}`)); const d = snap.val(); if (d) { _outletId = k; setOutletContext(_bizId, _outletId); setOutletInfo({ name: d.name || k, address: d.address || "" }); setReloadKey(r => r + 1); showToast(`Switched to ${d.name || k}`,"success"); } }}
+                <div key={k} onClick={async (e) => { e.stopPropagation(); setOutletSwitcherOpen(false); const snap = await get(ref(db, `businesses/${_bizId}/outlets/${k}`)); const d = snap.val(); if (d) { _outletId = k; setOutletContext(_bizId, _outletId); startBotStatusWatcher(); setOutletInfo({ name: d.name || k, address: d.address || "" }); setReloadKey(r => r + 1); showToast(`Switched to ${d.name || k}`,"success"); } }}
                   style={{ padding:"8px 12px", fontSize:12, fontWeight:500, color:"#475569", cursor:"pointer", borderBottom:"1px solid #f1f5f9" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
@@ -5499,7 +6159,7 @@ function App() {
               </button>
             </div>
           )}
-          <div className="page-content">{PageComponent && <PageComponent key={reloadKey} showToast={showToast} outletInfo={outletInfo} />}</div>
+          <div className="page-content">{PageComponent && <PageComponent key={reloadKey} showToast={showToast} outletInfo={outletInfo} notifEnabled={notifEnabled} setNotifEnabled={setNotifEnabled} fcmToken={fcmToken} requireAdminReauth={requireAdminReauth} setPage={setPage} setSelOrder={setSelOrder} />}</div>
         </main>
       </div>
       <div className="mobile-bottom-nav" style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:30, display:"flex", alignItems:"center", justifyContent:"space-around", padding:"6px 0 env(safe-area-inset-bottom,6px)", background:dark?"#1e293b":"rgba(255,255,255,0.9)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", borderTop:dark?"1px solid #334155":"1px solid rgba(0,0,0,0.06)" }}>

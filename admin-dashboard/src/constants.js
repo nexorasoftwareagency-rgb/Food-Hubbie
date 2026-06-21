@@ -52,6 +52,8 @@ export const PARTNERS_REF = ref(db, "system/partners");
 export const DISC_TYPES = [
   { value: "percentage", label: "% Off", color: "#3b82f6", bg: "#dbeafe" },
   { value: "flat", label: "Flat ₹ Off", color: "#22c55e", bg: "#dcfce7" },
+  { value: "category", label: "Category %/Flat", color: "#06b6d4", bg: "#cffafe" },
+  { value: "first_order", label: "First Order", color: "#f97316", bg: "#fff7ed" },
   { value: "bogo", label: "Buy 1 Get 1", color: "#8b5cf6", bg: "#ede9fe" },
   { value: "coupon", label: "Coupon", color: "#f59e0b", bg: "#fef3c7" },
 ];
