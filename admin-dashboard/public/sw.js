@@ -3,7 +3,7 @@
 // out fast), cache-first for hashed Vite assets and the offline fallback.
 // Never caches Firebase API calls — those are auth-gated and must always be live.
 
-const CACHE_VERSION = "fh-admin-v1";
+const CACHE_VERSION = "fh-admin-v2";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest", "/favicon.svg"];
