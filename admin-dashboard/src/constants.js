@@ -169,7 +169,7 @@ export const PAGE_GUIDES = {
     { icon: "Activity", title: "Active Campaigns", body: "Monitor running campaigns with progress bars. Use Kill Switch to emergency-stop all campaigns." },
   ],
   notifications: [
-    { icon: "Bell", title: "Compose Broadcast", body: "Write a title and message for your broadcast. Choose target audience: All, New, VIP, or Inactive (7+ days)." },
+    { icon: "Megaphone", title: "Compose Broadcast", body: "Write a title and message for your broadcast. Choose target audience: All, New, VIP, or Inactive (7+ days)." },
     { icon: "Send", title: "Send Broadcast", body: "Click Send to push the notification to the selected audience. Written to Firebase and delivered via bot." },
     { icon: "History", title: "Broadcast History", body: "View previously sent broadcasts with audience badge, source (SuperAdmin/Admin), and recipient count." },
   ],
