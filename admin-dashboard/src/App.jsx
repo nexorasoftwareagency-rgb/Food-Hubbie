@@ -598,6 +598,10 @@ function MenuPage({ showToast }) {
               <div style={{ display:"flex", gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid #f1f5f9" }}>
                 <Edit3 size={13} color="#3b82f6" style={{ cursor:"pointer" }} onClick={()=>openForm(d)} />
                 <Trash2 size={13} color="#ef4444" style={{ cursor:"pointer" }} onClick={()=>handleDelete(d.id)} />
+                <span style={{ flex:1 }} />
+                <button type="button" onClick={async (e) => { e.stopPropagation(); try { await push(Outlet("inventory"), { name: d.name, dishId: d.id, stock: 0, threshold: 5, unit: "units", updatedAt: new Date().toISOString() }); showToast("Now tracking stock for " + d.name, "success"); } catch(e) { showToast("Failed: " + (e?.message || e), "error"); } }} style={{ padding:"3px 8px", borderRadius:6, border:"1px solid #e2e8f0", background:"white", color:ORANGE, fontSize:10, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+                  + Track Stock
+                </button>
               </div>
             </div>
           </GlassCard>
@@ -875,6 +879,26 @@ function POSPage({ showToast, outletInfo }) {
         const newStock = Math.max(0, (Number(freshDishes[item.id].stock) || 0) - item.qty);
         await update(Outlet(`dishes/${item.id}`), { stock: newStock });
       }
+
+      // Auto-deduct from inventory (by dishId match, then name fallback)
+      try {
+        const invSnap = await get(Outlet("inventory"));
+        const inventory = invSnap.val() || {};
+        for (const [, item] of cartItems) {
+          const itemName = (item.name || "").toLowerCase();
+          let invEntry = Object.entries(inventory).find(([, data]) => data.dishId === item.id);
+          if (!invEntry) invEntry = Object.entries(inventory).find(([, data]) => (data.name || "").toLowerCase() === itemName);
+          if (invEntry) {
+            const [invId, invData] = invEntry;
+            const prevStock = Number(invData.stock) || 0;
+            const nextStock = Math.max(0, prevStock - (item.qty || 1));
+            await update(Outlet(`inventory/${invId}`), { stock: nextStock });
+            if (!invData.dishId && item.id) {
+              await update(Outlet(`inventory/${invId}`), { dishId: item.id });
+            }
+          }
+        }
+      } catch (e) { console.warn("[Inventory] Auto-deduct error:", e); }
 
       if (appliedDisc) {
         const usageRef = Outlet(`discountsUsage/${orderId}`);
@@ -1877,7 +1901,7 @@ function InventoryPage({ showToast }) {
     const r = Outlet("inventory");
     const d = Outlet("dishes");
     if (!d) { setLoading(false); return; }
-    const u1 = r ? onValue(r, snap => { const v = snap.val() || {}; setInvItems(Object.keys(v).map(k => ({ id: k, source: "inventory", name: v[k].name || "Unnamed", stock: Number(v[k].stock)||0, threshold: Number(v[k].threshold)||5, unit: v[k].unit || "units" }))); }) : () => {};
+    const u1 = r ? onValue(r, snap => { const v = snap.val() || {}; setInvItems(Object.keys(v).map(k => ({ id: k, source: "inventory", name: v[k].name || "Unnamed", stock: Number(v[k].stock)||0, threshold: Number(v[k].threshold)||5, unit: v[k].unit || "units", dishId: v[k].dishId || null }))); }) : () => {};
     const u2 = onValue(d, snap => {
       const v = snap.val() || {};
       setDishItems(Object.keys(v).map(k => ({ id: k, source: "dish", name: v[k].name || "Unnamed", stock: v[k].stock, stockType: typeof v[k].stock, category: v[k].category || "" })));
@@ -2062,13 +2086,13 @@ function InventoryPage({ showToast }) {
           <table className="w-full text-sm" style={{ minWidth: 500 }}>
             <thead>
               <tr className="border-b border-slate-100">
-                {["Item","Category","Stock","Status","Actions"].map(h => (
+                {["Item","Category","Stock","Linked Dish","Status","Actions"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 && <tr><td colSpan={5} style={{ textAlign:"center", padding:32, color:"#94a3b8" }}>No inventory items. Add dishes in the Menu page or seed raw materials under inventory.</td></tr>}
+              {items.length === 0 && <tr><td colSpan={6} style={{ textAlign:"center", padding:32, color:"#94a3b8" }}>No inventory items. Add dishes in the Menu page or seed raw materials under inventory.</td></tr>}
               {items.map(item => {
                 const available = itemIsAvailable(item);
                 const isBool = item.source === "dish" && item.stockType === "boolean";
@@ -2079,6 +2103,7 @@ function InventoryPage({ showToast }) {
                   ? (item.stock === false ? statusColors.critical : statusColors.ok)
                   : statusColors[stockStatus(numericStock, threshold)];
                 const pct = isBool ? (item.stock === false ? 5 : 100) : Math.min(100, numericStock / (threshold * 2 || 1) * 100);
+                const linkedDish = item.dishId ? dishItems.find(d => d.id === item.dishId) : null;
                 return (
                   <tr key={item.id} className="border-b border-slate-50 hover:bg-orange-50/30">
                     <td className="px-4 py-3 font-semibold text-slate-800">{item.name}</td>
@@ -2092,6 +2117,9 @@ function InventoryPage({ showToast }) {
                           <div className="h-1.5 rounded-full transition-all" style={{ width:`${pct}%`, backgroundColor: st.color }} />
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: linkedDish ? "#0f172a" : "#94a3b8" }}>
+                      {linkedDish ? linkedDish.name : (item.dishId ? "Unknown dish" : "—")}
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-1 rounded-full text-xs font-bold capitalize"

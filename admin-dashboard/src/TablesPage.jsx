@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 const QR_BASE = "https://foodhubbie-menu.web.app/";
-import { Grid3x3, Plus, QrCode, Printer, Download, Search, X, ChevronRight, ChevronLeft, Trash2, Edit3, Ban, Check, CheckCheck, Receipt, ExternalLink, Clock, Users, DollarSign, AlertTriangle, WifiOff } from "lucide-react";
+import { Grid3x3, Plus, QrCode, Printer, Download, Search, X, ChevronRight, ChevronLeft, Trash2, Edit3, Ban, Check, CheckCheck, Receipt, ExternalLink, Clock, Users, DollarSign, AlertTriangle, WifiOff, Bell } from "lucide-react";
 import { get, Outlet, getCurrentOutletContext, onValue, off, set, update, push, remove, runTransaction, serverTimestamp } from "./firebase";
 import { ORANGE, COLORS, ORD_ST } from "./constants";
 import { fmt, esc } from "./utils";
@@ -37,6 +37,7 @@ function TablesPage({ showToast, outletInfo }) {
   const paymentDataRef = useRef({ tableId: null, total: 0 });
   const [kdsTab, setKdsTab] = useState("grid");
   const [searchTerm, setSearchTerm] = useState("");
+  const [tableRequests, setTableRequests] = useState({});
   const tablesLoaded = useRef(false);
   const sessionsLoaded = useRef(false);
   const ordersLoaded = useRef(false);
@@ -66,6 +67,33 @@ function TablesPage({ showToast, outletInfo }) {
     const unsub = onValue(oRef, snap => { setOrders(snap.val() || {}); ordersLoaded.current = true; });
     return () => { off(oRef, "value", unsub); };
   }, [outletInfo]);
+
+  useEffect(() => {
+    const ctx = getCurrentOutletContext();
+    if (!ctx.businessId || !ctx.outletId) return;
+    const r = Outlet("tableRequests");
+    if (!r) return;
+    const unsub = onValue(r, snap => { setTableRequests(snap.val() || {}); });
+    return () => { off(r, "value", unsub); };
+  }, [outletInfo]);
+
+  const REQUEST_TYPE_META = {
+    waiter: { label: "Call Waiter" },
+    water: { label: "Request Water" },
+    bill: { label: "Request Bill" },
+    clean: { label: "Clean Table" },
+  };
+
+  const pendingRequests = useMemo(() => Object.entries(tableRequests).map(([id, r]) => ({ id, ...r })).filter(r => r.status !== "resolved").sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), [tableRequests]);
+
+  const resolveRequest = useCallback(async (reqId) => {
+    try {
+      await update(Outlet(`tableRequests/${reqId}`), { status: "resolved", resolvedAt: serverTimestamp() });
+      showToast("Request resolved", "success");
+    } catch (e) {
+      showToast("Could not resolve request: " + (e?.message || e), "error");
+    }
+  }, [showToast]);
 
   const tableList = useMemo(() => Object.entries(tables).map(([id, t]) => ({ id, ...t })).sort((a, b) => Number(a.number) - Number(b.number)), [tables]);
 
@@ -294,6 +322,40 @@ function TablesPage({ showToast, outletInfo }) {
     w.document.close();
   }, [tables, sessions, orders, showToast]);
 
+  const printBill = useCallback((tableId) => {
+    const t = tables[tableId];
+    const sess = sessionForTable(tableId);
+    if (!t || !sess) { showToast("No active session to print bill", "warning"); return; }
+    const orders = ordersForSession(sess.sessionId || t.currentSession);
+    const allItems = [];
+    orders.forEach(o => Object.values(o.items || {}).forEach(it => allItems.push(it)));
+    const itemRows = allItems.map(it => `<tr><td>${it.qty || 1} × ${esc(it.name || "Item")}</td><td style="text-align:right">₹${Number(it.price || 0).toFixed(2)}</td></tr>`).join("");
+    const total = Number(sess.grandTotal || sess.runningTotal || 0);
+    const w = window.open("", "_blank", "width=380,height=600");
+    w.document.write(`<html><head><title>Bill — Table ${esc(t.number)}</title><style>
+      body{font-family:'Courier New',monospace;padding:16px;width:280px;margin:0 auto;}
+      h2{text-align:center;margin-bottom:2px;font-size:20px;letter-spacing:1px;}
+      .sub{text-align:center;font-size:11px;color:#555;margin-bottom:4px;}
+      .divider{border-top:1px dashed #000;margin:10px 0;}
+      table{width:100%;border-collapse:collapse;font-size:13px;}
+      td{padding:4px 0;}
+      .total-row td{font-weight:700;font-size:15px;padding-top:8px;border-top:2px solid #000;}
+      .foot{text-align:center;font-size:11px;color:#777;margin-top:14px;padding-top:10px;border-top:1px dashed #000;}
+      .thank-you{text-align:center;font-size:14px;font-weight:700;margin:8px 0;}
+      </style></head><body>
+      <h2>FOODHUBBIE</h2>
+      <div class="sub">${new Date().toLocaleString("en-IN")}</div>
+      <div class="sub">Table ${esc(t.number)} · Session ${esc(sess.sessionId || "").slice(-6).toUpperCase()}</div>
+      <div class="divider"></div>
+      <table>${itemRows}</table>
+      <div class="divider"></div>
+      <table><tr class="total-row"><td>Total</td><td style="text-align:right">₹${total.toFixed(2)}</td></tr></table>
+      <div class="thank-you">Thank You!</div>
+      <div class="foot">FoodHubbie — Bill Copy</div>
+      <script>window.onload=function(){window.print();};</script></body></html>`);
+    w.document.close();
+  }, [tables, sessions, orders, showToast]);
+
   const exportCsv = useCallback(() => {
     const rows = [["Table", "Capacity", "Status", "Current Session", "Running Total"]];
     tableList.forEach(t => {
@@ -337,6 +399,29 @@ function TablesPage({ showToast, outletInfo }) {
         <StatCard label="Guests" value={kpis.guestCount} icon={Users} color={ORANGE} bg="rgba(232, 73, 8,0.1)" />
         <StatCard label="Revenue (Live)" value={fmt(kpis.revenue)} icon={DollarSign} color="#16a34a" bg="rgba(22,163,74,0.1)" sub={`Avg ${kpis.avgTime} min`} />
       </div>
+
+      {pendingRequests.length > 0 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12, padding:"10px 14px", borderRadius:10, background:"#fef3c7", border:"1px solid #f59e0b40" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <Bell size={14} color="#f59e0b" />
+            <span style={{ fontSize:12, fontWeight:700, color:"#92400e" }}>{pendingRequests.length} Request{pendingRequests.length > 1 ? "s" : ""}</span>
+          </div>
+          {pendingRequests.map(r => {
+            const meta = REQUEST_TYPE_META[r.type] || { label: r.type || "Request" };
+            const mins = Math.max(0, Math.floor((Date.now() - (r.createdAt || Date.now())) / 60000));
+            return (
+              <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, padding:"6px 10px", borderRadius:8, background:"white", border:"1px solid #fde68a" }}>
+                <div style={{ fontSize:12, color:"#78350f" }}>
+                  <strong>Table {r.tableNumber || ""}</strong> · {meta.label} · {mins} min ago
+                </div>
+                <button type="button" onClick={() => resolveRequest(r.id)} style={{ padding:"4px 12px", borderRadius:6, border:"none", background:"#f59e0b", color:"white", fontSize:11, fontWeight:600, cursor:"pointer" }}>
+                  Resolve
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16, flexWrap:"wrap" }}>
         <div style={{ position:"relative", flex:1, minWidth:200 }}>
@@ -512,6 +597,9 @@ function TablesPage({ showToast, outletInfo }) {
                                 <CheckCheck size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Close Table (Paid)
                               </button>
                             )}
+                            <button type="button" onClick={() => printBill(drawerTableId)} style={{ padding:"8px 0", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                              <Printer size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Print Bill
+                            </button>
                             <button type="button" onClick={() => printKOT(drawerTableId)} style={{ padding:"8px 0", borderRadius:8, border:"1.5px solid #e2e8f0", background:"white", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer" }}>
                               <Printer size={14} style={{ marginRight:6, verticalAlign:"middle" }} /> Print KOT
                             </button>
