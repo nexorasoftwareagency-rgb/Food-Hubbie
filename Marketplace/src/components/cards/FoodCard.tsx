@@ -62,6 +62,7 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
           quantity: 1,
           image: item.image,
           outletId: item.outletId,
+          businessId: item.businessId,
           customization: {
             addons: [],
             extraCheese: false,

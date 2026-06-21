@@ -204,7 +204,7 @@ App.jsx
         ├── showToast — 3.5s auto-dismiss toast
         │     ├── "success" → green (#10b981)
         │     ├── "error" → red (#ef4444)
-        │     └── "warning" → orange (#f36b21)
+        │     └── "warning" → orange (#E84908)
         │
         └── outletInfo — { name, address }
               └── Used in POSPage for receipt outletAddress

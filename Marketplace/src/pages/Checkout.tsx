@@ -153,6 +153,22 @@ export default function Checkout() {
       return;
     }
 
+    // 0b. Multi-tenant guard: every order MUST carry a businessId.
+    // Resolve bid from cart → outlet → first item, and refuse to proceed
+    // if no tenant is identified (would otherwise misroute the write).
+    const resolvedBid = (cartState.businessId
+      || outlet?.businessId
+      || cartState.items.find(i => i.businessId)?.businessId
+      || "").trim();
+    if (!resolvedBid) {
+      alert("Cannot place order: the cart is not associated with a business. Please re-add items from the outlet page.");
+      return;
+    }
+    if (!cartState.outletId) {
+      alert("Cannot place order: no outlet selected. Please re-add items.");
+      return;
+    }
+
     // 1. Validate wallet balance if selected
     if (paymentMethod === "wallet") {
       if ((user.walletBalance || 0) < summary.total) {
@@ -171,8 +187,7 @@ export default function Checkout() {
       const bonusAmount = projectedBonus;
 
       // 3. Pre-generate order ID for wallet transaction traceability
-      const bid = "business_roshani";
-      const pregeneratedOrderId = push(ref(db, `businesses/${bid}/outlets/${cartState.outletId ?? ""}/orders`)).key || "";
+      const pregeneratedOrderId = push(ref(db, `businesses/${resolvedBid}/outlets/${cartState.outletId}/orders`)).key || "";
 
       // 4. Debit wallet BEFORE writing order (prevents order-exists-but-unpaid states)
       if (paymentMethod === "wallet") {
@@ -200,7 +215,9 @@ export default function Checkout() {
       try {
         orderId = await placeOrder({
           pregeneratedOrderId,
+          businessId: resolvedBid,
           outletId: cartState.outletId ?? "",
+          outletName: outlet?.name,
           items: cartState.items,
           subtotal: summary.subtotal,
           deliveryFee: summary.deliveryFee,

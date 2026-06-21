@@ -1,47 +1,53 @@
 /**
  * ============================================================
- * FOODHUBBIE SAAS — Order Status Monitor
+ * FOODHUBBIE SAAS — Order Status Monitor (tenant-aware)
  * ============================================================
  * Listens for order status changes in Firebase and sends
  * real-time WhatsApp notifications to customers and riders.
+ *
+ * ARCHITECTURE (Phase 2 — PR 14):
+ * - `processedStatus` is per-tenant (one map per outlet).
+ * - All data helpers are bound via `tenantContext(tenant)`.
+ * ============================================================
  */
 
-const { db, admin, BUSINESS_ID, OUTLET_ID, resolvePath, getData } = require('./firebase');
+const { db, admin, tenantContext } = require('./firebase');
 const { formatJid } = require('../shared/utils');
 const { notifyAdmins } = require('../shared/push-notifications');
 
-// Track processed statuses to avoid duplicate notifications
-const processedStatus = {};
-
 /**
- * Initializes listeners for the specific outlet.
+ * Initializes listeners for a specific tenant.
+ *
+ * @param {object} sock - The active Baileys socket
+ * @param {{businessId: string, outletId: string, label?: string}} tenant
  */
-function initStatusMonitor(sock) {
-  const path = resolvePath('orders');
-  console.log(`[Monitor] Listening for status changes at: ${path}`);
+function initStatusMonitor(sock, tenant) {
+  const t = tenantContext(tenant);
+  const ordersPath = t.resolvePath('orders');
+  console.log(`[Monitor] [${tenant.label}] Listening for status changes at: ${ordersPath}`);
 
-  const orderRef = db.ref(path);
+  // Per-tenant dedup map
+  const processedStatus = {};
 
-  // Handle existing/new orders
+  const orderRef = db.ref(ordersPath);
+
   orderRef.on('child_added', (snap) => {
     const order = snap.val();
     if (!order) return;
-    
-    // Mark as processed if it's an old order (more than 10 mins old)
+
     const createdAt = new Date(order.createdAt).getTime();
     if (Date.now() - createdAt > 600000) {
       processedStatus[snap.key] = { status: order.status, riderId: order.riderId || "", timestamp: Date.now() };
       return;
     }
 
-    handleStatusUpdate(sock, snap.key, order, true);
+    handleStatusUpdate(sock, snap.key, order, t, tenant, processedStatus, true);
   });
 
-  // Handle status updates
   orderRef.on('child_changed', (snap) => {
     const order = snap.val();
     if (!order) return;
-    handleStatusUpdate(sock, snap.key, order);
+    handleStatusUpdate(sock, snap.key, order, t, tenant, processedStatus);
   });
 }
 
@@ -116,16 +122,16 @@ async function notifyRiderAssignment(sock, orderId, order) {
 
 // ─── Helper: broadcast pickup available to online riders ──────
 
-async function broadcastPickupAvailable(sock, orderId, order) {
+async function broadcastPickupAvailable(sock, orderId, order, t) {
   try {
     if (!sock) return;
-    const riders = await getData("riders") || {};
+    const riders = await t.getData("riders") || {};
     const onlineRiders = Object.entries(riders)
       .map(([uid, data]) => ({ uid, ...data }))
       .filter(r => r.status === "online" && r.phone);
 
     if (onlineRiders.length === 0) {
-      console.log(`[Monitor] No online riders to notify for #${orderId.slice(-6)}`);
+      console.log(`[Monitor] [${t.label}] No online riders to notify for #${orderId.slice(-6)}`);
       return;
     }
 
@@ -170,7 +176,7 @@ async function broadcastPickupAvailable(sock, orderId, order) {
 /**
  * Sends notifications based on the status.
  */
-async function handleStatusUpdate(sock, orderId, order, isNew = false) {
+async function handleStatusUpdate(sock, orderId, order, t, tenant, processedStatus, isNew = false) {
   const currentStatus = order.status || "Placed";
   const currentRider = order.riderId || "";
   const prev = processedStatus[orderId] || {};
@@ -178,56 +184,50 @@ async function handleStatusUpdate(sock, orderId, order, isNew = false) {
   const prevRider = prev.riderId || "";
   const isRiderChanged = !!(currentRider && currentRider !== prevRider);
 
-  // Skip if nothing changed (status same, rider same, not new)
   if (prevStatus === currentStatus && !isNew && !isRiderChanged) return;
 
-  // Update tracking
   processedStatus[orderId] = { status: currentStatus, riderId: currentRider, timestamp: Date.now() };
 
-  console.log(`[Monitor] Order #${orderId} status: ${prevStatus||'new'} → ${currentStatus}${isRiderChanged ? ' (rider changed)' : ''}`);
+  console.log(`[Monitor] [${tenant.label}] Order #${orderId} status: ${prevStatus||'new'} → ${currentStatus}${isRiderChanged ? ' (rider changed)' : ''}`);
 
-  // --- HANDLE RIDER ASSIGNMENT (separate from status change) ---
   if (isRiderChanged) {
     const riderStatuses = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Packed", "Out for Delivery", "Reached Drop Location", "Delivered"];
-    console.log(`[Monitor] Rider change detected for #${orderId.slice(-6)}: ${prevRider||'none'} → ${currentRider}`);
+    console.log(`[Monitor] [${tenant.label}] Rider change detected for #${orderId.slice(-6)}: ${prevRider||'none'} → ${currentRider}`);
     await notifyRiderAssignment(sock, orderId, order);
   }
 
-  // --- NOTIFY ADMIN ON NEW ORDER ---
   if (isNew && currentStatus === "Placed") {
-    const storeSettings = await getData('settings/Store') || {};
+    const storeSettings = await t.getData('settings/Store') || {};
     const adminPhone = storeSettings.reportPhone;
-    
-    if (adminPhone) {
-        const adminJid = formatJid(adminPhone);
-        const items = getOrderItems(order);
-        const orderSummary = items.length > 0 ? 
-            items.map(i => `- ${i.qty || 1}x ${i.name || i.item || 'Item'}`).join('\n') :
-            "_Items summary unavailable_";
 
-        const adminMsg = `🔔 *NEW WEBSITE ORDER!* 🚀\n━━━━━━━━━━━━━━━━━━━━\n🆔 *Order:* #${orderId.slice(-6).toUpperCase()}\n👤 *Customer:* ${order.customerName || 'Guest'}\n📞 *Phone:* ${order.phone || 'N/A'}\n📍 *Address:* ${order.address || 'Counter Sale'}\n\n📦 *Items:*\n${orderSummary}\n\n💰 *Total:* ₹${order.total || 0}\n━━━━━━━━━━━━━━━━━━━━\n_Action required: Confirm order in Admin Dashboard._`;
-        
-        try {
-            await sock.sendMessage(adminJid, { text: adminMsg });
-            console.log(`[Monitor] Admin notified of new order #${orderId}`);
-        } catch (err) {
-            console.error(`[Monitor] Failed to notify admin ${adminJid}:`, err.message);
-        }
+    if (adminPhone) {
+      const adminJid = formatJid(adminPhone);
+      const items = getOrderItems(order);
+      const orderSummary = items.length > 0 ?
+        items.map(i => `- ${i.qty || 1}x ${i.name || i.item || 'Item'}`).join('\n') :
+        "_Items summary unavailable_";
+
+      const adminMsg = `🔔 *NEW WEBSITE ORDER!* 🚀\n━━━━━━━━━━━━━━━━━━━━\n🆔 *Order:* #${orderId.slice(-6).toUpperCase()}\n👤 *Customer:* ${order.customerName || 'Guest'}\n📞 *Phone:* ${order.phone || 'N/A'}\n📍 *Address:* ${order.address || 'Counter Sale'}\n\n📦 *Items:*\n${orderSummary}\n\n💰 *Total:* ₹${order.total || 0}\n━━━━━━━━━━━━━━━━━━━━\n_Action required: Confirm order in Admin Dashboard._`;
+
+      try {
+        await sock.sendMessage(adminJid, { text: adminMsg });
+        console.log(`[Monitor] [${tenant.label}] Admin notified of new order #${orderId}`);
+      } catch (err) {
+        console.error(`[Monitor] [${tenant.label}] Failed to notify admin ${adminJid}:`, err.message);
+      }
     }
 
-    // --- PUSH NOTIFICATION TO ADMIN ---
-    notifyAdmins(admin, db, BUSINESS_ID, OUTLET_ID, {
-        title: "🆕 New Website Order!",
-        body: `Order #${orderId.slice(-6).toUpperCase()} from ${order.customerName} (₹${order.total})`,
-        data: { orderId, type: "NEW_ORDER", outletId: OUTLET_ID }
+    notifyAdmins(admin, db, tenant.businessId, tenant.outletId, {
+      title: "🆕 New Website Order!",
+      body: `Order #${orderId.slice(-6).toUpperCase()} from ${order.customerName} (₹${order.total})`,
+      data: { orderId, type: "NEW_ORDER", outletId: tenant.outletId }
     }).catch(e => console.error("Admin Push Error:", e));
   }
 
-  // --- NOTIFY CUSTOMER ON STATUS CHANGE ---
-  const customerJid = order.whatsappNumber || formatJid(order.phone);
+  const customerJid = order.whatsappNumber || formatJid(order.phone) || formatJid(order.customerPhone);
   if (!customerJid) return;
 
-  const botSettings = await getData('settings/Bot') || {};
+  const botSettings = await t.getData('settings/Bot') || {};
   let msg = "";
   let img = null;
 
@@ -249,14 +249,18 @@ async function handleStatusUpdate(sock, orderId, order, isNew = false) {
 
     case "Ready":
     case "Packed":
-      msg = `📦 *ORDER READY!* ✨\n━━━━━━━━━━━━━━━━━━━━\nYour order #${orderId.slice(-6).toUpperCase()} is packed and ready! 🚀\n\n${order.riderName ? `🛵 *Rider:* ${order.riderName}` : "Waiting for rider assignment."}`;
+      if (order.type === "Dine-in") {
+        msg = `🍽️ *ORDER READY TO BE SERVED!* ✨\n━━━━━━━━━━━━━━━━━━━━\nYour order #${orderId.slice(-6).toUpperCase()} is ready! Our server will bring it to your table shortly. 🚀\n\n_Thank you for dining with us!_ 🙏`;
+      } else {
+        msg = `📦 *ORDER READY!* ✨\n━━━━━━━━━━━━━━━━━━━━\nYour order #${orderId.slice(-6).toUpperCase()} is packed and ready! 🚀\n\n${order.riderName ? `🛵 *Rider:* ${order.riderName}` : "Waiting for rider assignment."}`;
+      }
       img = botSettings.imgReady || botSettings.imgCooked;
       break;
 
     case "Out for Delivery":
     case "Picked Up":
       if (!order.riderName) {
-        console.log(`[Monitor] Skipping customer notification for #${orderId.slice(-6)} — no rider assigned yet.`);
+        console.log(`[Monitor] [${tenant.label}] Skipping customer notification for #${orderId.slice(-6)} — no rider assigned yet.`);
         break;
       }
       const otp = order.otp || order.deliveryOTP || "N/A";
@@ -275,7 +279,11 @@ async function handleStatusUpdate(sock, orderId, order, isNew = false) {
       break;
 
     case "Delivered":
-      msg = `✅ *DELIVERED!* 🍕❤️\n━━━━━━━━━━━━━━━━━━━━\nEnjoy your delicious meal! 🙏\n\n_Thank you for choosing Foodhubbie._`;
+      if (order.type === "Dine-in") {
+        msg = `✅ *SERVED SUCCESSFULLY!* 🍕❤️\n━━━━━━━━━━━━━━━━━━━━\nEnjoy your delicious meal! 🙏\n\n_Thank you for dining at Foodhubbie._`;
+      } else {
+        msg = `✅ *DELIVERED!* 🍕❤️\n━━━━━━━━━━━━━━━━━━━━\nEnjoy your delicious meal! 🙏\n\n_Thank you for choosing Foodhubbie._`;
+      }
       img = botSettings.imgDelivered;
       break;
 
@@ -291,15 +299,14 @@ async function handleStatusUpdate(sock, orderId, order, isNew = false) {
       } else {
         await sock.sendMessage(customerJid, { text: msg });
       }
-      console.log(`[Monitor] ✅ ${currentStatus} notification sent to customer for #${orderId.slice(-6)}`);
+      console.log(`[Monitor] [${tenant.label}] ✅ ${currentStatus} notification sent to customer for #${orderId.slice(-6)}`);
     } catch (err) {
-      console.error(`[Monitor] Failed to notify customer ${customerJid}:`, err.message);
+      console.error(`[Monitor] [${tenant.label}] Failed to notify customer ${customerJid}:`, err.message);
     }
   }
 
-  // --- RIDER BROADCAST (only if no rider assigned yet) ---
-  if (!currentRider && !isRiderChanged && ["Cooked", "Ready", "Packed"].includes(currentStatus)) {
-    await broadcastPickupAvailable(sock, orderId, order);
+  if (!currentRider && !isRiderChanged && ["Cooked", "Ready", "Packed"].includes(currentStatus) && order.type !== "Dine-in") {
+    await broadcastPickupAvailable(sock, orderId, order, t);
   }
 }
 

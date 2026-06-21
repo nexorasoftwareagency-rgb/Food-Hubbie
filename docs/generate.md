@@ -1,5 +1,11 @@
 # Foodhubbie Generation & Seeding Guide
 
+> **Status:** Active  
+> **Audience:** DevOps, developers  
+> **Last updated:** 2026-06-04  
+> **Format:** Code-Logics · Firebase-Rules · Database-Structure · Connecting-Nodes · Complete-Flows  
+> **See also:** `docs/03-foundation/03-Scripts-Diagnostics-and-Migration.md` (canonical scripts doc)
+
 This document lists all available scripts for generating data, seeding the database, and managing system credentials.
 
 ## 🔑 Administrative Setup

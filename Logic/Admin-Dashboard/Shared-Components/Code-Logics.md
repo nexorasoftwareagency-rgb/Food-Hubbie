@@ -49,7 +49,7 @@ All Firebase RTDB functions (`ref`, `onValue`, `set`, `update`, `push`, `remove`
 ## Module-Level Helpers (`App.jsx` lines 16–57)
 
 ### Constants
-- **`ORANGE = "#f36b21"`**, `COLORS` object
+- **`ORANGE = "#E84908"`**, `COLORS` object
 - **`ORD_ST`** — 9 order statuses
 - **`ORDER_STATUSES`** — 7 order statuses
 - **`SEQ`** array — status transition sequence

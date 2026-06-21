@@ -1,8 +1,10 @@
 # Foodhubbie — Deep 100% Audit & Verification Plan
 
-**Date:** May 21, 2026  
-**Scope:** Complete platform verification — every file, every flow, every button, every cross-app integration  
-**Status:** Planning Phase
+> **Status:** 📜 HISTORICAL — Superseded by `docs/00-master/00-INDEX.md` (master TOC) + `Logic/` (per-page specs)  
+> **Date:** May 21, 2026  
+> **Scope:** Complete platform verification — every file, every flow, every button, every cross-app integration  
+> **Format:** Code-Logics · Firebase-Rules · Database-Structure · Connecting-Nodes · Complete-Flows  
+> **See also:** `docs/00-master/00-INDEX.md` (current master TOC)
 
 ---
 

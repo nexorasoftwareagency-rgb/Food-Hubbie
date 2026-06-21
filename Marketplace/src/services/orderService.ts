@@ -19,8 +19,19 @@ export function statusIndex(status: string): number {
  * Submit order to Firebase and sync with admin-dashboard
  */
 export async function submitOrder(input: PlaceOrderInput): Promise<string> {
+  // Multi-tenant safety: every order MUST carry a businessId.
+  // Hardcoding a fallback would silently misroute non-Roshani orders.
+  const bid = (input.businessId || "").trim();
+  if (!bid) {
+    throw new Error(
+      "Order is missing businessId. The selected cart/outlet did not supply a tenant. Aborting to prevent misrouted write."
+    );
+  }
+  if (!input.outletId) {
+    throw new Error("Order is missing outletId. Aborting.");
+  }
+
   const now = new Date().toISOString();
-  const bid = input.businessId || "business_roshani";
   
   // 1. Fetch Business Commission Config
   let commissionConfig = { percentage: 0, fixed: 0 };
@@ -251,7 +262,8 @@ export function persistOrders(orders: Order[]): void {
 
 export type PlaceOrderInput = {
   pregeneratedOrderId?: string;
-  businessId?: string;
+  /** REQUIRED: tenant id of the business the order belongs to. */
+  businessId: string;
   outletId: string;
   outletName?: string;
   items: CartItem[];

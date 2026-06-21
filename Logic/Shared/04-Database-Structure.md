@@ -156,7 +156,7 @@ Placed → Confirmed → Preparing → Cooked → Ready → Out for Delivery →
 | Preparing | Preparing | #8b5cf6 | #ede9fe |
 | Cooked | Cooked | #06b6d4 | #cffafe |
 | Ready | Ready | #0ea5e9 | #e0f2fe |
-| Out for Delivery | Out for Delivery | #f36b21 | #ffedd5 |
+| Out for Delivery | Out for Delivery | #E84908 | #ffedd5 |
 | Reached Drop Location | Reached Drop | #f97316 | #fff7ed |
 | Delivered | Delivered | #22c55e | #dcfce7 |
 | Cancelled | Cancelled | #ef4444 | #fee2e2 |

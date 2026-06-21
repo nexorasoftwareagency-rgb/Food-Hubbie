@@ -324,7 +324,7 @@ function buildOrdersChart(statusCounts) {
   const colors = {
     Pending: '#f59e0b',
     Confirmed: '#3b82f6',
-    Preparing: '#f36b21',
+    Preparing: '#E84908',
     'Out for Delivery': '#06b6d4',
     Delivered: '#10b981',
     Cancelled: '#ef4444'

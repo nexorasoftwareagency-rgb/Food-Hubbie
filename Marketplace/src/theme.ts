@@ -1,7 +1,11 @@
 // ─── Theme Engine ─────────────────────────────────────────────────────────────
 // SaaS-ready: each business can receive a custom ThemeConfig at runtime.
-// Currently uses the default Foodhubbie theme (Forest Green / Amber / Cream).
-// Future: fetch from /api/business/:id/theme and call applyTheme(config).
+// Tokens are sourced from the shared brand registry at
+// `config/theme-tokens.js` so per-app palettes stay in sync with the
+// central design source. Multi-tenant overrides are resolved by
+// `resolveMarketplaceTheme(businessId)`.
+
+import { TOKENS, resolveMarketplaceTheme } from "../../config/theme-tokens.js";
 
 export type ThemeConfig = {
   primary: string;
@@ -18,18 +22,18 @@ export type ThemeConfig = {
 };
 
 export const defaultTheme: ThemeConfig = {
-  primary: "160 91% 20%",
-  secondary: "38 92% 50%",
-  background: "48 100% 97%",
-  foreground: "160 50% 8%",
-  card: "48 80% 98%",
-  muted: "48 60% 92%",
-  radius: "0.75rem",
-  fontSans: "'Plus Jakarta Sans', sans-serif",
-  fontHeading: "'Syne', sans-serif",
-  brandName: "Foodhubbie",
-  logoText: "FH",
+  ...TOKENS.marketplace,
 };
+
+/**
+ * Resolve the theme for a given tenant (businessId).
+ * Falls back to the default Marketplace palette when the
+ * business has no override registered.
+ */
+export function getThemeForTenant(businessId: string | null | undefined): ThemeConfig {
+  const resolved = resolveMarketplaceTheme(businessId ?? "");
+  return { ...defaultTheme, ...resolved };
+}
 
 /**
  * Apply a ThemeConfig by writing CSS custom properties to :root.

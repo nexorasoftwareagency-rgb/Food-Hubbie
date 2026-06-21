@@ -41,6 +41,7 @@ export function ProductCustomizationModal({ item, isOpen, onClose }: ProductCust
         quantity,
         image: item.image,
         outletId: item.outletId,
+        businessId: item.businessId,
         basePrice: basePrice,
         customization: {
           size: selectedSize,

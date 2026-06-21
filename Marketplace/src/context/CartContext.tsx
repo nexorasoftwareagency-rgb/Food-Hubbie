@@ -8,6 +8,7 @@ import type { Coupon } from "@/services/promotionService";
 type CartState = {
   items: CartItem[];
   outletId: string | null;
+  businessId: string | null;
   pendingItem: CartItem | null;
   appliedCoupon: Coupon | null;
 };
@@ -19,13 +20,14 @@ type CartAction =
   | { type: "CLEAR_CART" }
   | { type: "SET_PENDING"; payload: CartItem | null }
   | { type: "CONFIRM_SWITCH_OUTLET" }
-  | { type: "SYNC_FROM_DB"; payload: { items: CartItem[]; outletId: string | null; appliedCoupon?: Coupon | null } }
+  | { type: "SYNC_FROM_DB"; payload: { items: CartItem[]; outletId: string | null; businessId?: string | null; appliedCoupon?: Coupon | null } }
   | { type: "APPLY_COUPON"; payload: Coupon }
   | { type: "REMOVE_COUPON" };
 
 const initialState: CartState = {
   items: [],
   outletId: null,
+  businessId: null,
   pendingItem: null,
   appliedCoupon: null,
 };
@@ -63,6 +65,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: newItems,
         outletId: action.payload.outletId,
+        businessId: action.payload.businessId ?? state.businessId,
         pendingItem: null,
       };
     }
@@ -72,6 +75,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return {
         items: [state.pendingItem],
         outletId: state.pendingItem.outletId,
+        businessId: state.pendingItem.businessId ?? null,
         pendingItem: null,
         appliedCoupon: null,
       };
@@ -86,6 +90,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: newItems,
         outletId: newItems.length > 0 ? state.outletId : null,
+        businessId: newItems.length > 0 ? state.businessId : null,
       };
     }
 
@@ -112,6 +117,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: action.payload.items,
         outletId: action.payload.outletId,
+        businessId: action.payload.businessId ?? state.businessId,
         appliedCoupon: action.payload.appliedCoupon || null,
       };
 
@@ -186,6 +192,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
               payload: { 
                 items: data.items || [], 
                 outletId: data.outletId || null,
+                businessId: data.businessId || null,
                 appliedCoupon: data.appliedCoupon || null
               } 
             });
@@ -217,6 +224,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           await set(cartRef, {
             items: state.items,
             outletId: state.outletId,
+            businessId: state.businessId,
             appliedCoupon: state.appliedCoupon,
             updatedAt: Date.now()
           });
@@ -226,7 +234,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       };
       persistCart();
     }
-  }, [state.items, state.outletId, state.appliedCoupon, authState, user]);
+  }, [state.items, state.outletId, state.businessId, state.appliedCoupon, authState, user]);
 
   return (
     <CartContext.Provider

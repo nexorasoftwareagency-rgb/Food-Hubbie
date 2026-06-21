@@ -1,0 +1,19 @@
+{
+  "name": "FoodHubbie Admin",
+  "short_name": "FH Admin",
+  "description": "Outlet admin dashboard for FoodHubbie — orders, POS, inventory, riders, and more.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f8fafc",
+  "theme_color": "#f36b21",
+  "icons": [
+    {
+      "src": "/icons.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

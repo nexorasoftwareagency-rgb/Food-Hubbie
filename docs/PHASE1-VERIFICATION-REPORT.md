@@ -1,8 +1,10 @@
 # Phase 1: Architecture & Security Audit — Verification Report
 
-**Date:** May 21, 2026  
-**Status:** ✅ COMPLETE  
-**Result:** 18/18 checks passed, 1 critical issue flagged
+> **Status:** 📜 HISTORICAL — Superseded by `docs/00-master/00-ARCHITECTURE.md` + `docs/03-foundation/03-Database-Security-Rules.md`  
+> **Date:** May 21, 2026  
+> **Result:** 18/18 checks passed, 1 critical issue flagged  
+> **Format:** Code-Logics · Firebase-Rules · Database-Structure · Connecting-Nodes · Complete-Flows  
+> **See also:** `docs/00-master/00-ARCHITECTURE.md` (current C4 model) · `docs/04-management/04-Security-and-RBAC.md` (current security + RBAC)
 
 ---
 

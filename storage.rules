@@ -7,15 +7,24 @@ service firebase.storage {
       return request.auth != null && request.auth.token.admin == true;
     }
 
+    // Helper: max image size (300KB)
+    function maxDishImageSize() {
+      return 300 * 1024;
+    }
+
     // ADMINS: Full access
     match /admins/{adminId}/{allPaths=**} {
       allow read, write: if isAdmin();
     }
 
-    // RIDERS: Admin write, self/admin read
+    // RIDERS: Admin write, self read, self photo upload (300KB)
     match /riders/{riderId}/{allPaths=**} {
       allow read: if request.auth != null && (isAdmin() || request.auth.uid == riderId);
       allow write: if isAdmin();
+      allow write: if request.auth != null
+                   && request.auth.uid == riderId
+                   && request.resource.size < maxDishImageSize()
+                   && request.resource.contentType.matches('image/.*');
     }
 
     // BOT: WhatsApp order/status images
@@ -26,18 +35,22 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
-    // OUTLET DISHES: Authenticated + same outlet OR admin
+    // OUTLET DISHES: Authenticated + same outlet OR admin (300KB limit)
     match /{outlet}/dishes/{dishId}/{allPaths=**} {
       allow read: if request.auth != null &&
         (isAdmin() || request.auth.token.outlet == outlet);
-      allow write: if isAdmin();
+      allow write: if isAdmin()
+                   && request.resource.size < maxDishImageSize()
+                   && request.resource.contentType.matches('image/.*');
     }
 
-    // OUTLET CATEGORIES: Authenticated + same outlet OR admin
+    // OUTLET CATEGORIES: Authenticated + same outlet OR admin (300KB limit)
     match /{outlet}/categories/{catId}/{allPaths=**} {
       allow read: if request.auth != null &&
         (isAdmin() || request.auth.token.outlet == outlet);
-      allow write: if isAdmin();
+      allow write: if isAdmin()
+                   && request.resource.size < maxDishImageSize()
+                   && request.resource.contentType.matches('image/.*');
     }
 
     // RECEIPTS: Admin only

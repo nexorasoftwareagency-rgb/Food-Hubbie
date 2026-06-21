@@ -1,5 +1,11 @@
 # Foodhubbie ShopAdmin — Complete Operations Manual
 
+> **Codebase:** `admin-dashboard` v2 (React 18 + Vite + Tailwind 4 + Firebase modular SDK).
+> The legacy vanilla-JS ShopAdmin v1 is archived at `archive/Admin-Previous-legacy-v1/`
+> and is no longer in use. See `docs/shopadmin-v2-parity.md` for a full v1 → v2
+> capability map and `admin-dashboard/src/utils/printing.js` for the multi-tenant
+> receipt/KOT builder.
+
 ## Table of Contents
 1. [Getting Started](#1-getting-started)
 2. [Dashboard](#2-dashboard)
@@ -20,10 +26,15 @@
 ## 1. Getting Started
 
 ### Login
-1. Open the ShopAdmin URL in your browser
+1. Open the ShopAdmin URL in your browser (production: the `admin` Firebase
+   Hosting target; local dev: `npm run dev` inside `admin-dashboard/`)
 2. Enter your **Email** and **Password** on the login form
 3. Click **"Sign In to Dashboard"**
 4. You will be redirected to the main dashboard
+
+> v2 uses Firebase Auth through the **modular SDK** (`admin-dashboard/src/firebase.js`)
+> and a single-page React app. Sessions are persisted client-side; logging out
+> from the sidebar fully clears the auth token.
 
 ### Session & Security
 - Session auto-logouts after **30 minutes of inactivity**
@@ -36,6 +47,10 @@
 - **Mobile bottom bar** has 5 quick-access buttons: Dash, Orders, Live, POS, More
 - Click any menu item to switch tabs
 - The browser's back button navigates through your tab history
+
+> v2 uses **React Router** for client-side routing, so the address bar URL
+> updates as you move between sections (e.g. `/orders`, `/pos`, `/menu`).
+> Bookmarking a section URL deep-links directly to it.
 
 ---
 
@@ -469,6 +484,21 @@ As you modify settings, a **live thermal receipt preview** updates in real-time 
 
 ## 13. Printing
 
+### What changed from ShopAdmin v1
+- **v1 (archived):** vanilla-JS modules, no router, hardcoded "ROSHANI PIZZA / CAKES"
+  branding in `printing.js` and `receipt-templates.js`, settings stored in a
+  single monolithic config.
+- **v2 (current):** React SPA with React Router, Tailwind 4 design system,
+  componentized sidebar/sections, multi-tenant printing in
+  `utils/printing.js`, modular Firebase SDK, section-level data hooks in
+  `hooks/useRealtimeData.js`.
+- **Net-new in v2:** `Analytics`, `Feedback`, `Inventory`, `LiveOps`,
+  `LostSales`, `Notifications`, `Partners`, `Riders`, `Settlements` —
+  none of these existed as standalone sections in v1.
+- For the full audit, see `docs/shopadmin-v2-parity.md`. The v1 codebase
+  is preserved at `archive/Admin-Previous-legacy-v1/` for historical
+  reference only and is **not** deployed.
+
 ### Thermal Receipts
 - Receipts print automatically on POS sale completion
 - Click the **Print icon** on any order to reprint
@@ -484,3 +514,10 @@ As you modify settings, a **live thermal receipt preview** updates in real-time 
 ### Print Settings
 - Receipt format is configured in **Settings** (show/hide store name, address, GSTIN, etc.)
 - The receipt preview updates in real-time as you configure
+
+> Receipts and KOTs are produced by `admin-dashboard/src/utils/printing.js`
+> (`printReceipt` / `printKOT` / `buildReceiptHtml` / `buildKotHtml`). The
+> builder is **multi-tenant**: store name, address, GSTIN, FSSAI, and tagline
+> all come from the active business's settings node — there is no hardcoded
+> "ROSHANI PIZZA/CAKES" branding. Printing uses an iframe with a `load`-event
+> guard so a half-rendered receipt never auto-prints.

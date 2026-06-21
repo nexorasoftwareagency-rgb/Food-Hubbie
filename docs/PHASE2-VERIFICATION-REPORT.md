@@ -1,8 +1,10 @@
 # Phase 2: Marketplace Audit — Verification Report
 
-**Date:** May 21, 2026  
-**Status:** ✅ COMPLETE  
-**Result:** 42/47 checks passed, 5 medium issues found
+> **Status:** 📜 HISTORICAL — Superseded by `docs/01-portals/01-Marketplace.md`  
+> **Date:** May 21, 2026  
+> **Result:** 42/47 checks passed, 5 medium issues found  
+> **Format:** Code-Logics · Firebase-Rules · Database-Structure · Connecting-Nodes · Complete-Flows  
+> **See also:** `docs/01-portals/01-Marketplace.md` (current Marketplace doc)
 
 ---
 

@@ -1,8 +1,10 @@
 # Phase 3: ShopAdmin Audit — Verification Report
 
-**Date:** May 21, 2026  
-**Status:** ✅ COMPLETE  
-**Result:** 38/43 checks passed, 5 medium issues found
+> **Status:** 📜 HISTORICAL — Superseded by `docs/01-portals/01-Admin-Dashboard.md` + `docs/shopadmin-v2-parity.md`  
+> **Date:** May 21, 2026  
+> **Result:** 38/43 checks passed, 5 medium issues found  
+> **Format:** Code-Logics · Firebase-Rules · Database-Structure · Connecting-Nodes · Complete-Flows  
+> **See also:** `docs/01-portals/01-Admin-Dashboard.md` (current Admin Dashboard doc) · `docs/shopadmin-v2-parity.md` (v1→v2 parity)
 
 ---
 

@@ -1,28 +1,33 @@
 /**
  * ============================================================
- * FOODHUBBIE SAAS — Bot Command Listener
+ * FOODHUBBIE SAAS — Bot Command Listener (tenant-aware)
  * ============================================================
  * Listens for commands from the Admin Dashboard at:
- * bot/{businessId}/{outletId}/commands
+ * bot/{businessId}/{outletId}/botCommands
+ * ============================================================
  */
 
-const { db, resolvePath, getData } = require('./firebase');
+const { db, tenantContext } = require('./firebase');
 const { formatJid } = require('../shared/utils');
 
 /**
- * Initializes the command listener.
+ * Initializes the command listener for a specific tenant.
+ *
+ * @param {object} sock - The active Baileys socket
+ * @param {{businessId: string, outletId: string, label?: string}} tenant
  */
-function initCommandListener(sock) {
-  const path = resolvePath('botCommands'); // businesses/{bid}/outlets/{oid}/botCommands
-  console.log(`[Commands] Listening for triggers at: ${path}`);
+function initCommandListener(sock, tenant) {
+  const t = tenantContext(tenant);
+  const cmdPath = t.resolvePath('botCommands');
+  console.log(`[Commands] [${tenant.label}] Listening for triggers at: ${cmdPath}`);
 
-  const cmdRef = db.ref(path);
-  
+  const cmdRef = db.ref(cmdPath);
+
   cmdRef.on('child_added', async (snap) => {
     const cmd = snap.val();
     if (!cmd) return;
 
-    console.log(`[Commands] Received: ${cmd.action}`);
+    console.log(`[Commands] [${tenant.label}] Received: ${cmd.action}`);
 
     try {
       switch (cmd.action) {
@@ -34,37 +39,35 @@ function initCommandListener(sock) {
           break;
 
         case "SEND_DAILY_REPORT":
-          await handleDailyReport(sock, cmd);
+          await handleDailyReport(sock, cmd, t, tenant);
           break;
-          
+
         // Add more commands as needed
       }
 
-      // Always remove command after processing
       await snap.ref.remove();
     } catch (err) {
-      console.error(`[Commands] Failed to execute ${cmd.action}:`, err.message);
+      console.error(`[Commands] [${tenant.label}] Failed to execute ${cmd.action}:`, err.message);
     }
   });
 }
 
 /**
- * Generates and sends a detailed sales report
+ * Generates and sends a detailed sales report.
  */
-async function handleDailyReport(sock, cmd) {
+async function handleDailyReport(sock, cmd, t, tenant) {
   const targetDate = cmd.targetDate || new Date().toISOString().split('T')[0];
-  console.log(`[Reports] Generating report for ${targetDate}...`);
+  console.log(`[Reports] [${tenant.label}] Generating report for ${targetDate}...`);
 
-  const ordersPath = resolvePath('orders');
-  const storeSettings = await getData('settings/Store');
+  const storeSettings = await t.getData('settings/Store');
   const adminPhone = storeSettings?.reportPhone;
 
   if (!adminPhone) {
-    console.warn("[Reports] No reportPhone found in settings. Cannot send report.");
+    console.warn(`[Reports] [${tenant.label}] No reportPhone found in settings. Cannot send report.`);
     return;
   }
 
-  const orders = await getData('orders') || {};
+  const orders = await t.getData('orders') || {};
   const dailyOrders = Object.values(orders).filter(o => {
     const raw = o.createdAt;
     let orderDate = '';
@@ -100,7 +103,6 @@ async function handleDailyReport(sock, cmd) {
     });
   });
 
-  // Sort top items
   const sortedItems = Object.entries(itemStats).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   let msg = `📊 *DAILY SALES REPORT* 🚀\n`;
@@ -109,7 +111,7 @@ async function handleDailyReport(sock, cmd) {
   msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
   msg += `📈 *Total Orders:* ${totalOrders}\n`;
   msg += `💰 *Total Revenue:* ₹${totalRevenue.toLocaleString()}\n\n`;
-  
+
   msg += `🍕 *Top Selling Items:*\n`;
   sortedItems.forEach(([name, qty]) => {
     msg += `• ${name}: ${qty}\n`;
@@ -120,7 +122,7 @@ async function handleDailyReport(sock, cmd) {
 
   const adminJid = formatJid(adminPhone);
   await sock.sendMessage(adminJid, { text: msg });
-  console.log(`[Reports] Report sent to ${adminPhone}`);
+  console.log(`[Reports] [${tenant.label}] Report sent to ${adminPhone}`);
 }
 
 module.exports = {

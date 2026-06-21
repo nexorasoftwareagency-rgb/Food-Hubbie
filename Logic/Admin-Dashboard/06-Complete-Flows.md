@@ -12,7 +12,7 @@
 4. [Loading state] — Shows FoodHubbie logo + spinner animation
    │
 5a. [No user] — Renders login screen:
-      ├── Full-screen orange gradient background (bg: #f36b21 → #e85d19)
+      ├── Full-screen orange gradient background (bg: #E84908 → #D94400)
       ├── GlassCard with logo + "Welcome back" text
       ├── Email input + Password input
       ├── "Sign In" button → handleLogin()

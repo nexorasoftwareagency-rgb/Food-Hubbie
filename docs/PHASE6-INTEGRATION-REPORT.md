@@ -1,8 +1,11 @@
 # Phase 6: Cross-App Integration Testing Report
 
-**Date:** 2026-05-21
-**Scope:** All 4 apps (Marketplace, ShopAdmin, RiderApp, SuperAdmin) + WhatsApp Bot
-**Status:** ✅ INTEGRATION VERIFIED - MINOR ISSUES FOUND
+> **Status:** 📜 HISTORICAL — Superseded by `docs/03-foundation/03-Connectivity-Map.md`  
+> **Date:** 2026-05-21  
+> **Scope:** All 4 apps (Marketplace, ShopAdmin, RiderApp, SuperAdmin) + WhatsApp Bot  
+> **Result:** ✅ INTEGRATION VERIFIED - MINOR ISSUES FOUND  
+> **Format:** Code-Logics · Firebase-Rules · Database-Structure · Connecting-Nodes · Complete-Flows  
+> **See also:** `docs/03-foundation/03-Connectivity-Map.md` (current end-to-end wiring)
 
 ---
 

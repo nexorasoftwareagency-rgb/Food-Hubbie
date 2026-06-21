@@ -16,7 +16,7 @@ See `D:\Foodhubbie\Logic\Admin-Dashboard\06-Complete-Flows.md` Flow 1.
 4. [Loading state] — Shows FoodHubbie logo + spinner animation
    │
 5a. [No user] — Renders login screen:
-     ├── Full-screen orange gradient (bg: #f36b21 → #e85d19)
+     ├── Full-screen orange gradient (bg: #E84908 → #D94400)
      ├── GlassCard with logo + "Welcome back"
      ├── Email + Password inputs
      ├── "Sign In" → signInWithEmailAndPassword(auth, email, password)

@@ -1,8 +1,11 @@
 # Phase 4: RiderApp Audit & Verification Report
 
-**Date:** 2026-05-21
-**Scope:** `RiderApp/app.js` (2585 lines), `RiderApp/style.css`, `RiderApp/index.html`
-**Status:** ✅ AUDITED - CRITICAL FIXES APPLIED
+> **Status:** 📜 HISTORICAL — Superseded by `docs/01-portals/01-Rider-App.md`  
+> **Date:** 2026-05-21  
+> **Scope:** `RiderApp/app.js` (2585 lines), `RiderApp/style.css`, `RiderApp/index.html`  
+> **Result:** ✅ AUDITED - CRITICAL FIXES APPLIED  
+> **Format:** Code-Logics · Firebase-Rules · Database-Structure · Connecting-Nodes · Complete-Flows  
+> **See also:** `docs/01-portals/01-Rider-App.md` (current Rider App doc)
 
 ---
 

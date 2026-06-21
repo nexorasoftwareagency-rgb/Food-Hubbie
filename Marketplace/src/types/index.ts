@@ -113,6 +113,7 @@ export type CartItem = {
   id: string;
   menuItemId: string;
   outletId: string;
+  businessId: string;
   name: string;
   image: string;
   basePrice: number;

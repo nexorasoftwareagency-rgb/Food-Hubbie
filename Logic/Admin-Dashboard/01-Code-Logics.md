@@ -56,7 +56,7 @@ Top-level nodes:
 - `SEQ` — Sequential status array: Placed → Confirmed → Preparing → Cooked → Ready → Out for Delivery → Reached Drop Location → Delivered (+ Cancelled)
 - `LIVE_ST` — Statuses considered active/live
 - `PIE_COLORS` — 6 chart colors
-- `ORANGE = "#f36b21"` — Brand color
+- `ORANGE = "#E84908"` — Brand color
 
 ## Shared Inline Components
 

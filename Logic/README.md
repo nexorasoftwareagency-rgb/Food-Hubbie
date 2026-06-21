@@ -1,5 +1,9 @@
 # Foodhubbie — Logic Knowledge Base
 
+> **New**: Higher-level portal & infrastructure docs live in `docs/` (21 files, 5 categories).  
+> See `docs/00-master/00-INDEX.md#docs--logic-cross-reference` for the full mapping.  
+> This directory (`Logic/`) contains per-page granular docs — use `docs/` for system-level understanding first, then drill into `Logic/` for implementation details.
+
 ## Structure
 
 ```
@@ -335,6 +339,20 @@ Every page subfolder contains these 6 files:
 | Infrastructure | `Settings/` | 6 |
 
 **Totals**: 6 root + 90 tabs = **96 files** (complete)
+
+## Cross-Reference to `docs/`
+
+| `Logic/` app | `docs/` overview file | `docs/` supplementary files |
+|---|---|---|
+| Shared | `03-Shared-Utilities.md` | `03-Config-and-Theme-Tokens.md`, `03-Database-Security-Rules.md` |
+| Admin Dashboard | `01-Admin-Dashboard.md` | `04-Business-Rules.md` (pricing/status rules) |
+| Bot | `02-Multi-Tenant-Bot-Engine.md` | `02-Order-Status-Monitor.md`, `02-Roshani-Pizza-Bot-Legacy.md` |
+| Marketplace | `01-Marketplace.md` | `03-Mission-Service-Layer.md` (service contracts) |
+| Rider App | `01-Rider-App.md` | `03-Connectivity-Map.md` (order lifecycle) |
+| SuperAdmin | `01-SuperAdmin.md` | `04-Security-and-RBAC.md` (2FA + RBAC) |
+| SupremeAdmin | `01-SupremeAdmin.md` | `03-Deployment-and-Hosting.md` (hosting topology) |
+
+> **Navigation tip**: Start at `docs/00-master/00-INDEX.md` → find your app's overview → then come to `Logic/` for per-page details.
 
 ## Grand Totals
 
