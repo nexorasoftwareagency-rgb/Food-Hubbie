@@ -58,7 +58,6 @@ scratch/
 # Legacy artifacts to prune (these should not be committed)
 Pizza-bot/
 Cake-bot/
-roshani-pizza-bot/
 QR Ordering Feature/
 rider_old/
 graphify-out/

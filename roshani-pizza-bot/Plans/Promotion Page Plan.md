@@ -1,47 +1,9 @@
 # Promotion Page Plan — Roshani ERP
 
-**Status:** ✅ IMPLEMENTED (v4.14.9)
+**Status:** Researched, refined after self-review, awaiting implementation
 **Target branch / module:** Admin dashboard + WhatsApp bot (Baileys)
 **Created:** 2026-06-02 · **Last refined:** 2026-06-02
 **Companion docs:** `Discount Control Panel Feature.md` (sister feature), `Review and Improvements.md` (audit trail of what was added in this revision)
-
----
-
-## ✅ Implementation Status (v4.14.9 — 2026-06-02)
-
-### Implemented
-| § | Section | Status | File(s) |
-|---|---------|--------|---------|
-| §2 | Scope (all 24 items) | ✅ Done | `promotions.js` (972L), `promotions-templates.js` (216L), `promotions-guide.js` (60L) |
-| §3 | Architecture + Firebase schema | ✅ Done | `bot/{outlet}/promotions/` tree, commands channel |
-| §4 | Pre-Flight Must-Haves (all 10) | ✅ Done | Kill switch, quiet hours, resume, consent, audit log |
-| §5 | Files to Touch (all) | ✅ Done | 3 new JS modules + index.html + main.js + state.js + style.css |
-| §6 | UI Wireframe | ✅ Done | Composer, recipient picker, control panel, progress bar |
-| §7 | Bot-Side Implementation (A–K) | ✅ Done | `runPromotionCampaign`, STOP/START, resume-on-startup, lock, kill-switch |
-| §8 | Admin-Side Implementation (A–H) | ✅ Done | CSV auto-detect, test send, live progress, kill-switch UI, clone, export |
-| §9 | Safety / Compliance (all) | ✅ Done | Throttle, quiet hours, dedup, retry, socket health, kill-switch |
-| §10 | Personalization Tokens | ✅ Done | `{name}`, `{phone}`, `{lastOrderDate}`, `{storeName}`, `{couponCode}` |
-| §11 | Testing & Rollback | ✅ Done | Feature flag at `promotions/enabled` |
-
-### Not Yet Implemented (from CHANGELOG Unreleased — v5.1.6)
-- Campaign list/builder polish
-- Scheduled pickup + auto-expiry (5-min heartbeat partially implemented)
-- Opt-out handling completeness audit
-- Image attachment in template (code exists, needs testing)
-- i18n on promotions module
-
-### Files Created
-- `Admin/js/features/promotions.js` (972L) — composer, recipient builder, campaign launcher, live progress, kill switch, clone, CSV export
-- `Admin/js/features/promotions-templates.js` (216L) — template CRUD, save/load/delete
-- `Admin/js/features/promotions-guide.js` (60L) — 6-step guide modal content
-
-### Files Modified
-- `bot/index.js` (+730L) — `SEND_PROMOTION` handler, `runPromotionCampaign()`, STOP/START opt-out, resume-on-startup, `sendPromotionalMessage()` (bypasses `appendContactInfo`)
-- `Admin/index.html` — new `tab-promotions` div, Marketing sidebar group, guide modal, kill-switch button
-- `Admin/js/main.js` — click handlers for promo actions
-- `Admin/js/state.js` — `state.promotions` cache
-- `Admin/style.css` (+657L) — composer, progress bar, campaign card styles
-- `Admin/mobile-overrides.css` (+128L) — mobile responsive overrides
 
 ---
 

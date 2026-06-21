@@ -1,50 +1,9 @@
 # Discount Control Panel — Feature Plan
 
-**Status:** ✅ IMPLEMENTED (v4.14.8)
+**Status:** Researched, refined after self-review, awaiting implementation (follow-up to Promotions Page)
 **Target branch / module:** Admin dashboard + POS + WhatsApp bot + RTDB schema
 **Created:** 2026-06-02 · **Last refined:** 2026-06-02
 **Companion docs:** `Promotion Page Plan.md` (sister feature), `Review and Improvements.md` (audit trail of what was added in this revision)
-
----
-
-## ✅ Implementation Status (v4.14.8 — 2026-06-02)
-
-### Implemented
-| § | Section | Status | File(s) |
-|---|---------|--------|---------|
-| §4 | Pre-Flight Must-Haves (all 6) | ✅ Done | `bot/discount-engine.js`, `Admin/js/features/discount-evaluator.js`, `Admin/receipt-templates.js` |
-| §5 | Database Schema (`discounts/`, `discountsUsage/`) | ✅ Done | `database.rules.json`, `bot/discount-engine.js:137-160` |
-| §6 | Files to Touch (all) | ✅ Done | `discounts.js` (331L), `discount-evaluator.js` (161L), `discountsReports.js` (284L) |
-| §7 | Bot AWAIT_COUPON state machine | ✅ Done | `bot/index.js` (+730L) |
-| §8 | Discount Engine (shared helper) | ✅ Done | `Admin/js/features/discount-evaluator.js` (161L) + `bot/discount-engine.js` (171L) |
-| §9 | Order-Time Behavior | ✅ Done | Both POS and bot paths integrated |
-| §10 | Receipt & Invoice Changes | ✅ Done | `formatDiscountLine()` helper in 5 invoice spots |
-| §11 | UI Wireframe (Discounts tab) | ✅ Done | `Admin/js/features/discounts.js` with active/scheduled/expired tabs |
-| §12 | Edge Cases & Safety | ✅ Done | Feature flag, cache, exclusivity groups, manual override |
-| §13 | Refund Policy | ✅ Done | `recordDiscountUsage` + `runTransaction` for stats |
-| §14 | Testing & Rollback | ✅ Done | Feature flag at `discounts/featureEnabled` |
-| §15 | Migration | ✅ Done | No data migration needed |
-
-### Not Yet Implemented (v2 deferred)
-- §18. v2 features (item-level discounts, BXGY, loyalty tiers, A/B testing, multi-code coupons)
-- Discount analytics dashboard (revenue impact calculation)
-- Pre-expiry admin warnings (72h banner)
-- Bulk discount application
-
-### Files Created
-- `bot/discount-engine.js` (171L) — bot-side evaluator + cache + coupon validation + usage recording
-- `Admin/js/features/discount-evaluator.js` (161L) — shared Admin-side evaluator
-- `Admin/js/features/discounts.js` (331L) — CRUD UI with tabs
-- `Admin/js/features/discountsReports.js` (284L) — analytics modal (KPIs, per-discount breakdown, channel split, CSV export)
-
-### Files Modified
-- `bot/index.js` (+730L) — AWAIT_COUPON state, `evaluateAndApplyDiscount()`, 5 invoice lines updated
-- `Admin/index.html` — new `tab-discounts` div, Marketing sidebar group
-- `Admin/js/main.js` — click handlers for discount actions
-- `Admin/js/state.js` — `state.discounts` cache
-- `Admin/js/features/pos.js` — auto-discount + manual override in POS
-- `Admin/receipt-templates.js` — discount label + source on receipt
-- `database.rules.json` — `discounts` and `discountsUsage` rules
 
 ---
 

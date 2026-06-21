@@ -6,8 +6,9 @@
  */
 
 import {
-    Outlet, ref, get, onValue, set, update, remove, push, runTransaction,
-    query, orderByChild, equalTo, limitToLast, serverTimestamp
+    db, Outlet, ref, get, onValue, set, update, remove, push, runTransaction,
+    query, orderByChild, equalTo, limitToLast, serverTimestamp,
+    isConnected, onConnectionChange
 } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast, showConfirm } from '../ui-utils.js';
@@ -34,10 +35,11 @@ let _promoEnabledLocal = true;
 let _botOnline = true;
 let _allCampaignsSnap = {};
 let _lastRecipientsCount = 0;
+let _connUnsub = null;
 
 function _outlet() { return state.currentOutlet || 'pizza'; }
 function _ref(path) { return Outlet.ref(path); }
-function _promoRef(sub) { return Outlet.ref(`promotions/${sub}`); }
+function _promoRef(sub) { return ref(db, `bot/${_outlet()}/promotions/${sub}`); }
 function _nowMs() { return Date.now(); }
 function _fmtDate(ms) {
     if (!ms) return '—';
@@ -278,15 +280,21 @@ function _attachCampaignListener() {
     if (_botStatusListener) { _botStatusListener(); _botStatusListener = null; }
     if (_enabledListener) { _enabledListener(); _enabledListener = null; }
 
+    const _promoErr = (ctx) => (err) => {
+        console.error(`[Promo] ${ctx} read error:`, err);
+        const el = document.getElementById('promoCampaignList');
+        if (el) el.innerHTML = '<div class="offline-placeholder"><div class="offline-icon">⚠️</div><h4>Permission denied</h4><p>Could not load campaign data. Try refreshing the page.</p></div>';
+    };
     _campaignListener = onValue(_promoRef('campaigns'), (snap) => {
         const val = snap.val() || {};
         _allCampaignsSnap = val;
         _renderActivePane();
         _renderHistoryPane();
-    });
+        _switchMode('active');
+    }, _promoErr('campaigns'));
     _killSwitchListener = onValue(_promoRef('killSwitch'), (snap) => {
         _setKillSwitchUi(snap.val() === true);
-    });
+    }, _promoErr('killSwitch'));
     // Bot status is now tracked by Admin/js/bot-status.js which dispatches
     // 'botStatusChange' events. We listen for that event here.
     window._botStatusEventHandler = (e) => {
@@ -302,7 +310,7 @@ function _attachCampaignListener() {
     _enabledListener = onValue(_promoRef('enabled'), (snap) => {
         // null = enabled by default, false = disabled
         _setPromoEnabledUi(snap.val() !== false);
-    });
+    }, _promoErr('enabled'));
 }
 
 export function cleanupPromotions() {
@@ -314,6 +322,7 @@ export function cleanupPromotions() {
         window._botStatusEventHandler = null;
     }
     if (_enabledListener) { _enabledListener(); _enabledListener = null; }
+    if (_connUnsub) { _connUnsub(); _connUnsub = null; }
 }
 
 /* ============ RENDERERS ============ */
@@ -724,7 +733,7 @@ function _switchMode(mode) {
 
 export function loadPromotions() {
     logger.info('PROMO', 'Loading promotions tab…');
-    _attachCampaignListener();
+    if (_connUnsub) { _connUnsub(); _connUnsub = null; }
     _setOfflineBanner(false);
     _refreshLaunchButton();
 
@@ -863,6 +872,19 @@ export function loadPromotions() {
 
     _wireActions();
     _switchMode('now');
+
+    if (isConnected()) {
+        _attachCampaignListener();
+    } else {
+        const el = document.getElementById('promoCampaignList');
+        if (el) el.innerHTML = '<div class="offline-placeholder"><div class="offline-icon">📡</div><h4>Waiting for connection</h4><p>Firebase is currently unreachable. Campaign data will load automatically when the connection is restored.</p></div>';
+        if (!_connUnsub) _connUnsub = onConnectionChange(function _retryPromo(online) {
+            if (!online) return;
+            if (_connUnsub) { _connUnsub(); _connUnsub = null; }
+            cleanupPromotions();
+            loadPromotions();
+        });
+    }
 }
 
 /* ============ SAMPLE TEMPLATE DOWNLOAD ============ */

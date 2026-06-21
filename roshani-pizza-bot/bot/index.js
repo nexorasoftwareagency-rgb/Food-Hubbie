@@ -50,8 +50,6 @@ let redisClient;
 let cachedAdminJids = null;
 let cachedAdminJidsExpiry = 0;
 const ADMIN_CACHE_TTL = 300000;
-const AUDIT_LOG_TTL_MS = 90 * 24 * 60 * 60 * 1000;  // 90 days
-const BOT_DELIVERY_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;  // 30 days
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 if (redisUrl.includes('clustercfg')) {
@@ -852,12 +850,6 @@ async function startBot() {
 
         // 5. Expire promotion logs older than 30 days (best-effort, every 5 min)
         promo.expireOldPromoLogs(OUTLET, db).catch(err => console.error("[Promo] Log expiry error:", err));
-
-        // 6. Expire audit logs older than 90 days (best-effort, every 5 min)
-        expireOldAuditLogs().catch(err => console.error("[Audit] Log expiry error:", err));
-
-        // 7. Expire bot delivery logs older than 30 days (best-effort, every 5 min)
-        expireOldBotDeliveryLogs().catch(err => console.error("[BotLogs] Log expiry error:", err));
     }, 300000);
 
     // Firebase Listeners — Only initialize once, reuse across reconnects
@@ -1680,43 +1672,5 @@ async function handleCheckoutFinal(sock, sender, user) {
 
 // Promotional campaign engine lives in ./promotions.js (imported as promo above).
 
-// ── Log Cleanup ──────────────────────────────────────────────────────────────
-
-async function expireOldAuditLogs() {
-    try {
-        const snap = await db.ref('logs/audit').orderByChild('timestamp')
-            .endAt(Date.now() - AUDIT_LOG_TTL_MS).limitToFirst(200).once('value');
-        if (!snap.exists()) return;
-        const updates = {};
-        snap.forEach(child => { updates[child.key] = null; });
-        if (Object.keys(updates).length > 0) {
-            await db.ref('logs/audit').update(updates);
-            console.log(`[Audit] Expired ${Object.keys(updates).length} old log entries`);
-        }
-    } catch (e) {
-        console.error('[Audit] expireOldAuditLogs error:', e.message);
-    }
-}
-
-async function expireOldBotDeliveryLogs() {
-    try {
-        const snap = await db.ref('bot/logs').once('value');
-        if (!snap.exists()) return;
-        const logs = snap.val();
-        const cutoff = Date.now() - BOT_DELIVERY_LOG_TTL_MS;
-        const updates = {};
-        for (const [orderId, entry] of Object.entries(logs)) {
-            if ((entry.timestamp || 0) < cutoff) {
-                updates[orderId] = null;
-            }
-        }
-        if (Object.keys(updates).length > 0) {
-            await db.ref('bot/logs').update(updates);
-            console.log(`[BotLogs] Expired ${Object.keys(updates).length} old delivery logs`);
-        }
-    } catch (e) {
-        console.error('[BotLogs] expireOldBotDeliveryLogs error:', e.message);
-    }
-}
 
 startBot();

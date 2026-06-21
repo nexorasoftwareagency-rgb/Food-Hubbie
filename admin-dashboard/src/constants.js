@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingBag, Zap, ChefHat, Monitor, UtensilsCrossed, Table2,
   Tag, Package, Percent, Users, Bike, Handshake, BarChart3, TrendingDown,
-  CreditCard, Bell, MessageSquare, MapPin, Settings, History, Megaphone
+  CreditCard, MessageSquare, MapPin, Settings, History, Megaphone
 } from "lucide-react";
 import { db, ref } from "./firebase";
 
@@ -42,10 +42,10 @@ export const NAV_GROUPS = [
   { label:"Data", items:[{ id:"inventory",label:"Inventory",icon:Package },{ id:"customers",label:"Customers",icon:Users },{ id:"riders",label:"Riders",icon:Bike },{ id:"riderAnalytics",label:"Rider Analytics",icon:BarChart3 },{ id:"partners",label:"Partners",icon:Handshake }]},
   { label:"Insights", items:[{ id:"analytics",label:"Analytics",icon:BarChart3 },{ id:"lostsales",label:"Lost Sales",icon:TrendingDown },{ id:"settlements",label:"Settlements",icon:CreditCard },{ id:"payments",label:"Payments",icon:CreditCard }]},
   { label:"Marketing", items:[{ id:"promotions",label:"Promotions",icon:Megaphone }]},
-  { label:"Tools", items:[{ id:"notifications",label:"Notifications",icon:Bell,badge:"3" },{ id:"activitylog",label:"Activity Log",icon:History },{ id:"feedback",label:"Feedback",icon:MessageSquare },{ id:"livetracker",label:"Live Tracker",icon:MapPin },{ id:"settings",label:"Settings",icon:Settings }]},
+  { label:"Tools", items:[{ id:"activitylog",label:"Activity Log",icon:History },{ id:"feedback",label:"Feedback",icon:MessageSquare },{ id:"livetracker",label:"Live Tracker",icon:MapPin },{ id:"settings",label:"Settings",icon:Settings }]},
 ];
 export const MOBILE_NAV = [{ id:"dashboard",label:"Home",icon:LayoutDashboard },{ id:"orders",label:"Orders",icon:ShoppingBag },{ id:"tables",label:"Tables",icon:Table2 },{ id:"pos",label:"POS",icon:Monitor },{ id:"menu",label:"Menu",icon:UtensilsCrossed },{ id:"settings",label:"Settings",icon:Settings }];
-export const PAGE_TITLES = { dashboard:"Dashboard", orders:"Orders", liveops:"Live Operations", kitchen:"Kitchen", tables:"Tables", pos:"Point of Sale", menu:"Menu Management", categories:"Categories", discounts:"Discounts", inventory:"Inventory", customers:"Customers", riders:"Riders", riderAnalytics:"Rider Analytics", partners:"Partners", analytics:"Analytics", lostsales:"Lost Sales", settlements:"Settlements", payments:"Payments", promotions:"Promotions", notifications:"Notifications", activitylog:"Activity Log", feedback:"Customer Feedback", livetracker:"Live Rider Tracker", settings:"Settings" };
+export const PAGE_TITLES = { dashboard:"Dashboard", orders:"Orders", liveops:"Live Operations", kitchen:"Kitchen", tables:"Tables", pos:"Point of Sale", menu:"Menu Management", categories:"Categories", discounts:"Discounts", inventory:"Inventory", customers:"Customers", riders:"Riders", riderAnalytics:"Rider Analytics", partners:"Partners", analytics:"Analytics", lostsales:"Lost Sales", settlements:"Settlements", payments:"Payments", promotions:"Promotions", activitylog:"Activity Log", feedback:"Customer Feedback", livetracker:"Live Rider Tracker", settings:"Settings" };
 
 export const PARTNERS_REF = ref(db, "system/partners");
 

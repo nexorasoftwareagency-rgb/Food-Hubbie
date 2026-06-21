@@ -1,4 +1,4 @@
-import { haptic } from './utils.js';
+﻿import { haptic } from './utils.js';
 import { showToast, showConfirm } from './ui-utils.js';
 import { state } from './state.js';
 import { toggleNotificationSheet, updateNotificationUI, updateNotificationSettingsUI } from './features/notifications.js';
@@ -67,7 +67,7 @@ export const switchTab = async (tabId, skipHistory = false) => {
 
     const previousTab = state.currentActiveTab;
     state.currentActiveTab = tabId;
-    window.__adminLogger?.nav('TAB', `Switching: ${previousTab || '(none)'} → ${tabId}`);
+    window.__adminLogger?.nav('TAB', `Switching: ${previousTab || '(none)'} â†’ ${tabId}`);
 
     if (!skipHistory) {
         history.pushState({ tabId }, "", `#${tabId}`);
@@ -80,6 +80,8 @@ export const switchTab = async (tabId, skipHistory = false) => {
     const orderOverlay = document.getElementById('orderDrawerOverlay');
     if (orderDrawer) orderDrawer.classList.remove('active');
     if (orderOverlay) orderOverlay.classList.remove('active');
+    
+    window.__tables?.closeDrawer?.();
     
     toggleNotificationSheet(false);
 
@@ -153,8 +155,10 @@ export const switchTab = async (tabId, skipHistory = false) => {
     });
 
     const target = document.getElementById(`tab-${tabId}`);
+    console.log(`[SWITCH] target=${!!target}, id=tab-${tabId}`);
     if (target) {
         target.classList.remove('hidden');
+        console.log(`[SWITCH] removed hidden, classes="${target.className}", display=${getComputedStyle(target).display}, height=${target.offsetHeight}`);
 
         const mainEl = document.querySelector('.main');
         if (mainEl) mainEl.scrollTop = 0;
@@ -172,7 +176,9 @@ export const switchTab = async (tabId, skipHistory = false) => {
         if (tabId !== 'promotions') cleanupTasks.push(mod('promotions').then(m => m.cleanupPromotions?.()));
         if (tabId !== 'discounts') cleanupTasks.push(mod('discounts').then(m => m.cleanupDiscounts?.()));
         if (tabId !== 'discounts') cleanupTasks.push(mod('discountsReports').then(m => m.closeDiscountsReports?.()));
+        if (tabId !== 'tables') cleanupTasks.push(mod('tables').then(m => m.cleanupTables?.()));
         await Promise.allSettled(cleanupTasks);
+        console.log(`[SWITCH] cleanup done for ${tabId}`);
 
         // --- PHASE 3.25: DATA REFRESH ---
         window.__adminLogger?.data('TAB', `Loading data for: ${tabId}`);
@@ -247,9 +253,7 @@ export const switchTab = async (tabId, skipHistory = false) => {
                     initRiderAnalytics();
                     break;
                 }
-                case 'payments': {
-                    break;
-                }
+                case 'payments': { const { renderOrders } = await mod('orders'); renderOrders(state.lastOrdersSnap); break; }
                 case 'promotions': {
                     const { loadPromotions } = await mod('promotions');
                     loadPromotions();
@@ -258,6 +262,11 @@ export const switchTab = async (tabId, skipHistory = false) => {
                 case 'discounts': {
                     const { loadDiscounts } = await mod('discounts');
                     loadDiscounts();
+                    break;
+                }
+                case 'tables': {
+                    const { loadTableManagement } = await mod('tables');
+                    loadTableManagement();
                     break;
                 }
             }
@@ -269,6 +278,7 @@ export const switchTab = async (tabId, skipHistory = false) => {
 
         applyDataLabels();
 
+        console.log(`[SWITCH] DONE: tab=${tabId}, height=${target.offsetHeight}, childCount=${target.children.length}`);
         window.__adminLogger?.success('TAB', `Tab loaded: ${tabId}`);
     } else {
         window.__adminLogger?.warn('TAB', `Tab target not found: tab-${tabId}`);

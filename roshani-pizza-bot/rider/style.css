@@ -13,7 +13,7 @@
  * Recommended: run a CSS dedup tool (e.g. cssnano, uncss) before next major release. */
 :root {
     --primary: #E84908;
-    --primary-dark: #E64A19;
+    --primary-dark: #c43d00;
     --primary-light: #FFF5F1;
     --bg-app: #F4F6F8;
     --bg-surface: #FFFFFF;

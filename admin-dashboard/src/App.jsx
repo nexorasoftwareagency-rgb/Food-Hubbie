@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspens
 import {
   LayoutDashboard, ShoppingBag, Zap, ChefHat, Monitor, UtensilsCrossed,
   Tag, Package, Percent, Users, Bike, Handshake, BarChart3, TrendingDown,
-  CreditCard, Bell, MessageSquare, MapPin, Settings, LogOut,
+  CreditCard, MessageSquare, MapPin, Settings, LogOut,
   Sun, Moon, Search, X, Menu, ChevronRight, ChevronLeft, ChevronDown,
   ShoppingCart, Wallet, Store, Plus, Edit3, Trash2, Printer,
   Minus, Phone, Save, Image, Upload, DollarSign, CheckCircle,
@@ -1245,13 +1245,15 @@ function SettingsPage({ showToast }) {
   const [tab, setTab] = useState("store");
   const [s, setS] = useState({}); // store settings
   const [d, setD] = useState({}); // delivery settings
+  const [inv, setInv] = useState({}); // inventory settings
 
   useEffect(() => {
-    const r1 = Outlet("settings/Store"); const r2 = Outlet("settings/Delivery");
+    const r1 = Outlet("settings/Store"); const r2 = Outlet("settings/Delivery"); const r3 = Outlet("settings/inventory");
     if (!r1||!r2) return;
     const u1 = onValue(r1, snap => setS(snap.val()||{}));
     const u2 = onValue(r2, snap => setD(snap.val()||{}));
-    return () => { off(r1,"value",u1); off(r2,"value",u2); };
+    const u3 = r3 ? onValue(r3, snap => setInv(snap.val()||{})) : null;
+    return () => { off(r1,"value",u1); off(r2,"value",u2); if (u3) off(r3,"value",u3); };
   }, []);
 
   // Store settings fields
@@ -1286,6 +1288,11 @@ function SettingsPage({ showToast }) {
     catch(e) { showToast("Save failed","error"); }
   };
 
+  const handleSaveInventory = async () => {
+    try { await set(Outlet("settings/inventory"), inv); showToast("Inventory settings saved","success"); }
+    catch(e) { showToast("Save failed","error"); }
+  };
+
   const addSlab = () => {
     const slabs = d.slabs||[];
     setD({...d, slabs:[...slabs, {km:0, fee:0}]});
@@ -1312,7 +1319,7 @@ function SettingsPage({ showToast }) {
   return (
     <div>
       <div className="flex gap-2 mb-4" style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {["store","delivery","display"].map(t => (
+        {["store","delivery","inventory","display"].map(t => (
           <div key={t} onClick={()=>setTab(t)} style={{ padding:"6px 18px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:600, textTransform:"capitalize", color:tab===t?"white":"#64748b", background:tab===t?ORANGE:"#f1f5f9" }}>{t}</div>
         ))}
       </div>
@@ -1336,6 +1343,24 @@ function SettingsPage({ showToast }) {
         </div>
         <BtnSecondary onClick={addSlab} style={{ marginBottom:16 }}><Plus size={12} /> Add Slab</BtnSecondary>
         <BtnPrimary onClick={handleSaveDelivery} style={{ width:"100%" }}>Save Delivery Settings</BtnPrimary>
+      </div>}
+      {tab==="inventory"&&<div>
+        <GlassCard className="p-5 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-slate-800">Enable Inventory Tracking</div>
+              <div className="text-xs text-slate-500 mt-1">Track stock quantities for menu items. Auto-deducts on sales.</div>
+            </div>
+            <label className="toggle-switch" style={{ position:"relative", display:"inline-block", width:44, height:24 }}>
+              <input type="checkbox" checked={!!inv.stockTracking} onChange={e => setInv(p => ({...p, stockTracking: e.target.checked}))}
+                style={{ opacity:0, width:0, height:0 }} />
+              <span style={{ position:"absolute", cursor:"pointer", inset:0, borderRadius:12, background:inv.stockTracking?ORANGE:"#cbd5e1", transition:".2s" }}>
+                <span style={{ position:"absolute", height:18, width:18, borderRadius:"50%", background:"white", top:3, left:inv.stockTracking?23:3, transition:".2s" }} />
+              </span>
+            </label>
+          </div>
+        </GlassCard>
+        <BtnPrimary onClick={handleSaveInventory} style={{ width:"100%" }}>Save Inventory Settings</BtnPrimary>
       </div>}
       {tab==="display"&&<div>
         <p style={{ fontSize:13, color:"#64748b", marginBottom:12 }}>Display visibility checkboxes coming soon. Check the database for current settings.</p>
@@ -3191,112 +3216,6 @@ function SettlementsPage() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NOTIFICATIONS PAGE
-// ═══════════════════════════════════════════════════════════════════════════
-function NotificationsPage({ showToast }) {
-  const [form, setForm] = useState({ title:"", body:"", audience:"all" });
-  const [sent, setSent] = useState([]);
-  const [sending, setSending] = useState(false);
-
-  const mergeBroadcasts = (prev, incoming, replaceSource) => {
-    const keep = prev.filter(p => p.source !== replaceSource);
-    const merged = [...keep, ...incoming].sort((a,b) => (b.sentAt||b.createdAt||0) - (a.sentAt||a.createdAt||0));
-    return merged;
-  };
-
-  useEffect(() => {
-    const sysRef = ref(db, "system/broadcasts");
-    const outletRef = Outlet("broadcasts");
-    const sysUnsub = onValue(sysRef, snap => {
-      const v = snap.val() || {};
-      const list = Object.keys(v).map(k => ({ id: "sys-" + k, source: "system", ...v[k] }));
-      setSent(prev => mergeBroadcasts(prev, list, outletRef ? "outlet" : null));
-    });
-    let outletUnsub = () => {};
-    if (outletRef) {
-      outletUnsub = onValue(outletRef, snap => {
-        const v = snap.val() || {};
-        const list = Object.keys(v).map(k => ({ id: "out-" + k, source: "outlet", ...v[k] }));
-        setSent(prev => mergeBroadcasts(prev, list, "outlet"));
-      });
-    }
-    return () => { off(sysRef, "value", sysUnsub); outletUnsub(); };
-  }, []);
-
-  const sendNotif = async () => {
-    if (!form.title.trim() || !form.body.trim()) return showToast("Title and message required","warning");
-    setSending(true);
-    try {
-      const audienceMap = { all: "all", new: "new", vip: "vip", inactive: "inactive" };
-      const r = Outlet("broadcasts");
-      if (!r) throw new Error("Outlet not configured");
-      const newRef = await push(r, { title: form.title.trim(), body: form.body.trim(), audience: form.audience, audienceLabel: audienceMap[form.audience] || form.audience, sentAt: serverTimestamp(), sentBy: "admin", recipients: 0 });
-      logAudit(_bizId, _outletId, "send_broadcast", { broadcastId: newRef?.key || null, title: form.title.trim(), audience: form.audience }, getCurrentAdminActor());
-      setForm({ title:"", body:"", audience:"all" });
-      showToast("Notification broadcast sent","success");
-    } catch(e) { showToast("Send failed: " + e.message, "error"); }
-    finally { setSending(false); }
-  };
-
-  return (
-    <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-      <GlassCard className="p-5 h-fit">
-        <SectionHeader title="Compose Notification" />
-        <div style={{ fontSize:11, color:"#94a3b8", marginBottom:8 }}>Write: <code>businesses/.../broadcasts</code> · Read also: <code>system/broadcasts</code> (SuperAdmin)</div>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1 block">Title</label>
-            <input value={form.title} onChange={e => setForm(p => ({...p, title:e.target.value}))}
-              placeholder="e.g. Flash Sale Today!"
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-orange-300" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1 block">Message</label>
-            <textarea value={form.body} onChange={e => setForm(p => ({...p, body:e.target.value}))}
-              placeholder="Your notification message..."
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-orange-300 resize-none"
-              rows={3} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1 block">Target Audience</label>
-            <select value={form.audience} onChange={e => setForm(p => ({...p, audience:e.target.value}))}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none">
-              <option value="all">All Customers</option>
-              <option value="new">New Customers</option>
-              <option value="vip">VIP Customers</option>
-              <option value="inactive">Inactive (7+ days)</option>
-            </select>
-          </div>
-          <BtnPrimary onClick={sendNotif} disabled={sending} className="w-full py-2.5 justify-center">
-            <Send size={14} /> {sending ? "Sending..." : "Send Notification"}
-          </BtnPrimary>
-        </div>
-      </GlassCard>
-      <div>
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Broadcast History ({sent.length})</div>
-        <div className="space-y-3">
-          {sent.length === 0 && <GlassCard className="p-6"><div className="text-center text-slate-400 text-sm">No broadcasts yet — sent by you or by SuperAdmin</div></GlassCard>}
-          {sent.map(n => (
-            <GlassCard key={n.id} className="p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div className="font-bold text-slate-800 text-sm">{n.title}</div>
-                <span className="text-xs text-slate-400">{n.sentAt ? relTime(n.sentAt) : (n.createdAt ? relTime(n.createdAt) : "Just now")}</span>
-              </div>
-              <div className="text-xs text-slate-500 mb-2">{n.body}</div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor:"#fff7ed", color:ORANGE }}>{n.audienceLabel || n.audience || "all"}</span>
-                <span className="text-slate-400">via {n.source === "system" ? "SuperAdmin" : "Admin"}</span>
-                {n.recipients ? <span className="text-slate-500">{n.recipients.toLocaleString("en-IN")} recipients</span> : null}
-              </div>
-            </GlassCard>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // FEEDBACK PAGE
 // ═══════════════════════════════════════════════════════════════════════════
 function FeedbackPage() {
@@ -4908,7 +4827,7 @@ const PAGES = {
   riderAnalytics: RiderAnalyticsPage,
   analytics: AnalyticsPage, lostsales: LostSalesPage, settlements: SettlementsPage, payments: PaymentsPage,
   activitylog: ActivityLogPage,
-  promotions: PromotionsPage, notifications: NotificationsPage, feedback: FeedbackPage, livetracker: LiveTrackerPage, settings: SettingsPage,
+  promotions: PromotionsPage, feedback: FeedbackPage, livetracker: LiveTrackerPage, settings: SettingsPage,
 };
 const VALID_PAGE_IDS = new Set(Object.keys(PAGES));
 
