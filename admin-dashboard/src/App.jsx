@@ -7,7 +7,7 @@ import {
   ShoppingCart, Wallet, Store, Plus, Edit3, Trash2, Printer,
   Minus, Phone, Save, Image, Upload, DollarSign, CheckCircle,
   AlertTriangle, ArrowUp, ArrowDown, Clock, TrendingUp, Globe,
-  Activity, Navigation, Truck, Eye, Download, Send, Star, XCircle, Lock, Octagon, Megaphone,
+  Activity, Navigation, Truck, Eye, EyeOff, Download, Send, Star, XCircle, Lock, Octagon, Megaphone,
   WifiOff, RefreshCw, Smartphone, History
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
@@ -3745,9 +3745,12 @@ function LostSalesPage() {
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTLEMENTS PAGE
 // ═══════════════════════════════════════════════════════════════════════════
-function SettlementsPage() {
+function SettlementsPage({ showToast }) {
   const [txns, setTxns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initOpen, setInitOpen] = useState(false);
+  const [initForm, setInitForm] = useState({ amount:"", type:"settlement", method:"Bank Transfer", notes:"" });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const r = Outlet("settlements");
@@ -3770,13 +3773,49 @@ function SettlementsPage() {
     })));
   }, [txns]);
 
+  const handleInitiate = useCallback(async () => {
+    const amount = Number(initForm.amount);
+    if (!amount || amount <= 0) return showToast("Enter a valid amount", "warning");
+    setSaving(true);
+    try {
+      const id = `stl_${Date.now().toString(36)}`;
+      await set(Outlet(`settlements/${id}`), {
+        amount: initForm.type === "debit" ? -amount : amount,
+        type: initForm.type === "debit" ? "debit" : "credit",
+        method: initForm.method || "Bank Transfer",
+        notes: initForm.notes?.trim() || "",
+        status: "pending",
+        createdBy: getCurrentAdminActor()?.uid || "admin",
+        createdAt: Date.now(),
+        settledAt: Date.now(),
+        date: new Date().toLocaleDateString("en-IN"),
+      });
+      logAudit(_bizId, _outletId, "settlement_initiated", { settlementId: id, amount, type: initForm.type }, getCurrentAdminActor());
+      showToast("Settlement initiated", "success");
+      setInitOpen(false);
+      setInitForm({ amount:"", type:"settlement", method:"Bank Transfer", notes:"" });
+    } catch(e) { showToast("Failed: " + (e?.message || "unknown"), "error"); }
+    finally { setSaving(false); }
+  }, [initForm, showToast]);
+
+  const updateStatus = useCallback(async (id, status) => {
+    try {
+      await update(Outlet(`settlements/${id}`), { status, updatedAt: Date.now() });
+      logAudit(_bizId, _outletId, "settlement_status_update", { settlementId: id, status }, getCurrentAdminActor());
+      showToast(`Status: ${status}`, "success");
+    } catch(e) { showToast("Update failed", "error"); }
+  }, [showToast]);
+
   if (loading) return <SkeletonPage kpi={3} table={6} />;
 
   return (
     <div className="space-y-4">
       <div className="sheet-toolbar">
         <div style={{ fontSize:12, color:"#94a3b8" }}>Path: <code>businesses/.../settlements</code></div>
-        <button type="button" className="sheet-button" onClick={exportCSV}><Download size={14} /> Export CSV</button>
+        <div className="flex gap-2">
+          <BtnPrimary onClick={() => setInitOpen(true)} style={{ padding:"8px 14px", fontSize:13 }}><Plus size={14} /> Initiate Settlement</BtnPrimary>
+          <button type="button" className="sheet-button" onClick={exportCSV}><Download size={14} /> Export CSV</button>
+        </div>
       </div>
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
         <KPICard title="Net Balance" value={fmt(total)} icon={Wallet} color={total >= 0 ? COLORS.success : COLORS.error} />
@@ -3785,16 +3824,16 @@ function SettlementsPage() {
       </div>
       <GlassCard>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: 500 }}>
+          <table className="w-full text-sm" style={{ minWidth: 600 }}>
             <thead>
               <tr className="border-b border-slate-100">
-                {["ID","Date","Type","Amount","Method","Status"].map(h => (
+                {["ID","Date","Type","Amount","Method","Status","Actions"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {txns.length === 0 && <tr><td colSpan={6} style={{ textAlign:"center", padding:32, color:"#94a3b8" }}>No settlements recorded yet<br/><span style={{ fontSize:11 }}>Path: <code>businesses/.../settlements</code> — written by SuperAdmin</span></td></tr>}
+              {txns.length === 0 && <tr><td colSpan={7} style={{ textAlign:"center", padding:32, color:"#94a3b8" }}>No settlements recorded yet<br/><span style={{ fontSize:11 }}>Path: <code>businesses/.../settlements</code></span></td></tr>}
               {txns.map(t => (
                 <tr key={t.id} className="border-b border-slate-50 hover:bg-orange-50/20">
                   <td className="px-4 py-3 font-mono text-xs text-slate-400">{t.id.slice(-8)}</td>
@@ -3806,9 +3845,14 @@ function SettlementsPage() {
                   <td className="px-4 py-3 text-slate-500">{t.method || "—"}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-1 rounded-full text-xs font-bold capitalize"
-                      style={{ color: t.status==="settled" ? COLORS.success : COLORS.warning, backgroundColor: t.status==="settled" ? "#dcfce7" : "#fef3c7" }}>
+                      style={{ color: t.status==="reconciled" ? COLORS.success : t.status==="pending" ? COLORS.warning : "#16a34a", backgroundColor: t.status==="reconciled" ? "#dcfce7" : t.status==="pending" ? "#fef3c7" : "#dcfce7" }}>
                       {t.status || "settled"}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {(!t.status || t.status === "pending" || t.status === "settled") && (
+                      <button onClick={() => updateStatus(t.id, "reconciled")} style={{ padding:"3px 8px", borderRadius:6, border:"1px solid #dcfce7", background:"#f0fdf4", color:"#16a34a", fontSize:10, fontWeight:600, cursor:"pointer" }}><CheckCircle size={11} style={{marginRight:3}} />Reconcile</button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -3816,6 +3860,44 @@ function SettlementsPage() {
           </table>
         </div>
       </GlassCard>
+
+      <Modal open={initOpen} onClose={() => setInitOpen(false)}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "'Outfit', sans-serif" }}>Initiate Settlement</h3>
+          <button type="button" onClick={() => setInitOpen(false)} style={{ width:36, height:36, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", border:"1px solid rgba(232, 73, 8,0.12)", background:"white", color:"#64748b", cursor:"pointer" }}><X size={18} /></button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div>
+            <label style={_discLabelStyle}>Type</label>
+            <Select value={initForm.type} onChange={e => setInitForm(f => ({...f, type: e.target.value}))}>
+              <option value="settlement">Credit (incoming)</option>
+              <option value="debit">Debit (outgoing)</option>
+            </Select>
+          </div>
+          <div>
+            <label style={_discLabelStyle}>Amount (₹) *</label>
+            <Input type="number" placeholder="e.g. 5000" value={initForm.amount} onChange={e => setInitForm(f => ({...f, amount: e.target.value}))} />
+          </div>
+          <div>
+            <label style={_discLabelStyle}>Method</label>
+            <Select value={initForm.method} onChange={e => setInitForm(f => ({...f, method: e.target.value}))}>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cash">Cash</option>
+              <option value="Cheque">Cheque</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+            </Select>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={_discLabelStyle}>Notes</label>
+            <Input placeholder="Optional notes" value={initForm.notes} onChange={e => setInitForm(f => ({...f, notes: e.target.value}))} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+          <BtnSecondary onClick={() => setInitOpen(false)} style={{ padding:"8px 18px", fontSize:13 }}>Cancel</BtnSecondary>
+          <BtnPrimary onClick={handleInitiate} disabled={saving} style={{ padding:"8px 18px", fontSize:13 }}>{saving ? "Initiating..." : "Initiate Settlement"}</BtnPrimary>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -3823,16 +3905,14 @@ function SettlementsPage() {
 // ═══════════════════════════════════════════════════════════════════════════
 // FEEDBACK PAGE
 // ═══════════════════════════════════════════════════════════════════════════
-function FeedbackPage() {
+function FeedbackPage({ showToast }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const REVIEW_PAGE_SIZE = 20;
   const [reviewPage, setReviewPage] = useState(1);
-  const reviewTotalPages = Math.max(1, Math.ceil(reviews.length / REVIEW_PAGE_SIZE));
-  useEffect(() => { setReviewPage(1); }, [reviews.length]);
-  const paginatedReviews = reviews.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE);
   const [replyFor, setReplyFor] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const [modTab, setModTab] = useState("all");
 
   useEffect(() => {
     const r = Outlet("reviews");
@@ -3845,12 +3925,30 @@ function FeedbackPage() {
     return () => off(r, "value", unsub);
   }, []);
 
+  const modFiltered = useMemo(() => {
+    if (modTab === "all") return reviews;
+    if (modTab === "pending") return reviews.filter(r => !r.status || r.status === "pending");
+    return reviews.filter(r => r.status === modTab);
+  }, [reviews, modTab]);
+
+  useEffect(() => { setReviewPage(1); }, [modFiltered.length]);
+  const totalPages = Math.max(1, Math.ceil(modFiltered.length / REVIEW_PAGE_SIZE));
+  const paginatedReviews = modFiltered.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE);
+
+  const modAction = useCallback(async (id, status) => {
+    try {
+      await update(Outlet(`reviews/${id}`), { status, moderatedAt: Date.now() });
+      showToast(status === "approved" ? "Review approved" : status === "hidden" ? "Review hidden" : "Status updated", "success");
+    } catch(e) { showToast("Action failed", "error"); }
+  }, [showToast]);
+
   if (loading) return <SkeletonPage cards={6} />;
 
   const counts = [5,4,3,2,1].map(n => reviews.filter(r => Math.round(Number(r.rating)||0) === n).length);
   const total = reviews.length;
   const avg = total > 0 ? (reviews.reduce((s, r) => s + (Number(r.rating)||0), 0) / total) : 0;
   const pcts = counts.map(c => total ? Math.round((c / total) * 100) : 0);
+  const pendingCount = reviews.filter(r => !r.status || r.status === "pending").length;
 
   return (
     <div className="space-y-4">
@@ -3875,24 +3973,45 @@ function FeedbackPage() {
           </div>
         </div>
       </GlassCard>
+      <div className="flex gap-2 flex-wrap">
+        <Pill label={`All (${reviews.length})`} active={modTab === "all"} onClick={() => setModTab("all")} />
+        <Pill label={`Pending (${pendingCount})`} active={modTab === "pending"} onClick={() => setModTab("pending")} />
+        <Pill label={`Approved (${reviews.filter(r => r.status === "approved").length})`} active={modTab === "approved"} onClick={() => setModTab("approved")} />
+        <Pill label={`Hidden (${reviews.filter(r => r.status === "hidden").length})`} active={modTab === "hidden"} onClick={() => setModTab("hidden")} />
+      </div>
       <div className="space-y-3">
-        {reviews.length === 0 && <GlassCard className="p-6"><div className="text-center text-slate-400 text-sm">No customer reviews yet. Reviews posted via the Marketplace will appear here.</div></GlassCard>}
-        {paginatedReviews.map(f => (
-          <GlassCard key={f.id} className="p-4">
+        {modFiltered.length === 0 && <GlassCard className="p-6"><div className="text-center text-slate-400 text-sm">No reviews in this category.</div></GlassCard>}
+        {paginatedReviews.map(f => {
+          const st = f.status || "pending";
+          return (
+          <GlassCard key={f.id} className="p-4" style={{ opacity: st === "hidden" ? 0.6 : 1 }}>
             <div className="flex items-start gap-3">
               <Avatar name={f.customerName || f.name || "Guest"} size={36} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
                   <span className="font-semibold text-slate-800">{f.customerName || f.name || "Guest"}</span>
-                  <span className="text-xs text-slate-400">{f.createdAt ? relTime(f.createdAt) : ""}</span>
+                  <div className="flex items-center gap-2">
+                    {st === "pending" && <span className="status-pill" style={{ fontSize:9, fontWeight:700, background:"#fef3c7", color:"#d97706", textTransform:"uppercase" }}>Pending</span>}
+                    {st === "approved" && <span className="status-pill" style={{ fontSize:9, fontWeight:700, background:"#dcfce7", color:"#16a34a", textTransform:"uppercase" }}>Approved</span>}
+                    {st === "hidden" && <span className="status-pill" style={{ fontSize:9, fontWeight:700, background:"#fee2e2", color:"#dc2626", textTransform:"uppercase" }}>Hidden</span>}
+                    <span className="text-xs text-slate-400">{f.createdAt ? relTime(f.createdAt) : ""}</span>
+                  </div>
                 </div>
                 <StarRating rating={Number(f.rating)||0} />
                 {f.comment && <p className="text-sm text-slate-600 mt-2 leading-relaxed">{f.comment}</p>}
                 {f.dishName && <span className="text-xs mt-2 inline-block px-2 py-0.5 rounded-full" style={{ backgroundColor:"#fff7ed", color:ORANGE }}>re: {f.dishName}</span>}
                 {f.reply && <div className="mt-3 pl-3 border-l-2 border-orange-300"><p className="text-xs text-orange-700 font-medium">Your reply:</p><p className="text-sm text-slate-600">{f.reply}</p></div>}
-                {!f.reply && replyFor !== f.id && (
-                  <button onClick={() => { setReplyFor(f.id); setReplyText(""); }} style={{ marginTop:8, padding:"3px 10px", borderRadius:6, border:"1px solid #e2e8f0", background:"white", color:ORANGE, fontSize:10, fontWeight:600, cursor:"pointer" }}>Reply</button>
-                )}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {!f.reply && replyFor !== f.id && (
+                    <button onClick={() => { setReplyFor(f.id); setReplyText(""); }} style={{ padding:"3px 10px", borderRadius:6, border:"1px solid #e2e8f0", background:"white", color:ORANGE, fontSize:10, fontWeight:600, cursor:"pointer" }}>Reply</button>
+                  )}
+                  {st !== "approved" && (
+                    <button onClick={() => modAction(f.id, "approved")} style={{ padding:"3px 10px", borderRadius:6, border:"1px solid #dcfce7", background:"#f0fdf4", color:"#16a34a", fontSize:10, fontWeight:600, cursor:"pointer" }}><CheckCircle size={12} style={{marginRight:3}} />Approve</button>
+                  )}
+                  {st !== "hidden" && (
+                    <button onClick={() => modAction(f.id, "hidden")} style={{ padding:"3px 10px", borderRadius:6, border:"1px solid #fee2e2", background:"#fef2f2", color:"#dc2626", fontSize:10, fontWeight:600, cursor:"pointer" }}><EyeOff size={12} style={{marginRight:3}} />Hide</button>
+                  )}
+                </div>
                 {replyFor === f.id && (
                   <div className="mt-3 flex gap-2">
                     <input value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Type your reply..." style={{ flex:1, padding:"6px 10px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, outline:"none" }} autoFocus />
@@ -3903,8 +4022,9 @@ function FeedbackPage() {
               </div>
             </div>
           </GlassCard>
-        ))}
-        <Pagination page={reviewPage} totalPages={reviewTotalPages} onPageChange={setReviewPage} totalItems={reviews.length} pageSize={REVIEW_PAGE_SIZE} />
+          );
+        })}
+        <Pagination page={reviewPage} totalPages={totalPages} onPageChange={setReviewPage} totalItems={modFiltered.length} pageSize={REVIEW_PAGE_SIZE} />
       </div>
     </div>
   );
@@ -4258,7 +4378,50 @@ function DiscountsPage({ showToast }) {
           <KPICard title="Redemptions" value={filteredUsage.length.toLocaleString("en-IN")} icon={Tag} />
           <KPICard title="Total Saved" value={fmt(filteredUsage.reduce((s, u) => s + (Number(u.amountGiven) || 0), 0))} icon={TrendingDown} color={COLORS.success} />
           <KPICard title="Avg Savings" value={filteredUsage.length ? fmt(Math.round(filteredUsage.reduce((s, u) => s + (Number(u.amountGiven) || 0), 0) / filteredUsage.length)) : fmt(0)} icon={BarChart3} color={COLORS.info} />
+          <KPICard title="Unique Discounts Used" value={new Set(filteredUsage.map(u => u.discountId)).size} icon={Percent} color="#8b5cf6" />
         </div>
+
+        <GlassCard className="p-4" style={{ marginBottom: 16 }}>
+          <SectionHeader title="Daily Redemption Trend" />
+          <div style={{ height: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={(() => {
+                const dayMap = new Map();
+                filteredUsage.forEach(u => {
+                  const day = new Date(u.appliedAt || 0).toLocaleDateString("en-IN", { day:"2-digit", month:"short" });
+                  dayMap.set(day, (dayMap.get(day) || 0) + 1);
+                });
+                return [...dayMap.entries()].map(([date, count]) => ({ date, count })).sort((a, b) => {
+                  const da = a.date.split(" "), db = b.date.split(" ");
+                  return new Date(`${da[1]} ${da[0]}, 2000`) - new Date(`${db[1]} ${db[0]}, 2000`);
+                });
+              })()}>
+                <defs><linearGradient id="discGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#E84908" stopOpacity={0.3}/><stop offset="95%" stopColor="#E84908" stopOpacity={0}/></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                <Area type="monotone" dataKey="count" stroke="#E84908" fill="url(#discGrad)" strokeWidth={2} name="Redemptions" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+
+        {reportBreakdown.length > 0 && <GlassCard className="p-4" style={{ marginBottom: 16 }}>
+          <SectionHeader title="Top Discounts by Savings" />
+          <div style={{ height: Math.min(reportBreakdown.length * 40 + 40, 280) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[...reportBreakdown].sort((a, b) => b.total - a.total).slice(0, 10)} layout="vertical" margin={{ left: 100 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} width={90} />
+                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }} formatter={(v) => fmt(v)} />
+                <Bar dataKey="total" fill="#E84908" radius={[0, 4, 4, 0]} name="Total Saved" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>}
+
         <div style={{ overflowX: "auto" }}>
           <table className="w-full text-sm" style={{ minWidth: 460 }}>
             <thead>
@@ -4273,14 +4436,18 @@ function DiscountsPage({ showToast }) {
               {reportBreakdown.map(r => {
                 const d = discounts[r.id];
                 const tInfo = discTypeStyle(d?.type);
+                const pct = reportBreakdown.length > 0 ? Math.round(r.total / Math.max(...reportBreakdown.map(x => x.total)) * 100) : 0;
                 return (
                   <tr key={r.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "8px 12px" }}>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</div>
                       <div style={{ fontSize: 11, color: "#94a3b8" }}><span style={{ padding: "1px 6px", borderRadius: 99, fontSize: 9, fontWeight: 700, background: tInfo.bg, color: tInfo.color, textTransform: "uppercase", marginRight: 4 }}>{d?.type || "?"}</span>{d?.couponCode ? `Code: ${d.couponCode}` : ""}</div>
                     </td>
-                    <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600 }}>{r.count}</td>
-                    <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600, color: COLORS.success }}>{fmt(r.total)}</td>
+                    <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600 }}>
+                      {r.count}
+                      <div style={{ marginTop: 3, height: 3, borderRadius: 2, background: "#f1f5f9", overflow: "hidden", width: 60 }}><div style={{ height: "100%", width: `${Math.min(100, r.count / Math.max(...reportBreakdown.map(x => x.count), 1) * 100)}%`, background: ORANGE, borderRadius: 2 }} /></div>
+                    </td>
+                    <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600, color: COLORS.success }}>{fmt(r.total)}<div style={{ marginTop: 3, height: 3, borderRadius: 2, background: "#f1f5f9", overflow: "hidden", width: 60 }}><div style={{ height: "100%", width: `${pct}%`, background: "#22c55e", borderRadius: 2 }} /></div></td>
                     <td style={{ padding: "8px 12px", fontSize: 13 }}>{r.count > 0 ? fmt(Math.round(r.total / r.count)) : "\u2014"}</td>
                   </tr>
                 );
@@ -5400,12 +5567,16 @@ function RiderAnalyticsPage({ showToast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAYMENTS PAGE
 // ═══════════════════════════════════════════════════════════════════════════
-function PaymentsPage() {
+function PaymentsPage({ showToast }) {
   const [orders, setOrders] = useState([]);
   const [methodFilter, setMethodFilter] = useState("All");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [payPage, setPayPage] = useState(1);
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeOrder, setDisputeOrder] = useState(null);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const r = Outlet("orders");
@@ -5433,6 +5604,34 @@ function PaymentsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAYMENT_PAGE_SIZE));
   const pageOrders = filtered.slice((payPage - 1) * PAYMENT_PAGE_SIZE, payPage * PAYMENT_PAGE_SIZE);
+
+  const handleReconcile = useCallback(async (o) => {
+    try {
+      await update(Outlet(`orders/${o.id}`), { reconciled: true, reconciledAt: Date.now() });
+      logAudit(_bizId, _outletId, "payment_reconciled", { orderId: o.id, amount: o.total }, getCurrentAdminActor());
+      showToast("Payment reconciled", "success");
+    } catch(e) { showToast("Failed", "error"); }
+  }, [showToast]);
+
+  const handleDispute = useCallback(async () => {
+    if (!disputeOrder || !disputeReason.trim()) return showToast("Enter a dispute reason", "warning");
+    setSaving(true);
+    try {
+      await update(Outlet(`orders/${disputeOrder.id}`), { disputed: true, disputeReason: disputeReason.trim(), disputedAt: Date.now() });
+      logAudit(_bizId, _outletId, "payment_disputed", { orderId: disputeOrder.id, reason: disputeReason.trim() }, getCurrentAdminActor());
+      showToast("Payment flagged as disputed", "success");
+      setDisputeOpen(false);
+      setDisputeOrder(null);
+      setDisputeReason("");
+    } catch(e) { showToast("Failed", "error"); }
+    finally { setSaving(false); }
+  }, [disputeOrder, disputeReason, showToast]);
+
+  const openDispute = useCallback((o) => {
+    setDisputeOrder(o);
+    setDisputeReason("");
+    setDisputeOpen(true);
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -5463,17 +5662,20 @@ function PaymentsPage() {
 
       <GlassCard>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: 650 }}>
+          <table className="w-full text-sm" style={{ minWidth: 750 }}>
             <thead>
               <tr className="border-b border-slate-100">
-                {["Order", "Customer", "Amount", "Method", "Status", "Date"].map(h => (
+                {["Order", "Customer", "Amount", "Method", "Status", "Reconciliation", "Date"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {pageOrders.map(o => (
-                <tr key={o.id} className="border-b border-slate-50 hover:bg-orange-50/30">
+              {pageOrders.map(o => {
+                const isReconciled = o.reconciled;
+                const isDisputed = o.disputed;
+                return (
+                <tr key={o.id} className="border-b border-slate-50 hover:bg-orange-50/30" style={{ opacity: isDisputed ? 0.7 : 1 }}>
                   <td className="px-4 py-3 font-semibold text-slate-800 font-mono">#{o.orderId || o.id.slice(-5)}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{o.customerName || "Guest"}</div>
@@ -5487,15 +5689,44 @@ function PaymentsPage() {
                     }}>{o.paymentMethod || "Cash"}</span>
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={o.paymentStatus === "Paid" ? "Delivered" : (o.paymentStatus || o.status)} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      {isReconciled ? (
+                        <span className="status-pill" style={{ fontSize:9, fontWeight:700, background:"#dcfce7", color:"#16a34a" }}><CheckCircle size={10} style={{marginRight:2}} />Reconciled</span>
+                      ) : isDisputed ? (
+                        <span className="status-pill" style={{ fontSize:9, fontWeight:700, background:"#fee2e2", color:"#dc2626" }}><AlertTriangle size={10} style={{marginRight:2}} />Disputed</span>
+                      ) : (
+                        <div className="flex gap-1">
+                          <button onClick={() => handleReconcile(o)} style={{ padding:"2px 7px", borderRadius:5, border:"1px solid #dcfce7", background:"#f0fdf4", color:"#16a34a", fontSize:9, fontWeight:600, cursor:"pointer" }}>Reconcile</button>
+                          <button onClick={() => openDispute(o)} style={{ padding:"2px 7px", borderRadius:5, border:"1px solid #fee2e2", background:"#fef2f2", color:"#dc2626", fontSize:9, fontWeight:600, cursor:"pointer" }}>Dispute</button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-slate-500 text-xs">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : ""}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
         {pageOrders.length === 0 && <div style={{ textAlign:"center", padding:40, color:"#94a3b8", fontSize:13 }}>No delivered orders found</div>}
         <Pagination page={payPage} totalPages={totalPages} onPageChange={setPayPage} totalItems={filtered.length} pageSize={PAYMENT_PAGE_SIZE} />
       </GlassCard>
+
+      <Modal open={disputeOpen} onClose={() => setDisputeOpen(false)}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "'Outfit', sans-serif" }}>Flag Payment Dispute</h3>
+          <button type="button" onClick={() => setDisputeOpen(false)} style={{ width:36, height:36, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", border:"1px solid rgba(232, 73, 8,0.12)", background:"white", color:"#64748b", cursor:"pointer" }}><X size={18} /></button>
+        </div>
+        {disputeOrder && <div style={{ fontSize:13, color:"#64748b", marginBottom:12 }}>Order <strong>#{disputeOrder.orderId || disputeOrder.id.slice(-5)}</strong> — {fmt(disputeOrder.total)} via {disputeOrder.paymentMethod || "Cash"}</div>}
+        <label style={_discLabelStyle}>Dispute Reason *</label>
+        <textarea value={disputeReason} onChange={e => setDisputeReason(e.target.value)} placeholder="Describe the reason for disputing this payment..." rows={3} style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontSize:12, outline:"none", resize:"vertical", fontFamily:"inherit" }} />
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+          <BtnSecondary onClick={() => setDisputeOpen(false)} style={{ padding:"8px 18px", fontSize:13 }}>Cancel</BtnSecondary>
+          <BtnPrimary onClick={handleDispute} disabled={saving} style={{ padding:"8px 18px", fontSize:13 }}>{saving ? "Saving..." : "Flag Dispute"}</BtnPrimary>
+        </div>
+      </Modal>
     </div>
   );
 }
