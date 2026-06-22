@@ -190,6 +190,17 @@ export const PAGE_GUIDES = {
     { icon: "Truck", title: "Delivery Settings", body: "Set developer/report/notification phone numbers, backup code, and configure delivery fee slabs by kilometer range." },
     { icon: "Sun", title: "Display Settings", body: "Customize branding elements and display preferences for your store." },
   ],
+  activitylog: [
+    { icon: "History", title: "Audit Log", body: "Every action is recorded here — dish edits, order updates, discount changes. Filter by action type or search details." },
+    { icon: "Search", title: "Search & Paginate", body: "Use the search bar to find specific entries. Click the Details cell to expand/collapse the full JSON payload." },
+    { icon: "Filter", title: "Filter by Action", body: "Click any action pill to filter the log. The count updates in real time as you filter." },
+  ],
+  tables: [
+    { icon: "Table2", title: "Table Overview", body: "All tables shown as color-coded cards. Green = free, Orange = occupied, Red = billing. Each card shows capacity and session time." },
+    { icon: "Search", title: "Search Tables", body: "Use the search bar to find a table by number. Filter pills show all tables, occupied, or free." },
+    { icon: "Printer", title: "Print Options", body: "Print KOT (Kitchen Order Ticket) with item name, qty, size, price, and addons. Reprint with multi-copy support for both KOT and bills." },
+    { icon: "CheckSquare", title: "Session Management", body: "Open a table to view session details — order items with status, total, and action buttons. Close / Cancel sessions, generate bills, and view QR." },
+  ],
 };
 
 export const STORAGE_KEYS = {

@@ -3831,6 +3831,8 @@ function FeedbackPage() {
   const reviewTotalPages = Math.max(1, Math.ceil(reviews.length / REVIEW_PAGE_SIZE));
   useEffect(() => { setReviewPage(1); }, [reviews.length]);
   const paginatedReviews = reviews.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE);
+  const [replyFor, setReplyFor] = useState(null);
+  const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
     const r = Outlet("reviews");
@@ -3887,6 +3889,17 @@ function FeedbackPage() {
                 <StarRating rating={Number(f.rating)||0} />
                 {f.comment && <p className="text-sm text-slate-600 mt-2 leading-relaxed">{f.comment}</p>}
                 {f.dishName && <span className="text-xs mt-2 inline-block px-2 py-0.5 rounded-full" style={{ backgroundColor:"#fff7ed", color:ORANGE }}>re: {f.dishName}</span>}
+                {f.reply && <div className="mt-3 pl-3 border-l-2 border-orange-300"><p className="text-xs text-orange-700 font-medium">Your reply:</p><p className="text-sm text-slate-600">{f.reply}</p></div>}
+                {!f.reply && replyFor !== f.id && (
+                  <button onClick={() => { setReplyFor(f.id); setReplyText(""); }} style={{ marginTop:8, padding:"3px 10px", borderRadius:6, border:"1px solid #e2e8f0", background:"white", color:ORANGE, fontSize:10, fontWeight:600, cursor:"pointer" }}>Reply</button>
+                )}
+                {replyFor === f.id && (
+                  <div className="mt-3 flex gap-2">
+                    <input value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Type your reply..." style={{ flex:1, padding:"6px 10px", borderRadius:6, border:"1px solid #e2e8f0", fontSize:12, outline:"none" }} autoFocus />
+                    <button onClick={async () => { if (!replyText.trim()) return; try { await update(Outlet(`reviews/${f.id}`), { reply: replyText.trim(), repliedAt: Date.now() }); setReplyFor(null); showToast("Reply posted","success"); } catch(e) { showToast("Failed","error"); } }} style={{ padding:"6px 12px", borderRadius:6, border:"none", background:ORANGE, color:"white", fontSize:11, fontWeight:600, cursor:"pointer" }}>Send</button>
+                    <button onClick={() => setReplyFor(null)} style={{ padding:"6px 8px", borderRadius:6, border:"1px solid #e2e8f0", background:"white", color:"#64748b", fontSize:11, cursor:"pointer" }}>X</button>
+                  </div>
+                )}
               </div>
             </div>
           </GlassCard>
@@ -5494,6 +5507,10 @@ function ActivityLogPage({ showToast }) {
   const [logs, setLogs] = useState([]);
   const [logFilter, setLogFilter] = useState("all");
   const [logLoading, setLogLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
+  const [logSearch, setLogSearch] = useState("");
+  const LOG_PAGE_SIZE = 50;
+  const [logPage, setLogPage] = useState(1);
   useEffect(() => {
     const r = _bizId && _outletId ? ref(db, `businesses/${_bizId}/outlets/${_outletId}/logs/audit`) : null;
     if (!r) { setLogLoading(false); return; }
@@ -5504,16 +5521,21 @@ function ActivityLogPage({ showToast }) {
     });
     return () => off(r, "value", unsub);
   }, []);
-  const filteredLogs = logFilter === "all" ? logs : logs.filter(l => l.action === logFilter);
   const actionTypes = [...new Set(logs.map(l => l.action))];
+  const searched = logSearch ? logs.filter(l => JSON.stringify(l.details || {}).toLowerCase().includes(logSearch.toLowerCase()) || (l.action || "").toLowerCase().includes(logSearch.toLowerCase())) : logs;
+  const filteredLogs = logFilter === "all" ? searched : searched.filter(l => l.action === logFilter);
+  const logTotalPages = Math.max(1, Math.ceil(filteredLogs.length / LOG_PAGE_SIZE));
+  useEffect(() => { setLogPage(1); }, [logFilter, logSearch]);
+  const paginatedLogs = filteredLogs.slice((logPage - 1) * LOG_PAGE_SIZE, logPage * LOG_PAGE_SIZE);
   if (logLoading) return <SkeletonPage table={8} />;
   return (
     <div>
-      <div style={{ marginBottom:12, display:"flex", gap:8, flexWrap:"wrap" }}>
-        <div onClick={()=>setLogFilter("all")} style={{ padding:"5px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:600, color:logFilter==="all"?"white":"#64748b", background:logFilter==="all"?ORANGE:"#f1f5f9" }}>All ({logs.length})</div>
+      <div style={{ marginBottom:12, display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+        <div onClick={()=>setLogFilter("all")} style={{ padding:"5px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:600, color:logFilter==="all"?"white":"#64748b", background:logFilter==="all"?ORANGE:"#f1f5f9" }}>All ({filteredLogs.length})</div>
         {actionTypes.slice(0, 10).map(a => (
           <div key={a} onClick={()=>setLogFilter(a)} style={{ padding:"5px 14px", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:600, color:logFilter===a?"white":"#64748b", background:logFilter===a?ORANGE:"#f1f5f9" }}>{a}</div>
         ))}
+        <input placeholder="Search details..." value={logSearch} onChange={e => setLogSearch(e.target.value)} style={{ marginLeft:"auto", padding:"5px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontSize:12, outline:"none", maxWidth:200 }} />
       </div>
       <GlassCard>
         {filteredLogs.length === 0 ? <div style={{ padding:40, textAlign:"center", color:"#94a3b8", fontSize:13 }}>No audit logs found</div> : (
@@ -5521,18 +5543,25 @@ function ActivityLogPage({ showToast }) {
             <table className="sheet-table"><thead><tr>
               <th>#</th><th>Action</th><th>Actor</th><th>Details</th><th>Time</th>
             </tr></thead><tbody>
-              {filteredLogs.slice(0, 100).map((l, i) => (
+              {paginatedLogs.map((l, i) => (
                 <tr key={l.id}>
-                  <td className="sheet-row-number">{i + 1}</td>
+                  <td className="sheet-row-number">{(logPage - 1) * LOG_PAGE_SIZE + i + 1}</td>
                   <td><span style={{ padding:"2px 8px", borderRadius:6, fontSize:11, fontWeight:600, background:"#fff7ed", color:ORANGE }}>{l.action}</span></td>
                   <td>{l.actor?.email || l.actor?.name || "—"}</td>
-                  <td style={{ maxWidth:300, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontSize:12, color:"#64748b" }}>{l.details ? JSON.stringify(l.details).slice(0, 80) : "—"}</td>
+                  <td style={{ maxWidth:300, fontSize:12, color:"#64748b", cursor:"pointer" }} onClick={() => setExpandedId(expandedId === l.id ? null : l.id)}>
+                    {l.details ? (
+                      expandedId === l.id
+                        ? <pre style={{ fontSize:11, whiteSpace:"pre-wrap", wordBreak:"break-all", margin:0, background:"#f8fafc", padding:8, borderRadius:6, maxHeight:200, overflow:"auto" }}>{JSON.stringify(l.details, null, 2)}</pre>
+                        : <span>{JSON.stringify(l.details).slice(0, 80)}… <span style={{ color:ORANGE, fontWeight:600 }}>▼</span></span>
+                    ) : "—"}
+                  </td>
                   <td style={{ whiteSpace:"nowrap", fontSize:12, color:"#64748b" }}>{l.clientTs ? new Date(l.clientTs).toLocaleString("en-IN") : "—"}</td>
                 </tr>
               ))}
             </tbody></table>
           </div>
         )}
+        <Pagination page={logPage} totalPages={logTotalPages} onPageChange={setLogPage} totalItems={filteredLogs.length} pageSize={LOG_PAGE_SIZE} />
       </GlassCard>
     </div>
   );
