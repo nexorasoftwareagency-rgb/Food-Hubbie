@@ -105,8 +105,8 @@ export function setOutletContext(businessId, outletId) {
 }
 
 export function Outlet(path) {
-  const fullPath = `businesses/${_currentBusinessId}/outlets/${_currentOutletId}/${path}`;
-  return ref(db, fullPath);
+  if (!_currentBusinessId || !_currentOutletId) return null;
+  return ref(db, `businesses/${_currentBusinessId}/outlets/${_currentOutletId}/${path}`);
 }
 
 export function getOutletRef(path) {
@@ -116,6 +116,9 @@ export function getOutletRef(path) {
 export function getCurrentOutletContext() {
   return { businessId: _currentBusinessId, outletId: _currentOutletId };
 }
+
+export function getBizId() { return _currentBusinessId; }
+export function getOutletId() { return _currentOutletId; }
 
 export async function uploadImage(file, storagePath) {
   const ref_ = storageRef(storage, storagePath);

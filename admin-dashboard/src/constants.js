@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingBag, Zap, ChefHat, Monitor, UtensilsCrossed, Table2,
   Tag, Package, Percent, Users, Bike, Handshake, BarChart3, TrendingDown,
-  CreditCard, MessageSquare, MapPin, Settings, History, Megaphone
+  CreditCard, MessageSquare, MapPin, Settings, History, Megaphone, Bell, Shield
 } from "lucide-react";
 import { db, ref } from "./firebase";
 
@@ -41,11 +41,11 @@ export const NAV_GROUPS = [
   { label:"Sales", items:[{ id:"pos",label:"POS",icon:Monitor },{ id:"menu",label:"Menu",icon:UtensilsCrossed },{ id:"categories",label:"Categories",icon:Tag },{ id:"discounts",label:"Discounts",icon:Percent }]},
   { label:"Data", items:[{ id:"inventory",label:"Inventory",icon:Package },{ id:"customers",label:"Customers",icon:Users },{ id:"riders",label:"Riders",icon:Bike },{ id:"riderAnalytics",label:"Rider Analytics",icon:BarChart3 },{ id:"partners",label:"Partners",icon:Handshake }]},
   { label:"Insights", items:[{ id:"analytics",label:"Analytics",icon:BarChart3 },{ id:"lostsales",label:"Lost Sales",icon:TrendingDown },{ id:"settlements",label:"Settlements",icon:CreditCard },{ id:"payments",label:"Payments",icon:CreditCard }]},
-  { label:"Marketing", items:[{ id:"promotions",label:"Promotions",icon:Megaphone }]},
-  { label:"Tools", items:[{ id:"activitylog",label:"Activity Log",icon:History },{ id:"feedback",label:"Feedback",icon:MessageSquare },{ id:"livetracker",label:"Live Tracker",icon:MapPin },{ id:"settings",label:"Settings",icon:Settings }]},
+  { label:"Marketing", items:[{ id:"promotions",label:"Promotions",icon:Megaphone }, { id:"notifications",label:"Notifications",icon:Bell }]},
+  { label:"Tools", items:[{ id:"activitylog",label:"Activity Log",icon:History },{ id:"feedback",label:"Feedback",icon:MessageSquare },{ id:"livetracker",label:"Live Tracker",icon:MapPin },{ id:"staff",label:"Staff",icon:Shield },{ id:"settings",label:"Settings",icon:Settings }]},
 ];
 export const MOBILE_NAV = [{ id:"dashboard",label:"Home",icon:LayoutDashboard },{ id:"orders",label:"Orders",icon:ShoppingBag },{ id:"tables",label:"Tables",icon:Table2 },{ id:"pos",label:"POS",icon:Monitor },{ id:"menu",label:"Menu",icon:UtensilsCrossed },{ id:"settings",label:"Settings",icon:Settings }];
-export const PAGE_TITLES = { dashboard:"Dashboard", orders:"Orders", liveops:"Live Operations", kitchen:"Kitchen", tables:"Tables", pos:"Point of Sale", menu:"Menu Management", categories:"Categories", discounts:"Discounts", inventory:"Inventory", customers:"Customers", riders:"Riders", riderAnalytics:"Rider Analytics", partners:"Partners", analytics:"Analytics", lostsales:"Lost Sales", settlements:"Settlements", payments:"Payments", promotions:"Promotions", activitylog:"Activity Log", feedback:"Customer Feedback", livetracker:"Live Rider Tracker", settings:"Settings" };
+export const PAGE_TITLES = { dashboard:"Dashboard", orders:"Orders", liveops:"Live Operations", kitchen:"Kitchen", tables:"Tables", pos:"Point of Sale", menu:"Menu Management", categories:"Categories", discounts:"Discounts", inventory:"Inventory", customers:"Customers", riders:"Riders", riderAnalytics:"Rider Analytics", partners:"Partners", analytics:"Analytics", lostsales:"Lost Sales", settlements:"Settlements", payments:"Payments", promotions:"Promotions", notifications:"Notifications", activitylog:"Activity Log", feedback:"Customer Feedback", livetracker:"Live Rider Tracker", staff:"Staff Management", settings:"Settings" };
 
 export const PARTNERS_REF = ref(db, "system/partners");
 
@@ -194,6 +194,15 @@ export const PAGE_GUIDES = {
     { icon: "History", title: "Audit Log", body: "Every action is recorded here — dish edits, order updates, discount changes. Filter by action type or search details." },
     { icon: "Search", title: "Search & Paginate", body: "Use the search bar to find specific entries. Click the Details cell to expand/collapse the full JSON payload." },
     { icon: "Filter", title: "Filter by Action", body: "Click any action pill to filter the log. The count updates in real time as you filter." },
+  ],
+  notifications: [
+    { icon: "Bell", title: "Broadcast History", body: "View all push notifications sent to customers and admins. Each card shows the audience, delivery stats, and content." },
+    { icon: "Send", title: "Send Broadcast", body: "Compose and send push notifications to all users, admins only, or customers. Track delivery and open rates." },
+  ],
+  staff: [
+    { icon: "Shield", title: "Staff Overview", body: "Manage all admin accounts for this business. See who has access, their roles, and last login time." },
+    { icon: "UserPlus", title: "Add Staff", body: "Create new admin accounts with email/password. Assign roles: SuperAdmin (full access), Admin (standard), Manager (limited)." },
+    { icon: "Key", title: "Permissions", body: "Change roles or remove staff access as needed. Staff members with FCM tokens receive real-time notifications." },
   ],
   tables: [
     { icon: "Table2", title: "Table Overview", body: "All tables shown as color-coded cards. Green = free, Orange = occupied, Red = billing. Each card shows capacity and session time." },
