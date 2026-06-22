@@ -170,11 +170,6 @@ export const PAGE_GUIDES = {
     { icon: "Send", title: "Send or Schedule", body: "Launch immediately or schedule for later. Set delay between messages (1-30s). Toggle coupon generation." },
     { icon: "Activity", title: "Active Campaigns", body: "Monitor running campaigns with progress bars. Use Kill Switch to emergency-stop all campaigns." },
   ],
-  notifications: [
-    { icon: "Megaphone", title: "Compose Broadcast", body: "Write a title and message for your broadcast. Choose target audience: All, New, VIP, or Inactive (7+ days)." },
-    { icon: "Send", title: "Send Broadcast", body: "Click Send to push the notification to the selected audience. Written to Firebase and delivered via bot." },
-    { icon: "History", title: "Broadcast History", body: "View previously sent broadcasts with audience badge, source (SuperAdmin/Admin), and recipient count." },
-  ],
   feedback: [
     { icon: "Star", title: "Rating Distribution", body: "Visual breakdown of 5-star to 1-star ratings with percentage bars and average rating." },
     { icon: "MessageSquare", title: "Review List", body: "Paginated review cards showing customer avatar, name, time, rating, comment, and dish name badge." },
