@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import { TopNav } from "./TopNav";
 import { BottomNav } from "./BottomNav";
 import { FloatingCart } from "../ui/FloatingCart";
@@ -9,40 +9,41 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const isCheckoutOrTracking = location.startsWith("/checkout") || location.startsWith("/tracking");
 
-  // Pull-to-refresh logic (200px threshold)
-  const [touchStart, setTouchStart] = useState(0);
   const [pulling, setPulling] = useState(false);
   const [pullDist, setPullDist] = useState(0);
+  const touchStartRef = useRef(0);
+  const pullDistRef = useRef(0);
 
   useEffect(() => {
     const handleStart = (e: TouchEvent) => {
       if (window.scrollY === 0) {
-        setTouchStart(e.touches[0].pageY);
+        touchStartRef.current = e.touches[0].pageY;
       } else {
-        setTouchStart(0);
+        touchStartRef.current = 0;
       }
     };
 
     const handleMove = (e: TouchEvent) => {
-      if (touchStart === 0) return;
+      if (touchStartRef.current === 0) return;
       const touchY = e.touches[0].pageY;
-      const diff = touchY - touchStart;
+      const diff = touchY - touchStartRef.current;
       
       if (diff > 0 && window.scrollY === 0) {
+        pullDistRef.current = Math.min(diff, 250);
         setPulling(true);
-        setPullDist(Math.min(diff, 250));
-        // Prevent scroll when pulling
+        setPullDist(pullDistRef.current);
         if (diff > 10 && e.cancelable) e.preventDefault();
       }
     };
 
     const handleEnd = () => {
-      if (pullDist > 200) {
+      if (pullDistRef.current > 200) {
         window.location.reload();
       }
       setPulling(false);
       setPullDist(0);
-      setTouchStart(0);
+      touchStartRef.current = 0;
+      pullDistRef.current = 0;
     };
 
     window.addEventListener("touchstart", handleStart, { passive: false });
@@ -54,7 +55,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       window.removeEventListener("touchmove", handleMove);
       window.removeEventListener("touchend", handleEnd);
     };
-  }, [touchStart, pullDist]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0 flex flex-col relative">

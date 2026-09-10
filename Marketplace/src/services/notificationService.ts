@@ -28,8 +28,8 @@ export const requestNotificationPermission = async (userId: string) => {
 };
 
 export const onMessageListener = () =>
-  new Promise((resolve) => {
-    if (!messaging) return;
+  new Promise((resolve, reject) => {
+    if (!messaging) { reject(new Error("Messaging unavailable")); return; }
     onMessage(messaging, (payload) => {
       console.log("Message received:", payload);
       resolve(payload);
@@ -38,10 +38,9 @@ export const onMessageListener = () =>
 
 export const listenForBroadcasts = (callback: (broadcast: any) => void) => {
   const broadcastRef = ref(db, 'system/broadcasts');
-  // Only listen for new broadcasts after the app starts
   let initialized = false;
   
-  onValue(broadcastRef, (snapshot) => {
+  const unsub = onValue(broadcastRef, (snapshot) => {
     if (!snapshot.exists()) return;
     
     // Get the most recent broadcast
@@ -57,4 +56,5 @@ export const listenForBroadcasts = (callback: (broadcast: any) => void) => {
     }
     initialized = true;
   });
+  return () => unsub();
 };

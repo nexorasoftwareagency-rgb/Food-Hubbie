@@ -10,10 +10,15 @@ const db = admin.database();
 const auth = admin.auth();
 
 async function createAdmin() {
-  const email = 'roshanipizza@gmail.com';
-  const password = '989515';
-  const businessId = 'business_roshani';
-  const outletId = 'outlet_pizza';
+  const email = process.argv[2];
+  const password = process.argv[3];
+  const businessId = process.argv[4];
+  const outletId = process.argv[5];
+
+  if (!email || !password || !businessId || !outletId) {
+    console.error('Usage: node create-admin.js <email> <password> <businessId> <outletId>');
+    process.exit(1);
+  }
 
   try {
     // Check if user already exists
@@ -26,10 +31,9 @@ async function createAdmin() {
       console.log('Created auth user with UID:', user.uid);
     }
 
-    // Add/update admin entry in RTDB (both paths)
+    // Add/update admin entry in RTDB (both paths) — no plaintext password
     const adminData = {
       email,
-      password,
       businessId,
       outlet: outletId,
       role: 'business',

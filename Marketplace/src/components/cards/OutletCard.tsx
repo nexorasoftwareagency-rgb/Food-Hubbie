@@ -83,9 +83,10 @@ export function OutletCard({ outlet, delay = 0 }: OutletCardProps) {
           {/* Logo floated up */}
           <div className="absolute -top-6 right-4 p-1 bg-card rounded-xl shadow-sm">
             <img
-              src={outlet.logo}
+              src={outlet.logo || '/favicon.svg'}
               alt={outlet.name}
               className="w-12 h-12 rounded-lg object-cover"
+              onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/favicon.svg'; } }}
             />
           </div>
 

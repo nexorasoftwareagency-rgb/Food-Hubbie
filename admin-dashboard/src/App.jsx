@@ -1,21 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  LayoutDashboard, ShoppingBag, Zap, ChefHat, Monitor, UtensilsCrossed,
-  Tag, Package, Percent, Users, Bike, Handshake, BarChart3, TrendingDown,
-  CreditCard, MessageSquare, MapPin, Settings, LogOut,
-  Sun, Moon, Search, X, Menu, ChevronRight, ChevronLeft, ChevronDown,
-  ShoppingCart, Wallet, Store, Plus, Edit3, Trash2, Printer,
-  Minus, Phone, Save, Image, Upload, DollarSign, CheckCircle,
-  AlertTriangle, ArrowUp, ArrowDown, Clock, TrendingUp, Globe,
-  Activity, Navigation, Truck, Eye, EyeOff, Download, Send, Star, XCircle, Lock, Octagon, Megaphone,
-  WifiOff, RefreshCw, Smartphone, History
+  MapPin, Settings, LogOut, Sun, Moon, X, Menu, ChevronRight, ChevronLeft, ChevronDown,
+  Store, AlertTriangle, Megaphone, WifiOff, RefreshCw
 } from "lucide-react";
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { getAuthInstance, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, get, ref, update, push, set, remove, serverTimestamp, onValue, off, query, orderByChild, equalTo, uploadImage, deleteImage, runTransaction, logAudit, getCurrentAdminActor, createRiderAuthAccount, deleteRiderAuthAccount, resetRiderPassword, EmailAuthProvider, reauthenticateWithCredential, getMessaging, getToken, onMessage as onFcmMessage, isMessagingSupported, isConnected, onConnectionChange, startBotStatusWatcher, Outlet, getBizId, getOutletId } from "./firebase";
-import { ORANGE, COLORS, ORD_ST, ORDER_STATUSES, SEQ, LIVE_ST, KITCHEN_ST, PIE_COLORS, HOURS_8_TO_23, DAY_KEYS, TRANSLATIONS, APP_VERSION, NAV_GROUPS, MOBILE_NAV, PAGE_TITLES, DISC_TYPES, DISC_STATUS, DISC_CHANNELS, PAYMENT_PAGE_SIZE, PAGE_GUIDES, STORAGE_KEYS, PARTNERS_REF, statusColors, stockStatus } from "./constants";
+import { get as fbGet } from "firebase/database";
+import { getAuthInstance, onAuthStateChanged, signInWithEmailAndPassword, signOut, setOutletContext, onValue, off, getMessaging, getToken, onMessage as onFcmMessage, isMessagingSupported, isConnected as firebaseIsConnected, onConnectionChange, startBotStatusWatcher, Outlet, getBizId, getOutletId, logAudit, getCurrentAdminActor, db, ref, update, EmailAuthProvider, reauthenticateWithCredential } from "./firebase";
+import { ORANGE, APP_VERSION, NAV_GROUPS, MOBILE_NAV, PAGE_TITLES, PAGE_GUIDES, STORAGE_KEYS, TRANSLATIONS } from "./constants";
 import TablesPage from "./TablesPage";
-import { fmt, esc, csvValue, downloadCSV, orderItemsCount, orderItemsText, validateGSTIN, validateFSSAI, validateCoords, handleImageError, buildTodayRevenue, buildWeekRevenue, normalizeRider, aggregateByDay, aggregateByHour, aggregateByCategory, aggregateByDish, aggregateByCustomer, relTime, fmtDate, toLocalInput, toMs, discTypeStyle } from "./utils";
-import { KPICard, StarRating, Pill, ToggleSwitch, EmptyState, SectionHeader, StatusBadge, GlassCard, BtnPrimary, BtnSecondary, Modal, Toast, Avatar, Skeleton, SkeletonCircle, SkeletonKPI, SkeletonCard, SkeletonText, SkeletonTable, SkeletonGrid, SkeletonPage, Loading, Input, Select, StatCard, SectionLabel, Pagination, ReauthModal, PageGuideModal } from "./components";
+import { ReauthModal, PageGuideModal, Toast, Avatar, BtnPrimary } from "./components";
 import "./App.css";
 
 import DashboardPage from "./pages/DashboardPage";
@@ -42,6 +34,10 @@ import PaymentsPage from "./pages/PaymentsPage";
 import ActivityLogPage from "./pages/ActivityLogPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import StaffPage from "./pages/StaffPage";
+import useOrders from "./hooks/useOrders";
+import OrderAlert from "./components/OrderAlert";
+
+const get = fbGet;
 
 const t = (key, fallback) => TRANSLATIONS[key] || fallback || key;
 
@@ -57,6 +53,24 @@ const PAGES = {
 };
 const VALID_PAGE_IDS = new Set(Object.keys(PAGES));
 
+function getOutletStatus(store) {
+  if (!store) return { label: "Unknown", color: "#94a3b8", bg: "#f1f5f9" };
+  const s = store.shopStatus;
+  if (s === "FORCE_CLOSED") return { label: "CLOSED", color: "#ef4444", bg: "#fef2f2" };
+  if (s === "FORCE_OPEN") return { label: "OPEN", color: "#22c55e", bg: "#f0fdf4" };
+  const now = new Date();
+  const [oh, om] = (store.shopOpenTime || "10:00").split(":").map(Number);
+  const [ch, cm] = (store.shopCloseTime || "23:00").split(":").map(Number);
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const open = oh * 60 + om;
+  const close = ch * 60 + cm;
+  let isOpen;
+  if (close < open) isOpen = mins >= open || mins < close;
+  else isOpen = mins >= open && mins < close;
+  return isOpen
+    ? { label: "OPEN", color: "#22c55e", bg: "#f0fdf4" }
+    : { label: "CLOSED", color: "#ef4444", bg: "#fef2f2" };
+}
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -82,7 +96,7 @@ function App() {
   const [lowStockDismissed, setLowStockDismissed] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem("fh_notif_enabled") !== "false");
   const [fcmToken, setFcmToken] = useState(null);
-  const [isConnected, setIsConnected] = useState(true);
+  const [connected, setConnected] = useState(true);
   const [showVersionBanner, setShowVersionBanner] = useState(false);
   const [badgeCounts, setBadgeCounts] = useState({});
   const [guideOpen, setGuideOpen] = useState(false);
@@ -92,6 +106,9 @@ function App() {
   const [outletSwitcherOpen, setOutletSwitcherOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const unacknowledgedRef = useRef(new Set());
+  const [orderAlerts, setOrderAlerts] = useState([]);
+  const [storeSettings, setStoreSettings] = useState(null);
+  const [displaySettings, setDisplaySettings] = useState(null);
 
   const playAlertSound = useCallback(() => {
     try {
@@ -111,9 +128,19 @@ function App() {
         gain2.gain.setValueAtTime(0.2, ctx.currentTime);
         gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
         osc2.start(ctx.currentTime); osc2.stop(ctx.currentTime + 0.4);
+        setTimeout(() => ctx.close(), 600);
       }, 200);
     } catch (_) {}
   }, []);
+
+  const showToast = useCallback((msg, type = "success") => {
+    setToast({ msg, type }); setTimeout(() => setToast(null), 3500);
+  }, []);
+  const showToastRef = useRef(showToast);
+  useEffect(() => { showToastRef.current = showToast; }, [showToast]);
+
+  const ordersReady = !!user && !!getBizId() && !!getOutletId();
+  const ordersData = useOrders({ showToast, playAlertSound, ready: ordersReady, reloadKey });
 
   // Version update banner
   useEffect(() => {
@@ -129,8 +156,8 @@ function App() {
   // Firebase connection state — uses centralized watcher from firebase.js
   useEffect(() => {
     if (!user) return;
-    setIsConnected(isConnected());
-    const unsub = onConnectionChange(setIsConnected);
+    setConnected(firebaseIsConnected());
+    const unsub = onConnectionChange(setConnected);
     return unsub;
   }, [user]);
 
@@ -170,6 +197,8 @@ function App() {
           }
           // Toast
           showToastRef.current?.(`${label}: ${name} — ₹${Number(total).toLocaleString()} (${items} items)`, "info");
+          // Order alert floater
+          setOrderAlerts(prev => [...prev, { id: Date.now(), key: k, order: { id: k, ...order } }]);
         });
         playAlertSound();
         setBadgeCounts(prev => ({ ...prev, liveops: (prev.liveops || 0) + newPlaced.length }));
@@ -439,11 +468,48 @@ function App() {
     if (lowStockCount > 0) setLowStockDismissed(false);
   }, [lowStockCount]);
 
-  const showToast = useCallback((msg, type = "success") => {
-    setToast({ msg, type }); setTimeout(() => setToast(null), 3500);
+  useEffect(() => {
+    if (!user || !getBizId() || !getOutletId()) return;
+    const r = Outlet("settings/Store");
+    if (!r) return;
+    const unsub = onValue(r, snap => setStoreSettings(snap.val() || {}));
+    return () => { off(r, "value", unsub); };
+  }, [user, reloadKey]);
+
+  useEffect(() => {
+    if (!user || !getBizId() || !getOutletId()) return;
+    const r = Outlet("settings/Display");
+    if (!r) return;
+    const unsub = onValue(r, snap => setDisplaySettings(snap.val() || {}));
+    return () => { off(r, "value", unsub); };
+  }, [user, reloadKey]);
+
+  const handleDismissAlert = useCallback((id) => {
+    setOrderAlerts(prev => prev.filter(a => a.id !== id));
   }, []);
-  const showToastRef = useRef(showToast);
-  useEffect(() => { showToastRef.current = showToast; }, [showToast]);
+
+  const handlePrintAlert = useCallback(async (order) => {
+    try {
+      const { printReceipt } = await import("./utils/printing");
+      const store = storeSettings || { name: outletInfo?.name || "Store" };
+      const ds = displaySettings || {};
+      const opts = {
+        showGSTIN: ds.checkShowGSTIN !== false,
+        showFSSAI: ds.checkShowFSSAI !== false,
+        showQR: ds.checkShowQR !== false,
+        showTagline: ds.checkShowTagline !== false,
+        showPoweredBy: ds.checkShowPoweredBy !== false,
+        showWifiInfo: ds.checkShowWifiInfo === true,
+        showFeedbackQR: ds.checkShowFeedbackQR !== false,
+      };
+      printReceipt(order, store, opts);
+    } catch (_) {}
+  }, [storeSettings, displaySettings, outletInfo]);
+
+  const PageComponent = PAGES[page] || DashboardPage;
+  const bg = dark ? "#0f172a" : "#f8fafc";
+  const sideBg = dark ? "#1e293b" : "#ffffff";
+  const textCol = dark ? "#f1f5f9" : "#1e293b";
 
   if (authLoading) {
     return (
@@ -512,11 +578,6 @@ function App() {
     );
   }
 
-  const PageComponent = PAGES[page] || DashboardPage;
-  const bg = dark ? "#0f172a" : "#f8fafc";
-  const sideBg = dark ? "#1e293b" : "#ffffff";
-  const textCol = dark ? "#f1f5f9" : "#1e293b";
-
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: bg, color: textCol, transition: "background 0.3s, color 0.3s" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Inter:wght@400;500;600&display=swap');
@@ -535,14 +596,14 @@ function App() {
         onCancel={cancelReauth}
       />
       <PageGuideModal open={guideOpen} page={page} onClose={()=>setGuideOpen(false)} />
-      {!isConnected && (
+      {!connected && (
         <div role="alert" style={{ position:"fixed", top:0, left:0, right:0, zIndex:99999, background:"#dc2626", color:"white", padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontSize:13, fontWeight:500, animation:"slideDown 0.3s ease-out" }}>
           <WifiOff size={16} /> No internet connection — changes may not save
           <button type="button" onClick={() => window.location.reload()} style={{ marginLeft:12, padding:"4px 14px", borderRadius:6, background:"rgba(255,255,255,0.2)", color:"white", border:"1px solid rgba(255,255,255,0.4)", cursor:"pointer", fontSize:12, fontWeight:600 }}>Retry</button>
         </div>
       )}
       {showVersionBanner && (
-        <div role="alert" style={{ position:"fixed", top:isConnected?0:44, left:0, right:0, zIndex:99998, background:"linear-gradient(135deg,#f59e0b,#d97706)", color:"white", padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontSize:13, fontWeight:500, animation:"slideDown 0.3s ease-out", flexWrap:"wrap" }}>
+        <div role="alert" style={{ position:"fixed", top:connected?0:44, left:0, right:0, zIndex:99998, background:"linear-gradient(135deg,#f59e0b,#d97706)", color:"white", padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontSize:13, fontWeight:500, animation:"slideDown 0.3s ease-out", flexWrap:"wrap" }}>
           <AlertTriangle size={16} /> A new version is available — click Refresh to update.
           <button type="button" onClick={handleVersionRefresh} style={{ padding:"4px 12px", borderRadius:8, border:"1px solid rgba(255,255,255,0.4)", background:"rgba(255,255,255,0.15)", color:"white", fontSize:12, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}><RefreshCw size={13} /> Refresh</button>
           <button type="button" onClick={handleVersionDismiss} aria-label="Dismiss" style={{ padding:"2px 8px", borderRadius:6, border:"none", background:"transparent", color:"rgba(255,255,255,0.7)", cursor:"pointer", fontSize:16, lineHeight:1 }}>×</button>
@@ -558,6 +619,7 @@ function App() {
           <div style={{ fontSize:11, color:"#94a3b8", fontWeight:600, textTransform:"uppercase", letterSpacing:0.5, marginBottom:2 }}>OUTLET <ChevronDown size={10} style={{ marginLeft:4 }} /></div>
           <div style={{ fontSize:13, fontWeight:600, color:ORANGE }}>{outletInfo.name}</div>
           {outletInfo.address&&<div style={{ fontSize:11, color:"#94a3b8", marginTop:2, display:"flex", alignItems:"center", gap:4 }}><MapPin size={10}/> {outletInfo.address}</div>}
+          {(() => { const st = getOutletStatus(storeSettings); return <div style={{ display:"inline-flex", alignItems:"center", gap:4, marginTop:5, padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:700, letterSpacing:0.5, color:st.color, background:st.bg }}><span style={{ width:6, height:6, borderRadius:"50%", background:st.color }} /> {st.label}</div>; })()}
           {outletSwitcherOpen && (
             <div style={{ position:"absolute", left:0, right:0, top:"100%", marginTop:4, zIndex:50, background:"white", borderRadius:10, boxShadow:"0 12px 40px rgba(0,0,0,0.15)", border:"1px solid #e2e8f0", maxHeight:200, overflow:"auto" }}>
               {Object.keys(outlets).filter(k => k !== getOutletId()).map(k => (
@@ -637,7 +699,7 @@ function App() {
                <div style={{ padding:"12px 16px", borderTop:"1px solid #f1f5f9", textAlign:"center", fontSize:11, color:"#64748b", cursor:"pointer" }} onClick={() => { setNotifOpen(false); setPage("notifications"); }}>View all notifications →</div>
              </div>
            )}
-          <div title={isConnected ? "Connected" : "Disconnected"} style={{ width:10, height:10, borderRadius:"50%", background:isConnected?"#22c55e":"#ef4444", boxShadow:isConnected?"0 0 8px rgba(34,197,94,0.5)":"0 0 8px rgba(239,68,68,0.5)", transition:"background 0.3s", animation:isConnected?"none":"pulse 2s infinite" }}/>
+          <div title={connected ? "Connected" : "Disconnected"} style={{ width:10, height:10, borderRadius:"50%", background:connected?"#22c55e":"#ef4444", boxShadow:connected?"0 0 8px rgba(34,197,94,0.5)":"0 0 8px rgba(239,68,68,0.5)", transition:"background 0.3s", animation:connected?"none":"pulse 2s infinite" }}/>
           {outletInfo&&<Avatar name={outletInfo.name} size={32}/>}
         </header>
         <main style={{ flex:1, padding:"24px 24px 88px", overflow:"auto" }}>
@@ -660,7 +722,9 @@ function App() {
               </button>
             </div>
           )}
-          <div className="page-content">{PageComponent && <PageComponent key={reloadKey} showToast={showToast} outletInfo={outletInfo} notifEnabled={notifEnabled} setNotifEnabled={setNotifEnabled} fcmToken={fcmToken} requireAdminReauth={requireAdminReauth} setPage={setPage} setSelOrder={setSelOrder} />}</div>
+          <div className="page-content">{PageComponent && <PageComponent key={reloadKey} showToast={showToast} outletInfo={outletInfo} notifEnabled={notifEnabled} setNotifEnabled={setNotifEnabled} fcmToken={fcmToken} requireAdminReauth={requireAdminReauth} setPage={setPage} storeSettings={storeSettings} displaySettings={displaySettings}
+            {...(page === "liveops" || page === "orders" ? { orders: ordersData.orders, ordersMap: ordersData.ordersMap, liveOrdersMap: ordersData.liveOrdersMap, riders: ordersData.riders, loading: ordersData.loading, updateStatus: ordersData.updateStatus, executeStatusUpdate: ordersData.executeStatusUpdate, assignRider: ordersData.assignRider, deleteOrder: ordersData.deleteOrder, getOrderItems: ordersData.getOrderItems, isRiderFresh: ordersData.isRiderFresh, getNextValidStatus: ordersData.getNextValidStatus, highlightedOrderId: ordersData.highlightedOrderId } : {})}
+          />}</div>
         </main>
       </div>
       <div className="mobile-bottom-nav" style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:30, display:"flex", alignItems:"center", justifyContent:"space-around", padding:"6px 0 env(safe-area-inset-bottom,6px)", background:dark?"#1e293b":"rgba(255,255,255,0.9)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", borderTop:dark?"1px solid #334155":"1px solid rgba(0,0,0,0.06)" }}>
@@ -672,9 +736,15 @@ function App() {
           </button>;
         })}
       </div>
+      <div id="alertContainer">
+        {orderAlerts.map(a => (
+          <OrderAlert key={a.id} order={a.order} onDismiss={() => handleDismissAlert(a.id)} onSwitchTab={setPage} onPrint={handlePrintAlert} />
+        ))}
+      </div>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
-    </div>
+    </div> 
   );
 }
 
 export default App;
+

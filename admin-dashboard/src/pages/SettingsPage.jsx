@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Menu, Store, Plus, Trash2, Phone, Save, Send } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { update, set, onValue, off, Outlet } from "../firebase";
 import { validateGSTIN, validateFSSAI, validateCoords } from "../utils";
 import { GlassCard, BtnPrimary, BtnSecondary, Input, SectionLabel } from "../components";
@@ -38,12 +38,18 @@ function SettingsPage({ showToast, notifEnabled, setNotifEnabled, fcmToken }) {
   const updateField = (setter, key, val) => setter(prev => ({...prev, [key]: val}));
 
   const handleSaveStore = async () => {
-    const v = validateCoords(s.lat, s.lng);
-    if (!v.valid) return showToast(v.msg, "error");
-    const g = validateGSTIN(s.gstin);
-    if (g!==true) return showToast(g.msg, "error");
-    const f = validateFSSAI(s.fssai);
-    if (f!==true) return showToast(f.msg, "error");
+    if (s.lat && s.lng) {
+      const v = validateCoords(s.lat, s.lng);
+      if (!v.valid) return showToast(v.msg, "error");
+    }
+    if (s.gstin) {
+      const g = validateGSTIN(s.gstin);
+      if (g!==true) return showToast(g.msg, "error");
+    }
+    if (s.fssai) {
+      const f = validateFSSAI(s.fssai);
+      if (f!==true) return showToast(f.msg, "error");
+    }
     try { await set(Outlet("settings/Store"), {...s, updatedAt:new Date().toISOString()}); showToast("Store settings saved","success"); }
     catch(e) { showToast("Save failed","error"); }
   };

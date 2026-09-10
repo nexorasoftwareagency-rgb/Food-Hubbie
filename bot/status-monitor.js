@@ -49,6 +49,13 @@ function initStatusMonitor(sock, tenant) {
     if (!order) return;
     handleStatusUpdate(sock, snap.key, order, t, tenant, processedStatus);
   });
+
+  // Return cleanup function to prevent stacking on reconnect
+  return () => {
+    orderRef.off('child_added');
+    orderRef.off('child_changed');
+    console.log(`[Monitor] [${tenant.label}] Listeners removed for: ${ordersPath}`);
+  };
 }
 
 // ─── Helper: extract items from order ─────────────────────────

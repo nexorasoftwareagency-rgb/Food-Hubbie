@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Store } from "lucide-react";
-import { db, ref, push, remove, onValue, off } from "../firebase";
+import { db, ref, onValue, off } from "../firebase";
 import "../App.css";
 
 function LiveTrackerPage() {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const markers = useRef({});
+  const cleanupRef = useRef(null);
   const [online, setOnline] = useState(0);
 
   useEffect(() => {
-    let L, cleanup;
+    let L;
     (async () => {
       try {
         L = (await import("leaflet")).default;
@@ -39,9 +39,14 @@ function LiveTrackerPage() {
         setOnline(oc);
         if (bounds.length>0) map.fitBounds(L.latLngBounds(bounds), { padding:[50,50], maxZoom:15 });
       });
-      cleanup = () => { off(r,"value",unsub); if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current=null; } };
+      cleanupRef.current = () => {
+        off(r,"value",unsub);
+        Object.values(markers.current).forEach(m => map.removeLayer(m));
+        markers.current = {};
+        if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current=null; }
+      };
     })();
-    return () => { if (cleanup) cleanup(); };
+    return () => { if (cleanupRef.current) cleanupRef.current(); };
   }, []);
 
   return (

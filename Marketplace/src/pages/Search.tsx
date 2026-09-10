@@ -43,8 +43,10 @@ export default function Search() {
     loadData();
 
     // Load recent searches
-    const saved = localStorage.getItem("recentSearches");
-    if (saved) setRecentSearches(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem("recentSearches");
+      if (saved) setRecentSearches(JSON.parse(saved));
+    } catch (_) {}
   }, []);
 
   // Sync state with URL changes
@@ -203,7 +205,7 @@ export default function Search() {
                     className="flex flex-col items-center gap-3 group"
                   >
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-all shadow-sm group-active:scale-95">
-                      <img src={c.image} alt={c.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                      <img src={c.image || '/favicon.svg'} alt={c.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/favicon.svg'; } }} />
                     </div>
                     <span className="text-xs font-black text-center group-hover:text-primary transition-colors">{c.name}</span>
                   </button>

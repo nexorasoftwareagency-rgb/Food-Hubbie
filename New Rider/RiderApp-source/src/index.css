@@ -1,0 +1,186 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   FOODHUBBIE RIDER — DESIGN TOKENS
+   Light mode only — no dark mode (per PRD §5.1 / §14)
+   ============================================================ */
+:root {
+  --radius: 0.65rem;
+
+  /* shadcn/ui base tokens mapped onto the vibrant-orange rider theme */
+  --background: #F4F6F8;
+  --foreground: #1E293B;
+  --card: #FFFFFF;
+  --card-foreground: #1E293B;
+  --popover: #FFFFFF;
+  --popover-foreground: #1E293B;
+  --primary: #FF5200;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FFF5F1;
+  --secondary-foreground: #E64A00;
+  --muted: #F1F4F7;
+  --muted-foreground: #64748B;
+  --accent: #FFF5F1;
+  --accent-foreground: #E64A00;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #E5E9EE;
+  --input: #E5E9EE;
+  --ring: #FF5200;
+
+  /* Rider brand tokens (PRD §5.1) */
+  --primary-rgb: 255, 82, 0;
+  --primary-glow: rgba(255, 82, 0, 0.15);
+  --primary-dark: #E64A00;
+  --primary-light: #FFF5F1;
+
+  --bg-app: #F4F6F8;
+  --bg-surface: #FFFFFF;
+  --bg-glass: rgba(255, 255, 255, 0.9);
+  --bg-card: rgba(255, 255, 255, 0.8);
+
+  --text-main: #1E293B;
+  --text-muted: #64748B;
+  --text-tertiary: #94A3B8;
+  --text-inverse: #FFFFFF;
+
+  --success: #10B981;
+  --success-rgb: 16, 185, 129;
+  --info: #3B82F6;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --danger-rgb: 239, 68, 68;
+
+  --stat-green: #10B981;
+  --stat-blue: #3B82F6;
+  --stat-orange: #FF5200;
+  --stat-gold: #F59E0B;
+
+  --shadow-pro: 0 10px 30px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.06);
+  --shadow-premium: 0 8px 32px rgba(0, 0, 0, 0.08);
+
+  --header-height: 60px;
+  --bottom-nav-height: 65px;
+  --sidebar-width: 280px;
+  --radius-card: 20px;
+  --radius-glass: 16px;
+  --radius-sm: 10px;
+
+  --glass-blur: blur(12px);
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --font-sans: 'Outfit', system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --color-stat-green: var(--stat-green);
+  --color-stat-blue: var(--stat-blue);
+  --color-stat-orange: var(--stat-orange);
+  --color-stat-gold: var(--stat-gold);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-sans);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  background: var(--bg-app);
+  min-height: 100dvh;
+  box-shadow: var(--shadow-premium);
+  overflow-x: hidden;
+}
+
+/* Glassmorphism utility (used by GlassCard) */
+.glass-surface {
+  background: var(--bg-glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Leaflet map container sizing fix inside flex layouts */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-card);
+  font-family: var(--font-sans);
+  z-index: 0;
+}
+
+.leaflet-div-icon {
+  background: transparent;
+  border: none;
+}
+
+/* Slim scrollbars app-wide */
+::-webkit-scrollbar { width: 0px; height: 0px; }
+
+/* Pulse animation for online status dot / map rider marker */
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes soft-pulse {
+  0%, 100% { box-shadow: 0 8px 20px var(--primary-glow); }
+  50% { box-shadow: 0 8px 26px rgba(255, 82, 0, 0.35); }
+}
+.animate-soft-pulse {
+  animation: soft-pulse 1.8s ease-in-out infinite;
+}

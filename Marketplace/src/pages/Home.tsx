@@ -234,7 +234,7 @@ export default function Home() {
           ) : (
             cuisines.map((cat, i) => (
               <motion.div
-                key={cat.id}
+                key={cat.name || cat.id || i}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.05 }}
@@ -243,9 +243,10 @@ export default function Home() {
               >
                 <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary transition-all shadow-sm">
                   <img 
-                    src={cat.image} 
+                    src={cat.image || '/placeholder.svg'} 
                     alt={cat.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/placeholder.svg'; } }}
                   />
                   <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors" />
                 </div>
@@ -282,7 +283,7 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {bestSellers.map((item, i) => (
-              <FoodCard key={item.id} item={item} delay={i} />
+              <FoodCard key={`bs-${item.outletId}-${item.id}-${i}`} item={item} delay={i} />
             ))}
           </div>
         )}
@@ -302,7 +303,7 @@ export default function Home() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {recommended.slice(0, 4).map((item, i) => (
-              <FoodCard key={item.id} item={item} delay={i} />
+              <FoodCard key={`rec-${item.outletId}-${item.id}-${i}`} item={item} delay={i} />
             ))}
           </div>
         </div>
@@ -329,13 +330,14 @@ export default function Home() {
           <div className="flex-1 grid grid-cols-2 gap-4">
             {outlets.slice(0, 4).map((o, i) => (
               <motion.img 
-                key={o.id}
+                key={`outlet-${o.id}-${i}`}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.1 }}
-                src={o.logo}
+                src={o.logo || '/favicon.svg'}
                 alt={o.name}
                 className="w-full h-32 md:h-40 object-cover rounded-2xl border border-border shadow-sm"
+                onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/favicon.svg'; } }}
               />
             ))}
           </div>
@@ -360,7 +362,7 @@ export default function Home() {
         ) : allMenuItems.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {allMenuItems.map((item, i) => (
-              <FoodCard key={item.id} item={item} delay={i % 4} />
+              <FoodCard key={`all-${item.outletId}-${item.id}-${i}`} item={item} delay={i % 4} />
             ))}
           </div>
         ) : (
@@ -405,9 +407,10 @@ export default function Home() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <img
-                      src={review.userAvatar}
+                      src={review.userAvatar || '/favicon.svg'}
                       alt={review.userName}
                       className="w-10 h-10 rounded-full object-cover"
+                      onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/favicon.svg'; } }}
                     />
                     <div>
                       <p className="font-bold text-sm text-card-foreground">

@@ -502,7 +502,7 @@ input, select { font-family: inherit; }
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: visible;
 }
 .table-header {
   display: flex;
@@ -975,20 +975,171 @@ input, select { font-family: inherit; }
   .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-xl); }
   .sidebar-toggle { display: flex; }
   .main-content { margin-left: 0; }
-  .kpi-grid { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
   .kpi-mini-grid { grid-template-columns: repeat(2, 1fr); }
-  .page-content { padding: 16px; }
+  .page-content { padding: 12px; }
   .header-search { display: none; }
   .form-row { grid-template-columns: 1fr; }
-  .kanban-board { grid-template-columns: repeat(2, 1fr); }
-  .pro-table { font-size: 12px; }
-  .pro-table th, .pro-table td { padding: 8px 10px; }
+  .kanban-board { grid-template-columns: 1fr; }
+  .pro-table { font-size: 11px; display: block; overflow-x: auto; white-space: nowrap; }
+  .pro-table th, .pro-table td { padding: 6px 8px; }
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-bar .pro-input,
   .filter-bar .pro-select,
   .filter-bar .search-input { width: 100%; min-width: unset; }
   .table-header { flex-direction: column; align-items: stretch; }
   .table-header-actions { flex-wrap: wrap; }
-  .modal { max-width: 100%; margin: 10px; }
+  .modal { max-width: 95%; margin: 10px; max-height: 90vh; overflow-y: auto; }
   .retention-group { flex-direction: column; align-items: stretch; }
+  .page-header h1 { font-size: 1.25rem; }
+  .kpi-value { font-size: 1.1rem; }
+  .kpi-label { font-size: 0.65rem; }
+  .btn-pro, .btn-pro-outline { padding: 8px 14px; font-size: 12px; }
+  .nav-link span { display: none; }
+  .nav-link { padding: 10px 12px; justify-content: center; }
+  .nav-link i { margin: 0; }
+}
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .kpi-mini-grid { grid-template-columns: 1fr; }
+  .page-content { padding: 8px; }
+  .pro-table { font-size: 10px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MISSING CSS CLASSES — Used in HTML but never defined
+   ══════════════════════════════════════════════════════════════ */
+
+/* card-header / card-body — Dashboard, Promotions, Broadcast, Settings */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.card-header h3 { font-size: 15px; font-weight: 600; margin: 0; }
+.card-body { padding: 20px; }
+.chart-body { padding: 16px 20px 20px; }
+.chart-body canvas { width: 100% !important; }
+
+/* promo-grid — Promotions tab 3-column layout */
+.promo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1024px) { .promo-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px)  { .promo-grid { grid-template-columns: 1fr; } }
+
+/* btn-filter — Live Orders status filter pills */
+.btn-filter {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+.btn-filter:hover { border-color: var(--color-cta); color: var(--color-cta); }
+.btn-filter.active { background: var(--color-cta); color: white; border-color: var(--color-cta); }
+
+/* Table scroll wrapper */
+.table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Actions cell alignment */
+.actions-cell { text-align: right; white-space: nowrap; }
+.text-right { text-align: right; }
+
+/* Sidebar toggle visibility on mobile */
+@media (max-width: 768px) { .sidebar-toggle { display: flex !important; } }
+
+/* Sync / Live badge */
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #16A34A;
+  background: #F0FDF4;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid #BBF7D0;
+}
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22C55E;
+  animation: pulse 2s infinite;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+/* Kanban outer container */
+#ordersKanbanView {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* View toggle spacing */
+.view-toggle { display: inline-flex; margin-bottom: 16px; }
+
+/* Page header gap */
+.page-header { gap: 12px; }
+
+/* Modal title styling for headers that use .modal-title */
+.modal-title { margin: 0; font-size: 16px; font-weight: 700; }
+
+/* Skeleton loading animation */
+.skeleton-text {
+  display: inline-block;
+  width: 60px;
+  height: 24px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ─── Mobile/Desktop Display Helpers ─── */
+.mobile-only { display: none !important; }
+.desktop-only { display: var(--display, flex) !important; }
+
+/* Mobile: modals as bottom sheets */
+@media (max-width: 640px) {
+  .modal {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .btn-pro, .btn-pro-outline { min-height: 44px; }
+  .pro-table th, .pro-table td { padding: 10px 12px; }
 }

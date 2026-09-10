@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Edit3, Trash2, Save, Image } from "lucide-react";
+import { Plus, Edit3, Trash2 } from "lucide-react";
 import { db, get, ref, update, push, remove, onValue, logAudit, getCurrentAdminActor, Outlet, getBizId, getOutletId } from "../firebase";
 import { GlassCard, BtnPrimary, BtnSecondary, Modal, Input } from "../components";
 import { ORANGE } from "../constants";

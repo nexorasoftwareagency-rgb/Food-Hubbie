@@ -127,7 +127,10 @@ export async function loadStoreSettings() {
         document.getElementById('settingWifiPass').value = s.wifiPass || '';
         document.getElementById('settingInstagram').value = s.instagram || '';
         document.getElementById('settingFacebook').value = s.facebook || '';
+        document.getElementById('settingGoogleReviewLink').value = s.googleReviewLink || '';
+        document.getElementById('settingWhatsappNumber').value = s.whatsappNumber || '';
         document.getElementById('settingReviewUrl').value = s.reviewUrl || '';
+        document.getElementById('settingCustomerMenuBgImage').value = s.customerMenuBgImage || '';
         
         document.getElementById('settingLat').value = s.lat || '25.887444';
         document.getElementById('settingLng').value = s.lng || '85.026889';
@@ -142,6 +145,16 @@ export async function loadStoreSettings() {
 
         // Render Fee Slabs
         renderFeeSlabs(d.slabs || []);
+
+        // 2b. Dine-In Settings (tax, service charge)
+        const dineSnap = await get(Outlet.ref('dineinSettings'));
+        const dine = dineSnap.val() || {};
+        document.getElementById('dineinTaxEnabled').checked = dine.taxEnabled !== false;
+        document.getElementById('dineinTaxName').value = dine.taxName || 'GST';
+        document.getElementById('dineinTaxRate').value = typeof dine.taxRate === 'number' ? dine.taxRate : 5;
+        document.getElementById('dineinServiceChargeEnabled').checked = dine.serviceChargeEnabled === true;
+        document.getElementById('dineinServiceChargeName').value = dine.serviceChargeName || 'Service Charge';
+        document.getElementById('dineinServiceChargeRate').value = typeof dine.serviceChargeRate === 'number' ? dine.serviceChargeRate : 10;
 
         // 3. Bot Aesthetics & Marketing
         const b = bot || {};
@@ -191,6 +204,9 @@ export async function loadStoreSettings() {
             document.getElementById('qrPreview').src = s.paymentQR;
             document.getElementById('settingQRUrl').value = s.paymentQR;
         }
+
+        // 7. Today's Offers
+        _renderOffers(dine.offers || []);
 
         if (window.updateOutletStatusIndicator) window.updateOutletStatusIndicator(s.shopStatus || 'AUTO');
         
@@ -259,7 +275,10 @@ export async function saveStoreSettings() {
             wifiPass: document.getElementById('settingWifiPass').value,
             instagram: document.getElementById('settingInstagram').value,
             facebook: document.getElementById('settingFacebook').value,
+            googleReviewLink: document.getElementById('settingGoogleReviewLink').value,
+            whatsappNumber: document.getElementById('settingWhatsappNumber').value,
             reviewUrl: document.getElementById('settingReviewUrl').value,
+            customerMenuBgImage: document.getElementById('settingCustomerMenuBgImage').value,
             lat, lng,
             paymentQR: document.getElementById('settingQRUrl').value,
             updatedAt: new Date().toISOString()
@@ -306,6 +325,16 @@ export async function saveStoreSettings() {
         updates[`${Outlet.current}/settings/Delivery`] = deliveryData;
         updates[`${Outlet.current}/settings/Bot`] = botData;
         updates[`${Outlet.current}/settings/Display`] = displayData;
+        updates[`${Outlet.current}/dineinSettings`] = {
+            qrBaseUrl: (await get(Outlet.ref('dineinSettings'))).val()?.qrBaseUrl || '',
+            taxEnabled: document.getElementById('dineinTaxEnabled').checked,
+            taxName: document.getElementById('dineinTaxName').value.trim() || 'GST',
+            taxRate: parseFloat(document.getElementById('dineinTaxRate').value) || 0,
+            serviceChargeEnabled: document.getElementById('dineinServiceChargeEnabled').checked,
+            serviceChargeName: document.getElementById('dineinServiceChargeName').value.trim() || 'Service Charge',
+            serviceChargeRate: parseFloat(document.getElementById('dineinServiceChargeRate').value) || 0,
+            offers: _getOffers()
+        };
         await update(ref(db), updates);
 
         showToast("Settings saved successfully!", "success");
@@ -495,3 +524,63 @@ document.addEventListener('input', (e) => {
         }
     }
 });
+
+// -------------------------------------------------------------------
+// OFFERS MANAGEMENT
+// -------------------------------------------------------------------
+let _offers = [];
+
+function _renderOffers(offers) {
+    const arr = Array.isArray(offers) ? offers : (offers && typeof offers === 'object' ? Object.values(offers) : []);
+    _offers = arr.map(o => ({ ...o }));
+    const list = document.getElementById('offersList');
+    const noMsg = document.getElementById('noOffersMsg');
+    if (!list) return;
+
+    if (_offers.length === 0) {
+        list.innerHTML = '';
+        if (noMsg) noMsg.classList.remove('hidden');
+        return;
+    }
+    if (noMsg) noMsg.classList.add('hidden');
+
+    list.innerHTML = _offers.map((o, i) => `
+        <div class="offer-row" style="display:flex; gap:8px; align-items:start; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--bg);">
+            <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                <input type="text" class="offer-title-input" data-offer-idx="${i}" data-field="title" value="${(o.title || '').replace(/"/g, '&quot;')}" placeholder="Offer title" style="border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:13px; font-weight:700;">
+                <input type="text" class="offer-desc-input" data-offer-idx="${i}" data-field="description" value="${(o.description || '').replace(/"/g, '&quot;')}" placeholder="Description (optional)" style="border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:12px;">
+                <input type="text" class="offer-code-input" data-offer-idx="${i}" data-field="code" value="${(o.code || '').replace(/"/g, '&quot;')}" placeholder="Promo code (optional)" style="border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:12px; max-width:160px;">
+            </div>
+            <button class="btn-icon offer-remove-btn" data-offer-idx="${i}" title="Remove" style="color:var(--error); font-size:18px; padding:4px;">✕</button>
+        </div>`).join('');
+
+    // Bind input changes
+    list.querySelectorAll('[data-field]').forEach(el => {
+        el.addEventListener('input', () => {
+            const idx = Number(el.dataset.offerIdx);
+            const field = el.dataset.field;
+            if (_offers[idx]) { _offers[idx][field] = el.value; state.settingsDirty = true; }
+        });
+    });
+
+    // Bind remove buttons
+    list.querySelectorAll('.offer-remove-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            _offers.splice(Number(btn.dataset.offerIdx), 1);
+            _renderOffers(_offers);
+            state.settingsDirty = true;
+        });
+    });
+}
+
+document.getElementById('btnAddOffer')?.addEventListener('click', () => {
+    _offers.push({ title: '', description: '', code: '' });
+    _renderOffers(_offers);
+    state.settingsDirty = true;
+    // Focus the new title input
+    const list = document.getElementById('offersList');
+    const lastTitle = list?.querySelector('.offer-title-input:last-of-type');
+    if (lastTitle) lastTitle.focus();
+});
+
+function _getOffers() { return _offers.filter(o => o.title && o.title.trim()); }

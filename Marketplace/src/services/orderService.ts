@@ -144,7 +144,7 @@ export async function submitOrder(input: PlaceOrderInput): Promise<string> {
       cashbackBonus: input.cashbackBonus,
       createdAt: now,
       updatedAt: now,
-      estimatedMinutes: 35
+      estimatedMinutes: input.estimatedMinutes ?? Math.round(((input.items.length > 0 ? 25 : 20) + (input.items.length * 3))),
     };
 
     const currentOrders = loadOrders();
@@ -280,6 +280,7 @@ export type PlaceOrderInput = {
   globalDiscountAmount?: number;
   platformFee?: number;
   cashbackBonus?: number;
+  estimatedMinutes?: number;
 };
 
 export function nextStatus(current: string): string | null {
@@ -348,7 +349,7 @@ export async function fetchOrdersFromFirebase(userId: string): Promise<Order[]> 
                   cashbackBonus: o.cashbackBonus,
                   createdAt: o.createdAt,
                   updatedAt: o.updatedAt,
-                  estimatedMinutes: 35
+                  estimatedMinutes: o.estimatedMinutes ?? 30
                 });
               }
             }

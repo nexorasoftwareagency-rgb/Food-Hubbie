@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { LayoutDashboard, ShoppingBag, Users, Bike, Search, X, Menu, Wallet, Plus, Trash2, Phone, CheckCircle, Clock, Activity, Navigation, Truck, Download, Star, Lock } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, Bike, Search, X, Plus, Trash2, CheckCircle, Clock, Activity, Navigation, Truck, Download, Star, Lock } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { db, get, ref, update, push, set, remove, serverTimestamp, onValue, off, logAudit, getCurrentAdminActor, createRiderAuthAccount, deleteRiderAuthAccount, resetRiderPassword, Outlet, getBizId, getOutletId } from "../firebase";
 import { fmt, downloadCSV, normalizeRider } from "../utils";
@@ -46,7 +46,7 @@ function RidersPage({ showToast }) {
   const toggleStatus = async (id) => {
     const r = riders.find(x => x.id === id);
     if (!r) return;
-    const next = r.status === "offline" ? "Online" : "Offline";
+    const next = r.status === "offline" ? "online" : "offline";
     try { await update(ref(db, `riders/${id}`), { status: next }); showToast(`Rider ${next}`,"success"); }
     catch(e) { showToast("Update failed","error"); }
   };

@@ -1,0 +1,1 @@
+import"./rolldown-runtime-CNC7AqOf.js";import{fn as e,yn as t}from"./vendor-oJcY8ppv.js";import{n}from"./utils-DDXHD7IQ.js";t();var r=e();function i({className:e,...t}){return(0,r.jsx)(`div`,{className:n(`glass-surface rounded-[16px] p-4 shadow-[var(--shadow-card)]`,e),...t})}export{i as t};

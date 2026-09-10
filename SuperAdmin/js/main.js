@@ -694,7 +694,7 @@ async function processRetentionOrders(cutoffTimestamp, action, updates) {
                 const orderTimestamp = order.timestamp || order.createdAt || 0;
                 if (orderTimestamp < cutoffTimestamp) {
                     if (action === 'archive') {
-                        updates[`archives/orders/${bizId}/${outletId}/${orderId}`] = { ...order, archivedAt: Date.now(), archivedBy: auth.currentUser.email };
+                        updates[`archives/orders/${bizId}/${outletId}/${orderId}`] = { ...order, archivedAt: Date.now(), archivedBy: auth.currentUser?.email || 'system' };
                     }
                     updates[`businesses/${bizId}/outlets/${outletId}/orders/${orderId}`] = null;
                     count++;
@@ -766,7 +766,11 @@ window.showOnboarding = function() {
 }
 
 // --- Dashboard Stats ---
+let _dashboardUnsub = null;
+
 function initStats() {
+    if (_dashboardUnsub) { _dashboardUnsub(); _dashboardUnsub = null; }
+    
     console.log("Initializing Pro Telemetry...");
     
     // Load secondary data modules
@@ -774,7 +778,7 @@ function initStats() {
     loadReports();
     loadBusinessesTab();
 
-    db.ref('businesses').on('value', (snap) => {
+    const _dashboardCallback = (snap) => {
         const businesses = snap.val() || {};
         console.log("Snapshot Received:", businesses);
         
@@ -829,6 +833,9 @@ function initStats() {
 
     // Render sparklines (decorative for now - shows growth pattern)
     renderDashboardSparklines();
+    
+    _dashboardUnsub = () => db.ref('businesses').off('value', _dashboardCallback);
+    db.ref('businesses').on('value', _dashboardCallback);
 }
 
 // --- Visualization Helpers (Hybrid from Claude Dashboard) ---
@@ -1080,7 +1087,6 @@ async function loadOutletsTab() {
                     cuisine: o.meta?.cuisine || o.cuisine || '',
                     phone: o.meta?.adminPhone || o.phone || '',
                     adminEmail: admin.email || '',
-                    adminPassword: admin.password || '',
                     adminPhone: admin.phone || '',
                     createdAt: o.meta?.createdAt || o.createdAt || biz.createdAt || '',
                     settings: o.settings || {}
@@ -1096,7 +1102,7 @@ async function loadOutletsTab() {
 }
 
 window.filterOutletList = function() {
-    const q = (document.getElementById('outletSearchInput').value || '').toLowerCase().trim();
+    const q = ((document.getElementById('outletSearchInput')?.value) || '').toLowerCase().trim();
     filteredOutletsList = q
         ? allOutletsList.filter(o => 
             o.name.toLowerCase().includes(q) ||
@@ -1150,7 +1156,7 @@ function renderOutletList() {
         </tr>`;
     }).join('');
 
-    renderPagination('outletsPagination', totalPages, outletsPage, (p) => { outletsPage = p; renderOutletList(); });
+    renderPagination('outletsPagination', outletsPage, OUTLETS_PAGE_SIZE, filteredOutletsList.length, 'goToOutletsPage');
     lucide.createIcons();
 }
 
@@ -1167,21 +1173,20 @@ window.showOutletProfile = async function(bid, oid) {
         ]);
 
         const o = outletSnap.val();
-        if (!o) return alert("Outlet not found!");
+        if (!o) return showToast("Outlet not found!", "error");
 
         const meta = o.meta || {};
         const settings = o.settings || {};
         const store = settings.Store || {};
 
         // Find admin for this outlet
-        let adminEmail = '', adminPassword = '', adminPhone = '';
+        let adminEmail = '', adminPhone = '';
         if (adminsSnap.exists()) {
             const admins = adminsSnap.val();
             for (const uid in admins) {
                 const a = admins[uid];
                 if (a.outletId === oid) {
                     adminEmail = a.email || '';
-                    adminPassword = a.password || '';
                     adminPhone = a.phone || '';
                     break;
                 }
@@ -1248,7 +1253,10 @@ window.showOutletProfile = async function(bid, oid) {
                             </div>
                             <div>
                                 <span class="text-muted text-xs">Password</span>
-                                <div class="font-bold text-lg" style="color:#000;font-family:monospace">${safeText(adminPassword || 'N/A')}</div>
+                                <div class="text-sm" style="color:#94A3B8">Encrypted — use password reset to change</div>
+                                <button class="btn-pro btn-sm btn-warning mt-2" onclick="if('${adminEmail}') auth.sendPasswordResetEmail('${adminEmail}').then(()=>showToast('Reset email sent!','success')).catch(e=>showToast(e.message,'error'))">
+                                    <i data-lucide="mail" size="14"></i> Send Password Reset
+                                </button>
                             </div>
                             <div>
                                 <span class="text-muted text-xs">Admin Phone</span>
@@ -1292,7 +1300,7 @@ window.showOutletProfile = async function(bid, oid) {
         document.getElementById('outletProfileModal').classList.remove('hidden');
         lucide.createIcons();
     } catch (err) {
-        alert("Error loading profile: " + err.message);
+        showToast("Error loading profile: " + err.message, "error");
     }
 };
 
@@ -1505,16 +1513,16 @@ window.saveGlobalDelivery = async function() {
         per100mRate: rate,
         slabs: globalDeliverySlabs,
         updatedAt: Date.now(),
-        updatedBy: auth.currentUser ? auth.currentUser.email : 'system'
+        updatedBy: auth.currentUser ? auth.currentUser?.email || 'system' : 'system'
     };
 
     try {
         const updates = {};
         updates['system/settings/delivery'] = payload;
         await atomicAdminAction(updates, 'DELIVERY_FEE_UPDATE', { mode: deliveryMode, per100mRate: rate, slabCount: globalDeliverySlabs.length });
-        alert("✅ Delivery Fee Configuration deployed successfully!");
+        showToast("Delivery Fee Configuration deployed successfully!", "success");
     } catch (err) {
-        alert("❌ Error saving flow: " + err.message);
+        showToast("Error saving flow: " + err.message, "error");
     }
 };
 
@@ -1526,7 +1534,7 @@ window.showOutletModal = async function(bid, oid) {
     editingBizId = bid;
     editingOutletId = oid;
     
-    if (!oid) return alert("No outlet nodes found for this business!");
+    if (!oid) return showToast("No outlet nodes found for this business!", "error");
     
     try {
         const [outletSnap, adminsSnap] = await Promise.all([
@@ -1534,11 +1542,10 @@ window.showOutletModal = async function(bid, oid) {
             db.ref('system/admins').orderByChild('businessId').equalTo(bid).once('value')
         ]);
         const o = outletSnap.val();
-        if (!o) return alert("Node not found!");
+        if (!o) return showToast("Node not found!", "error");
 
         // Find the admin for this outlet
         let adminEmail = '';
-        let adminPassword = '';
         let adminPhone = o.meta?.adminPhone || '';
         if (adminsSnap.exists()) {
             const admins = adminsSnap.val();
@@ -1546,7 +1553,6 @@ window.showOutletModal = async function(bid, oid) {
                 const a = admins[uid];
                 if (a.outletId === oid || !oid) {
                     adminEmail = a.email || '';
-                    adminPassword = a.password || '';
                     adminPhone = adminPhone || a.phone || '';
                     break;
                 }
@@ -1561,12 +1567,12 @@ window.showOutletModal = async function(bid, oid) {
         document.getElementById('editAdminEmail').value = adminEmail;
         document.getElementById('editAdminPhone').value = adminPhone;
         document.getElementById('editAdminPass').value = '';
-        document.getElementById('editAdminPassDisplay').value = adminPassword;
+        document.getElementById('editAdminPassDisplay').value = '***encrypted***';
 
         document.getElementById('outletModal').classList.remove('hidden');
         lucide.createIcons();
     } catch (err) {
-        alert("Error loading node data: " + err.message);
+        showToast("Error loading node data: " + err.message, "error");
     }
 };
 
@@ -1637,10 +1643,10 @@ window.updateOutlet = async function() {
             fields: ['name', 'slug', 'address', 'location', 'phone']
         });
 
-        alert("✅ Node updates deployed atomically to ecosystem.");
+        showToast("Node updates deployed atomically to ecosystem.", "success");
         hideOutletModal();
     } catch (err) {
-        alert("❌ Update failed: " + err.message);
+        showToast("Update failed: " + err.message, "error");
     }
 };
 
@@ -1761,15 +1767,19 @@ async function uploadRiderFile(uid, file, type) {
 
 let allRiders = {};
 let editingRiderId = null;
+let _ridersUnsub = null;
 
 async function loadRiders() {
-    db.ref('riders').on('value', (snap) => {
+    if (_ridersUnsub) { _ridersUnsub(); _ridersUnsub = null; }
+    const cb = (snap) => {
         const data = snap.val() || {};
         allRiders = Object.keys(data).map(id => ({ id, ...data[id] }));
         PAGINATION.riders.total = allRiders.length;
         PAGINATION.riders.page = 1;
         renderRidersList(allRiders);
-    });
+    };
+    _ridersUnsub = () => db.ref('riders').off('value', cb);
+    db.ref('riders').on('value', cb);
 }
 
 window.goToRidersPage = function(page) {
@@ -1914,9 +1924,9 @@ window.saveRider = async function() {
                 riderName: name
             });
 
-            alert("✅ Logistics Partner profile synchronized!");
+            showToast("Logistics Partner profile synchronized!", "success");
         } else {
-            if (!pass || pass.length < 6) return alert("❌ Access Passcode (min 6 chars) is required for new partner node.");
+            if (!pass || pass.length < 6) return showToast("Access Passcode (min 6 chars) is required for new partner node.", "error");
             
             const userCredential = await secondaryAuth.createUserWithEmailAndPassword(email, pass);
             const uid = userCredential.user.uid;
@@ -1940,11 +1950,11 @@ window.saveRider = async function() {
             });
 
             await secondaryAuth.signOut(); 
-            alert("✅ Enterprise Node Provisioned: Rider Account & Profile Active!");
+            showToast("Enterprise Node Provisioned: Rider Account & Profile Active!", "success");
         }
         hideRiderModal();
     } catch (err) {
-        alert("❌ Integration Error: " + err.message);
+        showToast("Integration Error: " + err.message, "error");
     }
 };
 
@@ -1953,9 +1963,9 @@ window.resetRiderPassword = async function(id, email) {
     if (!confirm(`Trigger secure password reset email for ${email}?`)) return;
     try {
         await auth.sendPasswordResetEmail(email);
-        alert("✅ Security recovery email dispatched successfully.");
+        showToast("Security recovery email dispatched successfully.", "success");
     } catch (err) {
-        alert("❌ Failed to dispatch reset: " + err.message);
+        showToast("Failed to dispatch reset: " + err.message, "error");
     }
 };
 
@@ -1970,9 +1980,9 @@ window.deleteRider = async function(id) {
             riderId: id
         });
         
-        alert("✅ Partner node decommissioned.");
+        showToast("Partner node decommissioned.", "success");
     } catch (err) {
-        alert("❌ Error: " + err.message);
+        showToast("Error: " + err.message, "error");
     }
 };
 
@@ -2028,7 +2038,7 @@ window.saveSurge = async function() {
             reason,
             isActive,
             updatedAt: Date.now(),
-            updatedBy: auth.currentUser.email
+            updatedBy: auth.currentUser?.email || 'system'
         });
         await logAdminAction('UPDATE_SURGE', { multiplier, reason, isActive });
         showToast("Surge Pricing Deployed", "success");
@@ -2050,7 +2060,7 @@ window.saveGlobalDiscount = async function() {
             type,
             isActive,
             updatedAt: Date.now(),
-            updatedBy: auth.currentUser.email
+            updatedBy: auth.currentUser?.email || 'system'
         });
         await logAdminAction('UPDATE_GLOBAL_DISCOUNT', { value, type, isActive });
         showToast("Global Discount Updated", "success");
@@ -2069,7 +2079,7 @@ window.savePlatformFee = async function() {
         updates['system/config/platformFee'] = {
             amount,
             updatedAt: Date.now(),
-            updatedBy: auth.currentUser.email
+            updatedBy: auth.currentUser?.email || 'system'
         };
         
         await atomicAdminAction(updates, 'UPDATE_PLATFORM_FEE', { amount });
@@ -2109,7 +2119,7 @@ window.saveCoupon = async function() {
             usedCount: 0,
             isActive,
             createdAt: Date.now(),
-            createdBy: auth.currentUser.email
+            createdBy: auth.currentUser?.email || 'system'
         };
         
         const updates = {};
@@ -2525,7 +2535,7 @@ window.viewUserHistory = function(uid) {
         msg += `[${item.type.toUpperCase()}] ₹${item.amount} - ${item.reason} (${new Date(item.timestamp).toLocaleDateString()})\n`;
     });
 
-    alert(msg);
+    showToast(msg, "info");
 };
 
 // --- Reports & Analytics ---
@@ -2912,15 +2922,17 @@ window.loadLiveOrders = async function() {
         const businesses = bizSnap.val() || {};
         _processAndRenderOrders(businesses);
 
-        db.ref('businesses').on('value', (snap) => {
+        const _ordersCallback = (snap) => {
             const data = snap.val() || {};
             _processAndRenderOrders(data);
-        }, (err) => {
+        };
+
+        db.ref('businesses').on('value', _ordersCallback, (err) => {
             console.error("[LiveOrders] Realtime listener error:", err);
         });
 
         _liveOrdersUnsub = () => {
-            db.ref('businesses').off('value');
+            db.ref('businesses').off('value', _ordersCallback);
         };
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center p-12 text-danger">Failed to load orders: ${err.message}</td></tr>`;
@@ -3190,10 +3202,22 @@ window.handleOrderDrop = async function(e, columnId) {
 
 window.updateOrderStatus = async function(bizId, outletId, orderId) {
     if (!hasPermission('all')) return showToast("Access denied", "error");
-    const newStatus = prompt("Enter new status:\n(Placed, Confirmed, Preparing, Cooked, Ready, Out for Delivery, Reached Drop Location, Delivered, Cancelled)");
-    if (!newStatus) return;
-    const valid = ['placed', 'confirmed', 'preparing', 'cooked', 'ready', 'out for delivery', 'reached drop location', 'delivered', 'cancelled'];
-    if (!valid.includes(newStatus.toLowerCase())) return showToast("Invalid status. Use: " + valid.join(', '), "error");
+    window._pendingStatusUpdate = { bizId, outletId, orderId };
+    document.getElementById('statusSelect').value = 'placed';
+    document.getElementById('statusUpdateModal').classList.remove('hidden');
+    lucide.createIcons();
+};
+
+window.hideStatusUpdateModal = function() {
+    document.getElementById('statusUpdateModal').classList.add('hidden');
+    window._pendingStatusUpdate = null;
+};
+
+window.confirmStatusUpdate = async function() {
+    const { bizId, outletId, orderId } = window._pendingStatusUpdate || {};
+    if (!bizId || !outletId || !orderId) return hideStatusUpdateModal();
+    const newStatus = document.getElementById('statusSelect').value;
+    hideStatusUpdateModal();
 
     try {
         const updates = {};
@@ -3368,7 +3392,7 @@ window.sendBroadcast = async function() {
             category,
             imageUrl,
             sentAt: Date.now(),
-            sentBy: auth.currentUser.email,
+            sentBy: auth.currentUser?.email || 'system',
             status: 'sent'
         };
 
@@ -3567,6 +3591,26 @@ window.toggleAvailability = async function(bizId, outId, dishId, status) {
         loadInventory();
     } catch (err) {
         showToast("Override Failed", "error");
+    }
+};
+
+window.toggleStockOutAll = async function() {
+    if (!hasPermission('all')) return showToast("Access denied", "error");
+    if (!confirm("⚠️ EMERGENCY FREEZE: This will mark ALL menu items as Out of Stock across ALL outlets. Continue?")) return;
+    try {
+        const updates = {};
+        for (const item of globalInventory) {
+            if (item.isAvailable) {
+                updates[`businesses/${item.bizId}/outlets/${item.outId}/dishes/${item.dishId}/isAvailable`] = false;
+                updates[`businesses/${item.bizId}/outlets/${item.outId}/dishes/${item.dishId}/stock`] = 0;
+                updates[`businesses/${item.bizId}/outlets/${item.outId}/dishes/${item.dishId}/updatedAt`] = firebase.database.ServerValue.TIMESTAMP;
+            }
+        }
+        await atomicAdminAction(updates, "EMERGENCY_FREEZE_ALL", { count: Object.keys(updates).length });
+        showToast(`Emergency freeze applied to ${globalInventory.filter(i => i.isAvailable).length} items`, "success");
+        loadInventory();
+    } catch (err) {
+        showToast("Emergency freeze failed: " + err.message, "error");
     }
 };
 
@@ -3772,7 +3816,7 @@ window.settleTransaction = async function(bizId, outId, settleId, amount) {
             // Update Settlement Status
             updates[path + '/settledStatus'] = 'SETTLED';
             updates[path + '/settledAt'] = firebase.database.ServerValue.TIMESTAMP;
-            updates[path + '/settledBy'] = auth.currentUser.email;
+            updates[path + '/settledBy'] = auth.currentUser?.email || 'system';
             updates[path + '/transactionId'] = txId;
 
             // Update Wallet Balance
@@ -3789,7 +3833,7 @@ window.settleTransaction = async function(bizId, outId, settleId, amount) {
                 timestamp: firebase.database.ServerValue.TIMESTAMP,
                 refId: settleId,
                 method: 'MANUAL_TRANSFER',
-                operator: auth.currentUser.email
+                operator: auth.currentUser?.email || 'system'
             };
 
             await atomicAdminAction(updates, 'PARTNER_FINANCIAL_SETTLEMENT', { 
@@ -3825,10 +3869,13 @@ window.exportReconciliationReport = function() {
 };
 // --- PARTNER ONBOARDING & APPROVAL ENGINE ---
 
+let _onboardingUnsub = null;
+
 function initOnboardingManager() {
+    if (_onboardingUnsub) { _onboardingUnsub(); _onboardingUnsub = null; }
     console.log("[Onboarding] Initializing real-time listener...");
     
-    db.ref('onboarding_requests').on('value', (snap) => {
+    const cb = (snap) => {
         const requests = [];
         snap.forEach(child => {
             requests.push({ id: child.key, ...child.val() });
@@ -3836,7 +3883,9 @@ function initOnboardingManager() {
 
         renderOnboardingRequests(requests);
         updateOnboardingBadges(requests.filter(r => r.status === 'PENDING').length);
-    });
+    };
+    _onboardingUnsub = () => db.ref('onboarding_requests').off('value', cb);
+    db.ref('onboarding_requests').on('value', cb);
 }
 
 function updateOnboardingBadges(count) {
@@ -3870,8 +3919,8 @@ function renderOnboardingRequests(requests) {
             <td><span class="text-xs opacity-60">${req.email}</span></td>
             <td>
                 <div class="flex gap-8">
-                    <button class="btn-pro-sm" style="background:rgba(16,185,129,0.1); color:#10B981;" onclick="viewKYC('${req.kyc.fssai}', 'FSSAI')">FSSAI</button>
-                    <button class="btn-pro-sm" style="background:rgba(59,130,246,0.1); color:#3B82F6;" onclick="viewKYC('${req.kyc.gst}', 'GST')">GST</button>
+                    <button class="btn-pro-sm" style="background:rgba(16,185,129,0.1); color:#10B981;" onclick="viewKYC('${safeText(req.kyc?.fssai || '')}', 'FSSAI')">FSSAI</button>
+                    <button class="btn-pro-sm" style="background:rgba(59,130,246,0.1); color:#3B82F6;" onclick="viewKYC('${safeText(req.kyc?.gst || '')}', 'GST')">GST</button>
                 </div>
             </td>
             <td><span class="text-xs">${new Date(req.submittedAt).toLocaleString()}</span></td>

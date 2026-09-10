@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { Star, X, Minus, Plus, ChevronLeft, ChevronRight, Clock, XCircle, CheckCircle, Lock } from "lucide-react";
-import { ORANGE, COLORS, ORD_ST, ORDER_STATUSES, PAGE_GUIDES, PAGE_TITLES } from "./constants";
-import { fmt } from "./utils";
+import { Star, XCircle, CheckCircle, Lock } from "lucide-react";
+import { ORANGE, ORD_ST, ORDER_STATUSES, PAGE_GUIDES, PAGE_TITLES } from "./constants";
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────
 
@@ -172,6 +171,7 @@ export const Pagination = ({ page, totalPages, onPageChange, totalItems, pageSiz
 
 export function ReauthModal({ open, onConfirm, onCancel, busy, error }) {
   const [pwd, setPwd] = useState("");
+  React.useEffect(() => { if (!open) setPwd(""); }, [open]);
   if (!open) return null;
   const submit = (e) => {
     e?.preventDefault();

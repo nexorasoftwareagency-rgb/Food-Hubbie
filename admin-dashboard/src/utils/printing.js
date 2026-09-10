@@ -20,7 +20,7 @@
  * (76mm / 80mm) using the order + tenant-specific store data.
  */
 export function buildReceiptHtml(order, store = {}, opts = {}) {
-  const { isReprint = false, showGSTIN = true, showFSSAI = true, showQR = true } = opts;
+  const { isReprint = false, showGSTIN = true, showFSSAI = true, showQR = true, showTagline = true, showPoweredBy = true, showWifiInfo = false, showFeedbackQR = true } = opts;
   const itemsHtml = (order.items || order.cart || [])
     .map((i) => {
       const qty = i.quantity ?? i.qty ?? 1;
@@ -124,8 +124,11 @@ export function buildReceiptHtml(order, store = {}, opts = {}) {
     <span>TOTAL</span><span>₹${total.toFixed(2)}</span>
   </div>
   <div class="hr"></div>
-  <div class="center">Thank you! Visit again.</div>
-  ${showQR ? `<div class="center" style="margin-top:10px;font-size:0.7rem;">Scan to rate: ${escapeHtml(orderId)}</div>` : ""}
+  <div class="center">${showTagline && store.tagline ? escapeHtml(store.tagline) : "Thank you! Visit again."}</div>
+  ${showPoweredBy && store.poweredBy ? `<div class="center" style="font-size:0.65rem;margin-top:2px;">${escapeHtml(store.poweredBy)}</div>` : ""}
+  ${showWifiInfo && store.wifiName ? `<div class="center" style="font-size:0.65rem;margin-top:4px;">WiFi: ${escapeHtml(store.wifiName)}${store.wifiPass ? ` / Pass: ${escapeHtml(store.wifiPass)}` : ""}</div>` : ""}
+  ${showQR && store.paymentQR ? `<div class="center" style="margin-top:8px;"><img src="${escapeHtml(store.paymentQR)}" style="width:120px;height:120px;object-fit:contain;" /></div>` : ""}
+  ${showFeedbackQR && store.reviewUrl ? `<div class="center" style="margin-top:6px;font-size:0.65rem;">Rate us: ${escapeHtml(store.reviewUrl)}${orderId !== "—" ? "/" + escapeHtml(orderId) : ""}</div>` : ""}
 </body>
 </html>`;
 }

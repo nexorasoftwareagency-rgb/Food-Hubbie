@@ -17,6 +17,7 @@ import { fetchSurgeConfig, fetchGlobalDiscount, validateCoupon, type SurgeConfig
 import { Tag, X, Loader2, Star } from "lucide-react";
 import { db, ref } from "@/lib/firebase";
 import { push } from "firebase/database";
+import { toast } from "sonner";
 
 const paymentMethods: { id: PaymentMethod; name: string; icon: typeof ShieldCheck }[] = [
   { id: "upi", name: "UPI", icon: ShieldCheck },
@@ -111,7 +112,7 @@ export default function Checkout() {
         // Check min order
         const subtotal = cartState.items.reduce((s, i) => s + i.price * i.quantity, 0);
         if (coupon.minOrder && subtotal < coupon.minOrder) {
-          alert(`Minimum order of ₹${coupon.minOrder} required for this coupon.`);
+          toast.error(`Minimum order of ₹${coupon.minOrder} required for this coupon.`);
           return;
         }
         if (couponCode.toUpperCase() === "FREESHIP") {
@@ -120,11 +121,11 @@ export default function Checkout() {
         cartDispatch({ type: "APPLY_COUPON", payload: coupon });
         setCouponCode("");
       } else {
-        alert("Invalid or expired promo code.");
+        toast.error("Invalid or expired promo code.");
       }
     } catch (err: any) {
       console.error("Coupon validation error:", err);
-      alert(err.message || "Failed to validate coupon. Please try again.");
+      toast.error(err.message || "Failed to validate coupon. Please try again.");
     } finally {
       setIsValidatingCoupon(false);
     }
@@ -137,19 +138,19 @@ export default function Checkout() {
 
     // 0. Validate form inputs
     if (!form.name.trim()) {
-      alert("Please enter your full name.");
+      toast.error("Please enter your full name.");
       return;
     }
     if (!PHONE_REGEX.test(form.phone.replace(/\s/g, ""))) {
-      alert("Please enter a valid 10-digit Indian phone number.");
+      toast.error("Please enter a valid 10-digit Indian phone number.");
       return;
     }
     if (fulfillmentMethod === "delivery" && !form.address.trim()) {
-      alert("Please enter your delivery address.");
+      toast.error("Please enter your delivery address.");
       return;
     }
     if (fulfillmentMethod === "dinein" && !form.tableNumber?.trim()) {
-      alert("Please enter your table number.");
+      toast.error("Please enter your table number.");
       return;
     }
 
@@ -161,18 +162,18 @@ export default function Checkout() {
       || cartState.items.find(i => i.businessId)?.businessId
       || "").trim();
     if (!resolvedBid) {
-      alert("Cannot place order: the cart is not associated with a business. Please re-add items from the outlet page.");
+      toast.error("Cannot place order: the cart is not associated with a business. Please re-add items from the outlet page.");
       return;
     }
     if (!cartState.outletId) {
-      alert("Cannot place order: no outlet selected. Please re-add items.");
+      toast.error("Cannot place order: no outlet selected. Please re-add items.");
       return;
     }
 
     // 1. Validate wallet balance if selected
     if (paymentMethod === "wallet") {
       if ((user.walletBalance || 0) < summary.total) {
-        alert("Insufficient wallet balance. Please choose another payment method.");
+        toast.error("Insufficient wallet balance. Please choose another payment method.");
         return;
       }
     }
@@ -201,9 +202,9 @@ export default function Checkout() {
         } catch (walletErr: any) {
           console.error("Wallet debit failed:", walletErr);
           if (walletErr?.message === "INSUFFICIENT_FUNDS") {
-            alert("Insufficient wallet balance. Please choose another payment method.");
+            toast.error("Insufficient wallet balance. Please choose another payment method.");
           } else {
-            alert("Wallet payment failed. Please try again.");
+            toast.error("Wallet payment failed. Please try again.");
           }
           setIsProcessing(false);
           return;
@@ -232,6 +233,7 @@ export default function Checkout() {
           deliveryAddress: form,
           platformFee: summary.platformFee,
           cashbackBonus: bonusAmount,
+          estimatedMinutes: outlet ? Math.round((outlet.deliveryTimeMin + outlet.deliveryTimeMax) / 2) : 30,
         });
       } catch (orderErr) {
         console.error("Order write failed after wallet debit, initiating refund:", orderErr);
@@ -248,7 +250,7 @@ export default function Checkout() {
             console.error("CRITICAL: Wallet refund also failed:", refundErr);
           }
         }
-        alert("Something went wrong while placing your order. Your wallet has been refunded.");
+        toast.error("Something went wrong while placing your order. Your wallet has been refunded.");
         setIsProcessing(false);
         return;
       }
@@ -266,7 +268,7 @@ export default function Checkout() {
           console.error("Bonus credit failed:", bonusErr);
           const { markCashbackPending } = await import("@/services/orderService");
           await markCashbackPending(orderId, bonusAmount);
-          alert("Cashback pending—will be credited shortly.");
+          toast("Cashback pending—will be credited shortly.");
         }
       }
       
@@ -274,7 +276,7 @@ export default function Checkout() {
       setLocation(`/tracking/${orderId}`);
     } catch (err) {
       console.error("Checkout error:", err);
-      alert("Something went wrong while placing your order. Please try again.");
+      toast.error("Something went wrong while placing your order. Please try again.");
     } finally {
       setIsProcessing(false);
     }

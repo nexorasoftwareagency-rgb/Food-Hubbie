@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Search } from "lucide-react";
 import { db, ref, onValue, off, getBizId, getOutletId } from "../firebase";
 import { GlassCard, SkeletonPage, Pagination } from "../components";
 import { ORANGE } from "../constants";
@@ -68,23 +67,4 @@ function ActivityLogPage({ showToast }) {
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PAGE REGISTRY
-// ═══════════════════════════════════════════════════════════════════════════
-const PAGES = {
-  dashboard: DashboardPage, orders: OrdersPage, liveops: LiveOpsPage, kitchen: KitchenPage, tables: TablesPage,
-  pos: POSPage, menu: MenuPage, categories: CategoriesPage, discounts: DiscountsPage,
-  inventory: InventoryPage, customers: CustomersPage, riders: RidersPage, partners: PartnersPage,
-  riderAnalytics: RiderAnalyticsPage,
-  analytics: AnalyticsPage, lostsales: LostSalesPage, settlements: SettlementsPage, payments: PaymentsPage,
-  activitylog: ActivityLogPage,
-  promotions: PromotionsPage, feedback: FeedbackPage, livetracker: LiveTrackerPage, settings: SettingsPage,
-};
-const VALID_PAGE_IDS = new Set(Object.keys(PAGES));
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ROOT APP
-// ═══════════════════════════════════════════════════════════════════════════
-
 export default ActivityLogPage;

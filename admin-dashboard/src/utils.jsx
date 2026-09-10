@@ -4,7 +4,7 @@ export const fmt = (v) => `\u20B9${Number(v).toLocaleString("en-IN")}`;
 export const esc = (t) => { if (!t) return ""; const m = {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}; return String(t).replace(/[&<>"']/g, c => m[c]); };
 export const csvValue = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
 export const downloadCSV = (filename, rows) => {
-  if (!rows.length) return;
+  if (!rows || !rows.length) return;
   const headers = Object.keys(rows[0]);
   const csv = [headers.map(csvValue).join(","), ...rows.map(row => headers.map(h => csvValue(row[h])).join(","))].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -25,6 +25,7 @@ export const validateCoords = (lat,lng) => { const l=parseFloat(lat),n=parseFloa
 export const handleImageError = (e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M8 12l2 2 4-4'/%3E%3C/svg%3E"; };
 
 export function buildTodayRevenue(orders) {
+  if (!orders || !orders.length) return [];
   const slots = ["8am","10am","12pm","2pm","4pm","6pm","8pm"];
   const buckets = slots.map(t => ({ t, rev: 0 }));
   const now = new Date();
@@ -42,6 +43,7 @@ export function buildTodayRevenue(orders) {
 }
 
 export function buildWeekRevenue(orders) {
+  if (!orders || !orders.length) return [];
   const buckets = DAY_KEYS.map(d => ({ d, rev: 0 }));
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
   orders.forEach(o => {
@@ -78,6 +80,7 @@ export function normalizeRider(r) {
 }
 
 export function aggregateByDay(orders, daysBack) {
+  if (!orders || !orders.length) return [];
   const start = Date.now() - daysBack * 24 * 60 * 60 * 1000;
   const out = DAY_KEYS.map(d => ({ d, rev: 0, ord: 0, prevRev: 0, prevOrd: 0 }));
   const prevStart = start - daysBack * 24 * 60 * 60 * 1000;
@@ -93,6 +96,7 @@ export function aggregateByDay(orders, daysBack) {
 }
 
 export function aggregateByHour(orders) {
+  if (!orders || !orders.length) return [];
   const buckets = HOURS_8_TO_23.map(h => ({ h, ord: 0 }));
   orders.forEach(o => {
     if (!o.createdAt) return;
@@ -104,6 +108,8 @@ export function aggregateByHour(orders) {
 }
 
 export function aggregateByCategory(orders, dishes) {
+  if (!orders || !orders.length) return [];
+  if (!dishes) dishes = {};
   const counts = {};
   const dishCat = {};
   Object.keys(dishes).forEach(id => { dishCat[id] = dishes[id].category || "Other"; });
@@ -118,6 +124,7 @@ export function aggregateByCategory(orders, dishes) {
 }
 
 export function aggregateByDish(orders, topN = 8) {
+  if (!orders || !orders.length) return [];
   const counts = {};
   orders.forEach(o => {
     if (!o || !o.createdAt) return;
@@ -135,6 +142,7 @@ export function aggregateByDish(orders, topN = 8) {
 }
 
 export function aggregateByCustomer(orders, topN = 6) {
+  if (!orders || !orders.length) return [];
   const counts = {};
   orders.forEach(o => {
     if (!o || !o.createdAt) return;

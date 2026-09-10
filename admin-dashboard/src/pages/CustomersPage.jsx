@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, X, Save, Download } from "lucide-react";
+import { Search, Download } from "lucide-react";
 import { update, onValue, off, Outlet } from "../firebase";
 import { fmt, downloadCSV } from "../utils";
 import { GlassCard } from "../components";

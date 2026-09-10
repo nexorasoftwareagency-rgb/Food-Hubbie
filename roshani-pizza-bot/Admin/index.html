@@ -447,7 +447,7 @@
 
                         <h1 class="logo-text">ROSHANI ERP</h1>
 
-                        <div class="version-badge">Premium v5.3.0</div>
+                        <div class="version-badge">Premium v5.3.6</div>
 
                     </div>
 
@@ -2026,11 +2026,11 @@
 
                                         <select id="settingShopStatus" class="form-input" title="Shop Status Override">
 
-                                            <option value="AUTO"><i data-lucide="clock"></i> Auto (Time Based)</option>
+                                            <option value="AUTO">Auto (Time Based)</option>
 
-                                            <option value="FORCE_OPEN"><i data-lucide="check-circle"></i> Force Open — Accept Orders</option>
+                                            <option value="FORCE_OPEN">Force Open — Accept Orders</option>
 
-                                            <option value="FORCE_CLOSED"><i data-lucide="moon"></i> Force Closed — Reject Orders</option>
+                                            <option value="FORCE_CLOSED">Force Closed — Reject Orders</option>
 
                                         </select>
 
@@ -2117,6 +2117,50 @@
                                                 <input type="text" id="settingFacebook" class="form-input"
 
                                                     placeholder="Facebook Profile Link">
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="flex-row flex-gap-12 mb-14">
+
+                                            <div class="flex-1">
+
+                                                <label class="form-label-small">Google Maps Review Link</label>
+
+                                                <input type="text" id="settingGoogleReviewLink" class="form-input"
+
+                                                    placeholder="https://g.page/r/.../review">
+
+                                                <small class="fs-10 text-muted">Shown as "Rate us on Google" on the customer QR menu's Promotions page.</small>
+
+                                            </div>
+
+                                            <div class="flex-1">
+
+                                                <label class="form-label-small">WhatsApp Number</label>
+
+                                                <input type="text" id="settingWhatsappNumber" class="form-input"
+
+                                                    placeholder="e.g. 919876543210 (with country code, no +)">
+
+                                                <small class="fs-10 text-muted">Used to build the "Chat with us" link on the customer Promotions page.</small>
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="flex-row flex-gap-12 mb-14">
+
+                                            <div class="flex-1">
+
+                                                <label class="form-label-small">Customer Menu Background Image (URL)</label>
+
+                                                <input type="text" id="settingCustomerMenuBgImage" class="form-input"
+
+                                                    placeholder="https://.../hero-photo.jpg">
+
+                                                <small class="fs-10 text-muted">Optional. Shown as the hero banner on the QR menu's Welcome screen. Leave blank to use the default design.</small>
 
                                             </div>
 
@@ -2375,12 +2419,6 @@
                     </div>
 
                 </div>
-
-                <label class="checkbox-label mt-8">
-
-                    <input type="checkbox" id="discStackable"> <span data-i18n="discount.editor.stackable">Stackable with other discounts</span>
-
-                </label>
 
             </div>
 
@@ -2753,6 +2791,77 @@
                         </div>
 
 
+
+                        <!-- Dine-In Charges (Tax & Service Charge) -->
+
+                        <div class="glass-card p-20">
+
+                            <h4 class="mb-14">🍽️ Dine-In Charges</h4>
+
+                            <p class="text-secondary-small mb-14">Configure tax and service charge for QR dine-in orders. These are displayed on the customer's bill.</p>
+
+                            <div class="settings-grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+
+                                <!-- Tax Section -->
+                                <div class="settings-section-card" style="border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+
+                                    <div class="flex-between flex-center mb-10">
+                                        <h5 style="margin:0;">Tax</h5>
+                                        <label class="toggle-switch" style="margin:0;">
+                                            <input type="checkbox" id="dineinTaxEnabled">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="form-group-mini mb-10">
+                                        <label>Tax Name</label>
+                                        <input type="text" id="dineinTaxName" placeholder="GST" maxlength="20">
+                                    </div>
+
+                                    <div class="form-group-mini">
+                                        <label>Tax Rate (%)</label>
+                                        <input type="number" id="dineinTaxRate" placeholder="5" min="0" max="100" step="0.5">
+                                    </div>
+
+                                </div>
+
+                                <!-- Service Charge Section -->
+                                <div class="settings-section-card" style="border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+
+                                    <div class="flex-between flex-center mb-10">
+                                        <h5 style="margin:0;">Service Charge</h5>
+                                        <label class="toggle-switch" style="margin:0;">
+                                            <input type="checkbox" id="dineinServiceChargeEnabled">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="form-group-mini mb-10">
+                                        <label>Service Charge Name</label>
+                                        <input type="text" id="dineinServiceChargeName" placeholder="Service Charge" maxlength="30">
+                                    </div>
+
+                                    <div class="form-group-mini">
+                                        <label>Service Charge Rate (%)</label>
+                                        <input type="number" id="dineinServiceChargeRate" placeholder="10" min="0" max="100" step="0.5">
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <!-- Today's Offers -->
+                        <div class="glass-card p-20" style="margin-top:16px;">
+                            <div class="flex-between flex-center mb-14">
+                                <h4>Today's Offers (QR Welcome Screen)</h4>
+                                <button id="btnAddOffer" class="btn-secondary btn-small" style="font-size:12px;">+ Add Offer</button>
+                            </div>
+                            <p style="font-size:12px; color:var(--text-sub); margin-bottom:12px;">These offers appear on the customer's welcome screen when they scan the QR code.</p>
+                            <div id="offersList" style="display:flex; flex-direction:column; gap:10px;"></div>
+                            <div id="noOffersMsg" style="font-size:13px; color:var(--text-sub); text-align:center; padding:16px;">No offers configured. Click "+ Add Offer" to create one.</div>
+                        </div>
 
                         <!-- Delivery Fees -->
 
@@ -3993,7 +4102,7 @@
 
                             <div id="promoMenuImagePreview" style="position:relative;display:inline-block;">
 
-                                <img id="promoMenuImageImg" src="" alt="Menu image preview" style="max-width:180px;max-height:120px;border-radius:8px;object-fit:cover;border:1px solid var(--border-color);">
+                                <img id="promoMenuImageImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120'%3E%3Crect fill='%23f1f5f9' width='180' height='120'/%3E%3Ctext x='90' y='65' text-anchor='middle' fill='%2394a3b8' font-size='12'%3ENo image%3C/text%3E%3C/svg%3E" alt="Menu image preview" style="max-width:180px;max-height:120px;border-radius:8px;object-fit:cover;border:1px solid var(--border-color);">
 
                             </div>
 
@@ -4293,7 +4402,7 @@
 
     <!-- DISH MODAL -->
 
-    <div id="dishModal" class="modal">
+    <div id="dishModal" class="modal" role="dialog" aria-modal="true" aria-label="Edit Dish">
 
         <div class="modal-content glass-card">
 
@@ -4445,7 +4554,7 @@
 
     <!-- RIDER MANAGEMENT MODAL -->
 
-    <div id="riderModal" class="modal modal-fullscreen-top">
+    <div id="riderModal" class="modal modal-fullscreen-top" role="dialog" aria-modal="true" aria-label="Rider Details">
 
         <div class="modal-content glass-card rider-modal-width">
 
@@ -4883,7 +4992,7 @@
 
     <!-- DISCOUNTS REPORTS MODAL -->
 
-    <div id="discountsReportsModal" class="modal" role="dialog" aria-labelledby="discountsReportsTitle" aria-hidden="true">
+    <div id="discountsReportsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="discountsReportsTitle" aria-hidden="true">
 
         <div class="modal-content glass-card" style="max-width: 880px;">
 
@@ -5007,7 +5116,7 @@
 
     <!-- PROMOTIONS GUIDE MODAL -->
 
-    <div id="promotionsGuideModal" class="modal" role="dialog" aria-labelledby="promoGuideTitle" aria-hidden="true">
+    <div id="promotionsGuideModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="promoGuideTitle" aria-hidden="true">
 
         <div class="modal-content glass-card" style="max-width: 640px;">
 
@@ -5049,7 +5158,7 @@
 
     <!-- TEMPLATE PICKER MODAL -->
 
-    <div id="promoTemplatePickerModal" class="modal">
+    <div id="promoTemplatePickerModal" class="modal" role="dialog" aria-modal="true" aria-label="Promotion Template Picker">
 
         <div class="modal-content" style="max-width:700px;">
 
@@ -5057,7 +5166,7 @@
 
                 <h3>Choose a template</h3>
 
-                <button class="modal-close" data-action="closePromoTemplatePicker">&times;</button>
+                <button class="modal-close" data-action="closePromoTemplatePicker" aria-label="Close template picker">&times;</button>
 
             </div>
 
@@ -5081,7 +5190,7 @@
 
     <!-- NEW DISCOUNT MODAL (outside .main, alongside other modals) -->
 
-    <div id="discountEditorModal" class="modal" role="dialog" aria-labelledby="discountEditorTitle" aria-hidden="true">
+    <div id="discountEditorModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="discountEditorTitle" aria-hidden="true">
 
         <div class="modal-content glass-card" style="max-width:640px;">
 
@@ -5098,6 +5207,8 @@
             </div>
 
             <div class="modal-body">
+
+                <form id="discountEditorForm" onsubmit="return false;">
 
                 <div class="form-group">
 
@@ -5283,6 +5394,12 @@
 
                 </label>
 
+                <label class="checkbox-label mt-8">
+
+                    <input type="checkbox" id="discStackable"> <span data-i18n="discount.editor.stackable">Stackable with other discounts</span>
+
+                </label>
+
 
 
                 <div class="promo-options-grid mt-16">
@@ -5327,7 +5444,7 @@
 
 
 
-    <div id="posSelectionModal" class="modal pos-side-panel">
+    <div id="posSelectionModal" class="modal pos-side-panel" role="dialog" aria-modal="true" aria-label="POS Selection">
 
         <div class="modal-content glass-card selection-panel-v4">
 
@@ -5449,7 +5566,7 @@
 
     <!-- RE-AUTHENTICATION MODAL -->
 
-    <div id="reauthModal" class="modal">
+    <div id="reauthModal" class="modal" role="dialog" aria-modal="true" aria-label="Re-authenticate">
 
         <div class="modal-content glass-card max-w-400">
 
@@ -5485,11 +5602,13 @@
 
                         <input type="password" id="reauthPassword" class="form-input" placeholder="Enter password" autocomplete="current-password">
 
-                    </div>
-
                 </div>
 
-                <div class="modal-footer">
+                </form>
+
+            </div>
+
+            <div class="modal-footer">
 
                     <button type="button" class="btn-secondary btn-hide-modal">Cancel</button>
 
@@ -5511,7 +5630,7 @@
 
     <!-- ADD/EDIT INVENTORY MODAL -->
 
-    <div id="inventoryModal" class="modal">
+    <div id="inventoryModal" class="modal" role="dialog" aria-modal="true" aria-label="Inventory Management">
 
         <div class="modal-content glass-card w-400">
 
@@ -5629,7 +5748,7 @@
 
     <!-- Receipt Preview Modal -->
 
-    <div id="receiptPreviewModal" class="modal hidden">
+    <div id="receiptPreviewModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Receipt Preview">
 
         <div class="modal-content" style="max-width: 520px; width: 95%;">
 
@@ -5671,7 +5790,7 @@
 
     <!-- PAGE GUIDE MODAL (generic, used by all tabs) -->
 
-    <div id="pageGuideModal" class="modal" role="dialog" aria-labelledby="pageGuideTitle" aria-hidden="true">
+    <div id="pageGuideModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="pageGuideTitle" aria-hidden="true">
 
         <div class="modal-content glass-card" style="max-width:640px;">
 
@@ -5703,7 +5822,7 @@
 
     </div>
 
-    <div id="tableEditorModal" class="modal">
+    <div id="tableEditorModal" class="modal" role="dialog" aria-modal="true" aria-label="Edit Table">
 
         <div class="modal-content" style="max-width:380px;">
 
@@ -5757,7 +5876,7 @@
 
     </div>
 
-    <div id="tableQrModal" class="modal">
+    <div id="tableQrModal" class="modal" role="dialog" aria-modal="true" aria-label="Table QR Code">
 
         <div class="modal-content" style="max-width:340px; text-align:center;">
 
@@ -5793,7 +5912,7 @@
 
             <div class="modal-footer">
 
-                <button class="btn-secondary" onclick="document.getElementById('tableQrModal').classList.remove('active')">Close</button>
+                <button class="btn-secondary" id="tableQrCloseBtn">Close</button>
 
                 <button class="btn-primary" id="tableQrPrintBtn">
 

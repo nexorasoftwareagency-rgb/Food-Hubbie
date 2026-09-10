@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Package, Menu, Plus, Edit3, Trash2, Save, Upload, AlertTriangle, Download, XCircle } from "lucide-react";
-import { ref, update, push, set, remove, onValue, off, logAudit, getCurrentAdminActor, Outlet, getBizId, getOutletId } from "../firebase";
+import { Package, Plus, Edit3, Trash2, Upload, AlertTriangle, Download, XCircle } from "lucide-react";
+import { update, push, set, remove, onValue, off, logAudit, getCurrentAdminActor, Outlet, getBizId, getOutletId } from "../firebase";
 import { downloadCSV } from "../utils";
 import { KPICard, GlassCard, Modal, SkeletonPage } from "../components";
 import { ORANGE, COLORS, statusColors, stockStatus } from "../constants";

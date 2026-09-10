@@ -81,6 +81,14 @@ async function bootTenant(tenant) {
   const log = (...a) => console.log(`[${tenant.label}]`, ...a);
   const logErr = (...a) => console.error(`[${tenant.label}]`, ...a);
 
+  // Clean up previous listeners if reconnecting
+  if (tenant._cleanupFns) {
+    tenant._cleanupFns.forEach(fn => { try { fn(); } catch (_) {} });
+    tenant._cleanupFns = [];
+  } else {
+    tenant._cleanupFns = [];
+  }
+
   const sessionPath = path.join(__dirname, 'sessions', `${tenant.businessId}_${tenant.outletId}`);
   if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
   log(`📂 Session dir: ${sessionPath}`);
@@ -110,13 +118,16 @@ async function bootTenant(tenant) {
     if (connection === 'open') {
       log(`✅ BOT IS ONLINE [${tenant.businessId}/${tenant.outletId}] (${tenant.phone})`);
 
-      // Per-tenant listeners
-      initStatusMonitor(sock, tenant);
-      initCommandListener(sock, tenant);
+      // Per-tenant listeners — return cleanup fn to prevent stacking on reconnect
+      const cleanupStatus = initStatusMonitor(sock, tenant);
+      const cleanupCommands = initCommandListener(sock, tenant);
+      if (cleanupStatus) tenant._cleanupFns.push(cleanupStatus);
+      if (cleanupCommands) tenant._cleanupFns.push(cleanupCommands);
       registerReportsCron(sock, tenant);
 
       // Per-tenant heartbeat — writes to the tenant's own botStatus path
-      setInterval(() => {
+      if (tenant._heartbeatInterval) clearInterval(tenant._heartbeatInterval);
+      tenant._heartbeatInterval = setInterval(() => {
         const t = tenantContext(tenant);
         t.updateData('botStatus', {
           lastSeen: Date.now(),
@@ -131,6 +142,10 @@ async function bootTenant(tenant) {
     if (connection === 'close') {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       logErr(`\n❌ [${tenant.label}] Connection closed. Reconnecting this tenant only: ${shouldReconnect}`);
+
+      // Clean up heartbeat
+      if (tenant._heartbeatInterval) { clearInterval(tenant._heartbeatInterval); tenant._heartbeatInterval = null; }
+
       try { deregisterReportsCron(tenant); } catch (_) { /* noop */ }
       if (shouldReconnect) {
         // Per-tenant reconnect — does not affect other tenants in the process

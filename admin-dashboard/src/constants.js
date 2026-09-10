@@ -25,6 +25,25 @@ export const SEQ = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Out 
 export const LIVE_ST = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready", "Out for Delivery", "Pending", "New"];
 export const KITCHEN_ST = ["Placed", "Confirmed", "Preparing", "Cooked", "Ready"];
 
+// ─── ORDERS: Per-type status sequences ────────────────────────────────────
+export const STATUS_SEQUENCES = {
+  Online: ["Placed","Confirmed","Ready","Picked Up","Out for Delivery","Reached Drop Location","Delivered"],
+  'Dine-in': ["Confirmed","Ready","Delivered"],
+  Default: ["Placed","Confirmed","Ready","Picked Up","Out for Delivery","Reached Drop Location","Delivered"],
+};
+export const STATUS_MAPPING = {
+  "New":0,"Pending":0,"Placed":0,
+  "Confirmed":1,
+  "Ready":2,"Cooked":2,"Preparing":2,"In Kitchen":2,"Packed":2,
+  "Picked Up":3,
+  "Out for Delivery":4,
+  "Reached Drop Location":5,
+  "Delivered":6,"Served":6,
+  "Cancelled":0,
+};
+export const LIVE_STATUSES = ["Placed","Confirmed","Ready","Arriving at Restaurant","Arrived at Restaurant","Picked Up","Out for Delivery","Reached Drop Location","Pending","New","Dispatched"];
+export const RIDER_STALE_MS = 300000; // 5 min
+
 export const TRANSLATIONS = {};
 
 export const APP_VERSION = "5.0.0";

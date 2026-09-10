@@ -169,11 +169,12 @@ export function FoodCard({ item, delay = 0, showOutlet = true }: FoodCardProps) 
           className="relative w-32 h-32 flex-shrink-0"
         >
           <img
-            src={item.image}
+            src={item.image || '/favicon.svg'}
             alt={item.name}
             className={`w-full h-full object-cover rounded-2xl shadow-sm transition-transform duration-500 ${
               !isOutOfStock && "group-hover:scale-105"
             }`}
+            onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/favicon.svg'; } }}
           />
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">

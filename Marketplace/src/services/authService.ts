@@ -1,7 +1,7 @@
 // ─── Auth Service ─────────────────────────────────────────────────────────────
 // Real Firebase Authentication Integration.
 
-import { auth, db, ref, set, googleProvider, signInWithPopup, firebaseSignOut, onAuthStateChanged, getRedirectResult } from "@/lib/firebase";
+import { auth, db, ref, set, update, googleProvider, signInWithPopup, firebaseSignOut, onAuthStateChanged, getRedirectResult } from "@/lib/firebase";
 import { updateProfile as fbUpdateProfile } from "firebase/auth";
 import type { User } from "@/types";
 
@@ -74,7 +74,7 @@ export async function updateProfile(
       });
     }
     const profileRef = ref(db, `users/${fbUser.uid}`);
-    await set(profileRef, {
+    await update(profileRef, {
       ...updates,
       updatedAt: new Date().toISOString(),
     });

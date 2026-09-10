@@ -8,7 +8,7 @@ export type Cuisine = {
 
 export const fetchCuisines = async (): Promise<Cuisine[]> => {
   try {
-    const cuisinesRef = ref(db, 'system/platformConfig/cuisines');
+    const cuisinesRef = ref(db, 'platformConfig/cuisines');
     const snapshot = await get(cuisinesRef);
     if (snapshot.exists()) {
       return Object.values(snapshot.val());

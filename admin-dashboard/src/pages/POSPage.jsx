@@ -1,10 +1,79 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Search, Menu, ShoppingCart, Plus, Trash2, Minus, WifiOff } from "lucide-react";
+import { Search, ShoppingCart, Plus, Trash2, Minus, WifiOff } from "lucide-react";
 import { get, update, set, onValue, off, runTransaction, logAudit, getCurrentAdminActor, isConnected, onConnectionChange, Outlet, getBizId, getOutletId } from "../firebase";
 import { fmt, esc } from "../utils";
 import { GlassCard, BtnPrimary, Modal, SkeletonGrid, Input, Select, SectionLabel } from "../components";
 import { ORANGE } from "../constants";
 import "../App.css";
+
+function cartHasCategory(cart, categoryIds) {
+  if (!categoryIds || !categoryIds.length) return false;
+  return cart.some(([_, item]) => categoryIds.includes(item.category));
+}
+
+function discountAmount(d, subtotal) {
+  if (!d || !d.value) return 0;
+  if (d.type === "percentage") return Math.round(subtotal * Number(d.value) / 100);
+  if (d.type === "flat") return Math.min(Number(d.value), subtotal);
+  if (d.type === "bogo") return 0;
+  return 0;
+}
+
+const DISC_PRIORITY = { first_order: 4, coupon: 3, category: 2, percentage: 1, flat: 1, bogo: 0 };
+
+function evaluateDiscounts(discounts, ctx) {
+  const { subtotal, cart, customer, couponCode, orderType, now = Date.now() } = ctx;
+  if (!subtotal || subtotal <= 0 || !discounts) return null;
+
+  const list = Object.entries(discounts)
+    .filter(([, d]) => d && d.type && d.value != null)
+    .map(([id, d]) => ({ id, ...d }));
+
+  const candidates = list.filter(d =>
+    d.enabled !== false
+    && now >= (d.startsAt || 0)
+    && (!d.endsAt || now <= d.endsAt)
+    && (!d.minSubtotal || subtotal >= Number(d.minSubtotal))
+    && (!d.globalLimit || (d.stats?.usedCount || 0) < d.globalLimit)
+    && (!d.applicableTo || d.applicableTo === "all" || d.applicableTo === orderType?.toLowerCase())
+  );
+
+  const applicable = candidates.filter(d => {
+    if (d.type === "percentage" || d.type === "flat") return true;
+    if (d.type === "first_order") return !customer?.firstOrderDiscountUsed;
+    if (d.type === "category") return cartHasCategory(cart, d.categoryIds);
+    if (d.type === "coupon") return !!couponCode && String(couponCode).toLowerCase() === String(d.couponCode || "").toLowerCase();
+    return false;
+  });
+
+  if (!applicable.length) return null;
+
+  const byGroup = new Map();
+  for (const d of applicable) {
+    const g = d.exclusiveGroup || "__none__";
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g).push(d);
+  }
+
+  const pickBest = (group) => group.slice().sort((a, b) => {
+    const pa = DISC_PRIORITY[a.type] || 0, pb = DISC_PRIORITY[b.type] || 0;
+    if (pa !== pb) return pb - pa;
+    return discountAmount(b, subtotal) - discountAmount(a, subtotal);
+  })[0];
+
+  const bestPerGroup = [...byGroup.values()].map(g => pickBest(g));
+  const exclusive = bestPerGroup.filter(d => !d.stackable);
+  const stackable = bestPerGroup.filter(d => d.stackable);
+  const chosen = exclusive.length > 0 ? [pickBest(exclusive), ...stackable] : bestPerGroup;
+
+  let total = 0;
+  for (const d of chosen) total += discountAmount(d, subtotal);
+  total = Math.min(total, subtotal);
+  if (total <= 0) return null;
+
+  const primary = chosen[0];
+  return { discount: primary, allApplied: chosen, amount: total };
+}
 
 function POSPage({ showToast, outletInfo }) {
   const [dishes, setDishes] = useState([]);
@@ -36,6 +105,7 @@ function POSPage({ showToast, outletInfo }) {
   const [deliverySettings, setDeliverySettings] = useState(null);
   const [deliveryDist, setDeliveryDist] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [autoDisc, setAutoDisc] = useState(null);
 
   useEffect(() => {
     const r = Outlet("dishes"); const r2 = Outlet("categories"); const r3 = Outlet("discounts"); const r4 = Outlet("orders");
@@ -93,16 +163,17 @@ function POSPage({ showToast, outletInfo }) {
   // Reactive auto-discount evaluation on cart/customer/coupon change
   useEffect(() => {
     const hasManual = Number(discFlat) > 0 || discount > 0 || couponApplied;
-    if (!posDiscounts || !cartItems.length || hasManual) { setAutoDisc(null); return; }
+    const entries = Object.entries(cart);
+    if (!posDiscounts || !entries.length || hasManual) { setAutoDisc(null); return; }
     const cleanPhone = custPhone ? custPhone.replace(/\D/g, "") : "";
     const hasPrevOrder = cleanPhone && cleanPhone !== "Walk-in" && posAllOrders.some(o => o.phone && o.phone.replace(/\D/g, "") === cleanPhone);
     const customer = cleanPhone && cleanPhone !== "Walk-in" ? { firstOrderDiscountUsed: hasPrevOrder } : null;
     const result = evaluateDiscounts(posDiscounts, {
-      subtotal: cartItems.reduce((s,[_,i])=>s+i.price*i.qty,0), cart: cartItems,
+      subtotal: entries.reduce((s,[_,i])=>s+i.price*i.qty,0), cart: entries,
       customer, couponCode: couponCode || null, orderType, now: Date.now(),
     });
     setAutoDisc(result);
-  }, [cartItems, custPhone, couponCode, orderType, posDiscounts, discFlat, discount, couponApplied]);
+  }, [cart, custPhone, couponCode, orderType, posDiscounts, discFlat, discount, couponApplied]);
 
   const addToCart = () => {
     if (!selModal||!selSize) return showToast("Select a size first","warning");
@@ -180,7 +251,6 @@ function POSPage({ showToast, outletInfo }) {
     setCart({}); setDiscount(0); setDiscFlat(0); setCouponCode(""); setCouponApplied(null); setCustName(""); setCustPhone(""); setOrderNotes(""); setOrderType("Dine-in"); setTableNo("");
   };
 
-  const [autoDisc, setAutoDisc] = useState(null);
   const cartItems = Object.entries(cart);
   const subtotal = cartItems.reduce((s,[_,i])=>s+i.price*i.qty,0);
   const manualDiscVal = Number(discFlat) > 0 ? Number(discFlat) : (discount > 0 ? subtotal * discount / 100 : 0);

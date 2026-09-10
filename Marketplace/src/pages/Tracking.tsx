@@ -44,33 +44,19 @@ const stageMessages: Partial<Record<OrderStatus, string>> = {
 
 export default function Tracking() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { orders, updateOrderStatus, getOrderById, markOrderAsReviewed } = useOrderContext();
+  const { orders, getOrderById, markOrderAsReviewed } = useOrderContext();
   const order = getOrderById(orderId ?? "");
 
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [eta, setEta] = useState(35);
+  const [eta, setEta] = useState(order?.estimatedMinutes ?? 30);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   useEffect(() => {
     if (!order) return;
     setCurrentIdx(statusIndex(order.status));
+    setEta(order.estimatedMinutes ?? 30);
 
     if (order.status === "Delivered" || order.status === "Cancelled") return;
-
-    // Simulate order advancing every 6 seconds for demo (DISABLED IN PRODUCTION)
-    const advance = setInterval(() => {
-      if (import.meta.env.DEV) {
-        setCurrentIdx((prev) => {
-          if (prev >= STATUS_PIPELINE.length - 1) {
-            clearInterval(advance);
-            return prev;
-          }
-          const nextStatus = STATUS_PIPELINE[prev + 1] as any;
-          updateOrderStatus(order.id, nextStatus);
-          return prev + 1;
-        });
-      }
-    }, 6000);
 
     // Countdown ETA
     const countdown = setInterval(() => {
@@ -78,10 +64,9 @@ export default function Tracking() {
     }, 60000);
 
     return () => {
-      clearInterval(advance);
       clearInterval(countdown);
     };
-  }, [order?.id]);
+  }, [order?.id, order?.estimatedMinutes, order?.status]);
 
   if (!order) {
     return (

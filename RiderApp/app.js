@@ -405,7 +405,7 @@ window.reachedDropLocation = async (id, outlet, bid = null) => {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         // Use cache-busting for SW registration itself
-        navigator.serviceWorker.register('sw.js?v=4.5.5').catch(err => console.error('SW failed', err));
+        navigator.serviceWorker.register('sw.js?v=4.7.1').catch(err => console.error('SW failed', err));
     });
 }
 
@@ -931,26 +931,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// PULL TO REFRESH (MOBILE)
-let touchStart = -1;
-window.addEventListener('touchstart', (e) => {
-    if ((window.scrollY || document.documentElement.scrollTop || 0) === 0) touchStart = e.touches[0].pageY;
-    else touchStart = -1;
-}, { passive: true });
-
-window.addEventListener('touchend', (e) => {
-    if (touchStart === -1) return;
-    const touchEnd = e.changedTouches[0].pageY;
-    if (window.scrollY === 0 && touchEnd - touchStart > 180) {
-        window.completeSiteRefresh();
-    }
-    touchStart = -1;
-}, { passive: true });
-
-window.addEventListener('touchcancel', () => {
-    touchStart = -1;
-});
-
 
 window.logout = async () => {
     if (confirm("End your shift and logout?")) {
@@ -1174,7 +1154,7 @@ window.clearAllNotifications = async () => {
 };
 
 window.toggleNotifSheet = () => {
-    const sheet = document.getElementById('notifSheet');
+    const sheet = document.getElementById('notificationSheet');
     const overlay = document.querySelector('.sidebar-overlay');
     if (!sheet) return;
     
@@ -1353,8 +1333,8 @@ window.verifyOTP = async () => {
         }
 
         const [storeSnap, deliverySnap] = await Promise.all([
-            get(ref(db, `${outletId}/settings/Store`)),
-            get(ref(db, `${outletId}/settings/Delivery`))
+            get(ref(db, resolvePath('settings/Store', outletId))),
+            get(ref(db, resolvePath('settings/Delivery', outletId)))
         ]);
         const fallbackCode = (deliverySnap.val() || {}).backupCode || (storeSnap.val() || {}).deliveryBackupCode;
 
@@ -1577,9 +1557,24 @@ window.showPingModal = (id, outletId, order) => {
     window.haptic([100, 50, 100, 50, 200]);
     try {
         const audio = document.getElementById('pingAudio');
-        if (audio) {
+        if (audio && audio.src) {
             audio.currentTime = 0;
-            audio.play().catch(e => console.warn('Audio play blocked:', e));
+            audio.play().catch(() => {});
+        } else {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 880;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+                setTimeout(() => ctx.close(), 600);
+            } catch (_) {}
         }
     } catch(e) {}
     
@@ -1587,7 +1582,7 @@ window.showPingModal = (id, outletId, order) => {
     if (!modal) return;
     
     const outletMeta = window.outletCoords[outletId] || {};
-    const pingOutletName = outletMeta.name || outletId.replace('outlet_', '') || 'Outlet';
+    const pingOutletName = getOutletName(outletId) || outletId.replace('outlet_', '') || 'Outlet';
     document.getElementById('pingOutletName').innerText = pingOutletName + ' Outlet';
     document.getElementById('pingCustomerAddress').innerText = order.address || 'Unknown';
     document.getElementById('pingOrderId').innerText = '#' + (order.orderId || id.slice(-6)).toUpperCase();
@@ -1948,6 +1943,11 @@ window._doRenderAllOrders = () => {
 
     if (!unassignedList || !dashboardActiveView || !window.currentUser) return;
     if (window.sliderState && window.sliderState.isDragging) return;
+
+    // Build flat currentOrders array from orderCache for route optimization
+    window.currentOrders = Object.entries(window.orderCache || {}).flatMap(([outletId, orders]) =>
+        Object.entries(orders).map(([id, order]) => ({ ...order, id, outletId }))
+    );
 
     // SKELETON STATE: If no data yet, show placeholders
     const hasData = Object.values(window.orderCache).some(outlet => Object.keys(outlet).length > 0);
@@ -2673,7 +2673,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.addEventListener('touchmove', e => {
             if (touchStart === 0) return;
-            const diff = touch - touchStart;
+            const diff = e.touches[0].pageY - touchStart;
             if (diff > 0 && window.scrollY === 0) {
                 ptr.classList.add('active');
                 const rotation = Math.min(diff * 2, 360);

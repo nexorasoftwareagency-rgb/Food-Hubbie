@@ -50,6 +50,12 @@ function initCommandListener(sock, tenant) {
       console.error(`[Commands] [${tenant.label}] Failed to execute ${cmd.action}:`, err.message);
     }
   });
+
+  // Return cleanup function to prevent stacking on reconnect
+  return () => {
+    cmdRef.off('child_added');
+    console.log(`[Commands] [${tenant.label}] Listener removed for: ${cmdPath}`);
+  };
 }
 
 /**

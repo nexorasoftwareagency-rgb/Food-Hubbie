@@ -9,11 +9,13 @@ import { deliveryFeeLabel } from "@/lib/deliveryFee";
 import type { Outlet } from "@/types";
 import { useEffect } from "react";
 import { validateCoupon } from "@/services/promotionService";
+import { toast } from "sonner";
 
 export default function Cart() {
   const { state, dispatch, total, itemCount, platformFee } = useCart();
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [couponInput, setCouponInput] = useState("");
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
 
   useEffect(() => {
     if (state.outletId) {
@@ -55,18 +57,18 @@ export default function Cart() {
       if (couponData) {
         const subtotal = state.items.reduce((s, i) => s + i.price * i.quantity, 0);
         if (couponData.minOrder && subtotal < couponData.minOrder) {
-          alert(`Minimum order of ₹${couponData.minOrder} required for this coupon.`);
+          toast.error(`Minimum order of ₹${couponData.minOrder} required for this coupon.`);
           return;
         }
         // Dispatch to CartContext so Checkout page sees it
         dispatch({ type: "APPLY_COUPON", payload: couponData });
         setCouponInput("");
       } else {
-        alert("Invalid or expired coupon code.");
+        toast.error("Invalid or expired coupon code.");
       }
     } catch (error) {
       console.error("Coupon validation error:", error);
-      alert("Failed to validate coupon. Please try again.");
+      toast.error("Failed to validate coupon. Please try again.");
     }
   };
 
@@ -157,9 +159,10 @@ export default function Cart() {
                   data-testid={`cart-item-${item.id}`}
                 >
                   <img
-                    src={item.image}
+                    src={item.image || '/favicon.svg'}
                     alt={item.name}
                     className="w-20 h-20 rounded-xl object-cover"
+                    onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/favicon.svg'; } }}
                   />
 
                   <div className="flex-1 flex flex-col justify-between">
@@ -299,6 +302,8 @@ export default function Cart() {
               placeholder="Any specific instructions for the delivery partner? (e.g., Ring doorbell, leave at gate)"
               data-testid="textarea-delivery-instructions"
               className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
+              value={deliveryInstructions}
+              onChange={(e) => setDeliveryInstructions(e.target.value)}
             />
           </div>
 

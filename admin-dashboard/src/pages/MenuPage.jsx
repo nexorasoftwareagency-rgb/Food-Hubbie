@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, Plus, Edit3, Trash2, Save } from "lucide-react";
-import { get, ref, update, push, set, remove, onValue, off, uploadImage, deleteImage, logAudit, getCurrentAdminActor, Outlet, getBizId, getOutletId } from "../firebase";
+import { Search, Plus, Edit3, Trash2 } from "lucide-react";
+import { get, update, push, remove, onValue, off, uploadImage, deleteImage, logAudit, getCurrentAdminActor, Outlet, getBizId, getOutletId } from "../firebase";
 import { GlassCard, BtnPrimary, Modal, SkeletonGrid, Input, Select } from "../components";
 import { ORANGE } from "../constants";
 import "../App.css";

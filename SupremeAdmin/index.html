@@ -3,17 +3,65 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#4F46E5"><link rel="manifest" href="manifest.json">
 <title>Foodhubbie – Supreme Admin</title>
-<link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-functions-compat.js"></script>
+<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="mobile-overrides.css?v=10">
 </head>
 <body>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})});caches.keys().then(function(k){return Promise.all(k.filter(function(x){return x.indexOf('supreme')>-1}).map(function(x){return caches.delete(x)}))})}</script>
+
+<!-- ═══════════ AUTH OVERLAY (renders first, no JS needed) ═══════════ -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <i data-lucide="utensils-crossed" class="auth-logo"></i>
+    <h2>Supreme Admin</h2>
+    <p>Sign in to manage your platform</p>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" placeholder="admin@foodhubbie.com" required>
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" placeholder="Enter password" required>
+      </div>
+       <button type="submit" class="btn-pro" id="loginBtn" onclick="window.__btn_clicked__=true;this.style.opacity='0.5'"><i data-lucide="log-in"></i> Sign In</button>
+      <p class="auth-error" id="loginError"></p>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── Login handler: shows feedback until app.js is ready ──
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+  if (window.__SUPREME_AUTH_READY__) return;
+  e.preventDefault();
+  document.getElementById('loginBtn').disabled = true;
+  document.getElementById('loginError').textContent = 'Initializing…';
+});
+
+// Show error if Firebase doesn't exist in 8s
+setTimeout(function() {
+  if (typeof firebase === 'undefined') {
+    document.getElementById('loginError').textContent = 'Cannot connect to auth server. Check internet/firewall.';
+    document.getElementById('loginBtn').disabled = false;
+  }
+}, 8000);
+</script>
+
+<!-- ═══════════ MOBILE HEADER ═══════════ -->
+<header class="mobile-header mobile-only" id="mobileHeader">
+  <button class="mobile-header-btn" id="mobileSidebarToggle" aria-label="Menu"><i data-lucide="menu"></i></button>
+  <span class="mobile-header-title">Supreme Admin</span>
+  <button class="mobile-header-btn" id="mobileNotificationsToggle" aria-label="Notifications"><i data-lucide="bell"></i></button>
+</header>
+
+<!-- ═══════════ SIDEBAR OVERLAY ═══════════ -->
+<div class="sidebar-overlay" id="sidebarOverlay" data-action="toggleSidebar"></div>
+
+<!-- ═══════════ OFFLINE BANNER ═══════════ -->
+<div class="offline-banner" id="offlineBanner">You are offline. Some features may be unavailable.</div>
 
 <div id="app">
   <aside class="sidebar" id="sidebar">
@@ -100,6 +148,12 @@
           <p>Approve or reject new business partners</p>
           <button class="btn-pro" id="btnProvisionNode"><i data-lucide="plus"></i> Provision New</button>
         </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card"><div class="kpi-icon" style="background:#FFF7ED"><i data-lucide="clock" style="color:#EA580C"></i></div><div class="kpi-info"><span class="kpi-value" id="onboardingCountPending">0</span><span class="kpi-label">Pending</span></div></div>
+          <div class="kpi-card"><div class="kpi-icon" style="background:#F0FDF4"><i data-lucide="check-circle" style="color:#16A34A"></i></div><div class="kpi-info"><span class="kpi-value" id="onboardingCountApproved">0</span><span class="kpi-label">Approved</span></div></div>
+          <div class="kpi-card"><div class="kpi-icon" style="background:#FEF2F2"><i data-lucide="x-circle" style="color:#DC2626"></i></div><div class="kpi-info"><span class="kpi-value" id="onboardingCountRejected">0</span><span class="kpi-label">Rejected</span></div></div>
+          <div class="kpi-card"><div class="kpi-icon" style="background:#EFF6FF"><i data-lucide="building-2" style="color:#2563EB"></i></div><div class="kpi-info"><span class="kpi-value" id="onboardingCountAll">0</span><span class="kpi-label">Total</span></div></div>
+        </div>
         <div class="filter-bar">
           <select id="onboardingStatusFilter"><option value="all">All Status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
           <input type="text" placeholder="Search business name..." id="onboardingSearchInput">
@@ -125,7 +179,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>All Businesses</h3></div>
       <table class="pro-table">
-            <thead><tr><th>ID</th><th>Name</th><th>Owner</th><th>Admin Email</th><th>Phone</th><th>Outlets</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Name</th><th>Owner</th><th>Admin Email</th><th>Phone</th><th>Outlets</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="businessesBody"></tbody>
           </table>
         </div>
@@ -181,7 +235,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>All Riders</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Orders</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Rider</th><th>Phone</th><th>Status</th><th>Online</th><th>Joined</th><th class="text-right">Actions</th></tr></thead>
             <tbody id="ridersBody"></tbody>
           </table>
         </div>
@@ -201,7 +255,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>All Users</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Joined</th><th>Actions</th></tr></thead>
+            <thead><tr><th>User</th><th>Phone</th><th>Wallet</th><th>Joined</th><th class="text-right">Actions</th></tr></thead>
             <tbody id="usersBody"></tbody>
           </table>
         </div>
@@ -282,7 +336,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>Settlement Records</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Partner</th><th>Period</th><th>Volume</th><th>Commission</th><th>Net Payable</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Partner</th><th>Date</th><th>Volume</th><th>Commission</th><th>Net Payable</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
             <tbody id="settlementsBody"></tbody>
           </table>
         </div>
@@ -301,7 +355,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>Delivery Fee Slabs</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Min Distance (km)</th><th>Max Distance (km)</th><th>Fee (₹)</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Min Distance (km)</th><th>Max Distance (km)</th><th>Fee (₹)</th><th>Actions</th></tr></thead>
             <tbody id="slabsBody"></tbody>
           </table>
         </div>
@@ -334,7 +388,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>All Reviews</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Customer</th><th>Outlet</th><th>Rating</th><th>Review</th><th>Date</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Customer</th><th>Outlet</th><th>Rating</th><th>Review</th><th>Date</th><th class="text-right">Actions</th></tr></thead>
             <tbody id="reviewsBody"></tbody>
           </table>
         </div>
@@ -359,7 +413,7 @@
         <div class="pro-card" style="margin-top:20px">
           <div class="table-header"><h3>Broadcast History</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Title</th><th>Target</th><th>Sent</th><th>Opened</th><th>Date</th><th>Status</th></tr></thead>
+            <thead><tr><th>Title</th><th>Message</th><th>Audience</th><th>Sent By</th><th>Date</th></tr></thead>
             <tbody id="broadcastHistoryBody"></tbody>
           </table>
         </div>
@@ -374,7 +428,7 @@
         <div class="pro-card">
           <div class="table-header"><h3>Audit Trail</h3></div>
           <table class="pro-table">
-            <thead><tr><th>Timestamp</th><th>Admin</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
+            <thead><tr><th>Timestamp</th><th>Admin</th><th>Action</th><th>Details</th><th>Source</th></tr></thead>
             <tbody id="auditBody"></tbody>
           </table>
         </div>
@@ -403,7 +457,7 @@
           <div class="pro-card" style="margin-top:20px">
             <div class="table-header"><h3>Top Performing Outlets</h3></div>
             <table class="pro-table">
-              <thead><tr><th>#</th><th>Outlet</th><th>Orders</th><th>Revenue</th><th>Rating</th></tr></thead>
+              <thead><tr><th>#</th><th>Business</th><th>Orders</th><th>Revenue</th><th>Commission</th></tr></thead>
               <tbody id="topOutletsBody"></tbody>
             </table>
           </div>
@@ -461,30 +515,9 @@
 
     </div><!-- /.page-content -->
   </main>
-<!-- #app auto-closed by browser at </body> -->
+</div><!-- /#app -->
 
-<!-- ═══════════ AUTH OVERLAY ═══════════ -->
-<div class="auth-overlay" id="authOverlay">
-  <div class="auth-card">
-    <i data-lucide="utensils-crossed" class="auth-logo"></i>
-    <h2>Supreme Admin</h2>
-    <p>Sign in to manage your platform</p>
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" placeholder="admin@foodhubbie.com" required>
-      </div>
-      <div class="form-group">
-        <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" placeholder="Enter password" required>
-      </div>
-      <button type="submit" class="btn-pro" id="loginBtn"><i data-lucide="log-in"></i> Sign In</button>
-      <p class="auth-error" id="loginError"></p>
-    </form>
-  </div>
-</div>
-
-<!-- ═══════════ CONFIRM MODAL ═══════════ -->
+<!-- ═══════════ MODALS ═══════════ -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal">
     <div class="modal-header"><h2>Confirm Action</h2><button class="btn-close" id="confirmClose"><i data-lucide="x"></i></button></div>
@@ -496,7 +529,6 @@
   </div>
 </div>
 
-<!-- ═══════════ ONBOARDING MODAL ═══════════ -->
 <div class="modal-overlay" id="onboardingModal">
   <div class="modal">
     <div class="modal-header"><h2>Provision New Partner</h2><button class="btn-close" id="onboardingModalClose"><i data-lucide="x"></i></button></div>
@@ -512,13 +544,12 @@
       <div class="form-row"><div class="form-group"><label>Latitude</label><input type="text" id="onboardingLat"></div><div class="form-group"><label>Longitude</label><input type="text" id="onboardingLng"></div></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="onboardingModalClose">Cancel</button>
+      <button class="btn-pro-outline" id="onboardingModalCancel">Cancel</button>
       <button class="btn-pro" id="onboardingSave">Provision</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ OUTLET EDIT MODAL ═══════════ -->
 <div class="modal-overlay" id="outletEditModal">
   <div class="modal">
     <div class="modal-header"><h2>Edit Outlet</h2><button class="btn-close" id="outletEditClose"><i data-lucide="x"></i></button></div>
@@ -533,17 +564,16 @@
       </div>
       <div class="form-group">
         <label style="color:#F59E0B;font-weight:700">Admin Password</label>
-        <input type="text" id="editAdminPassDisplay" readonly style="background:#1a2332;color:#F59E0B;font-weight:700">
+        <button class="btn-pro-outline" id="sendPasswordReset" style="width:100%;margin-top:4px">Send Password Reset Email</button>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="outletEditClose">Cancel</button>
+      <button class="btn-pro-outline" id="outletEditCancelBtn">Cancel</button>
       <button class="btn-pro" id="outletEditSave">Save</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ COMMISSION MODAL ═══════════ -->
 <div class="modal-overlay" id="commissionModal">
   <div class="modal">
     <div class="modal-header"><h2>Set Commission</h2><button class="btn-close" id="commissionClose"><i data-lucide="x"></i></button></div>
@@ -552,16 +582,15 @@
       <div class="form-group"><label>Fixed Fee (₹)</label><input type="number" step="0.5" id="commissionFixedFee"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="commissionClose">Cancel</button>
+      <button class="btn-pro-outline" id="commissionCancel">Cancel</button>
       <button class="btn-pro" id="commissionSave">Save</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ RIDER MODAL ═══════════ -->
 <div class="modal-overlay" id="riderModal">
   <div class="modal">
-    <div class="modal-header"><h2>Add / Edit Rider</h2><button class="btn-close" id="riderClose"><i data-lucide="x"></i></button></div>
+    <div class="modal-header"><h2 class="modal-title">Add / Edit Rider</h2><button class="btn-close" id="riderClose"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="form-group"><label>Name</label><input type="text" id="riderName"></div>
       <div class="form-group"><label>Email</label><input type="email" id="riderEmail"></div>
@@ -573,13 +602,12 @@
       <div class="form-group"><label>Address</label><textarea id="riderAddress" rows="2"></textarea></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="riderClose">Cancel</button>
+      <button class="btn-pro-outline" id="riderCancelBtn">Cancel</button>
       <button class="btn-pro" id="riderSave">Save</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ WALLET CREDIT MODAL ═══════════ -->
 <div class="modal-overlay" id="walletModal">
   <div class="modal">
     <div class="modal-header"><h2>Wallet Credit</h2><button class="btn-close" id="walletClose"><i data-lucide="x"></i></button></div>
@@ -590,13 +618,12 @@
       <div class="form-group"><label>Reason</label><input type="text" id="walletReason" placeholder="e.g. Refund, Bonus"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="walletClose">Cancel</button>
+      <button class="btn-pro-outline" id="walletCancel">Cancel</button>
       <button class="btn-pro" id="walletSave">Credit</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ WALLET HISTORY MODAL ═══════════ -->
 <div class="modal-overlay" id="walletHistoryModal">
   <div class="modal">
     <div class="modal-header"><h2>Wallet History</h2><button class="btn-close" id="walletHistoryClose"><i data-lucide="x"></i></button></div>
@@ -607,12 +634,11 @@
       </table>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="walletHistoryClose">Close</button>
+      <button class="btn-pro-outline" id="walletHistoryDone">Close</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ COUPON MODAL ═══════════ -->
 <div class="modal-overlay" id="couponModal">
   <div class="modal">
     <div class="modal-header"><h2>Add / Edit Coupon</h2><button class="btn-close" id="couponModalClose"><i data-lucide="x"></i></button></div>
@@ -624,13 +650,12 @@
       <div class="form-group"><label>Usage Limit</label><input type="number" id="couponUsageLimit"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="couponModalClose">Cancel</button>
+      <button class="btn-pro-outline" id="couponModalCancel">Cancel</button>
       <button class="btn-pro" id="couponSave">Save</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ TFA SETUP MODAL ═══════════ -->
 <div class="modal-overlay" id="tfaSetupModal">
   <div class="modal">
     <div class="modal-header"><h2>Setup Two-Factor Auth</h2><button class="btn-close" id="tfaSetupClose"><i data-lucide="x"></i></button></div>
@@ -648,34 +673,98 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-pro-outline" id="tfaSetupClose">Cancel</button>
+      <button class="btn-pro-outline" id="tfaSetupCancel">Cancel</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ SUCCESS DIALOG ═══════════ -->
-<div class="modal-overlay" id="successDialog">
-  <div class="modal modal-sm">
-    <div class="modal-header"><h2>Success</h2><button class="btn-close" id="successDialogClose"><i data-lucide="x"></i></button></div>
-    <div class="modal-body" id="successDialogBody">
-      <i data-lucide="check-circle" style="font-size:48px;color:#22c55e;display:block;margin:0 auto 16px;width:48px;height:48px"></i>
-      <p id="successDialogMessage">Operation completed successfully.</p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-pro" id="successDialogClose">OK</button>
+<div class="modal-overlay" id="tfaModal" style="display:none">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header"><h2>Two-Factor Authentication</h2></div>
+    <div class="modal-body" style="padding:24px">
+      <p style="color:#64748B;margin-bottom:16px;font-size:14px">Enter the 6-digit code from your authenticator app.</p>
+      <form id="tfaForm">
+        <div class="form-group">
+          <input type="text" id="tfaCode" placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:700;padding:12px" autocomplete="one-time-code">
+        </div>
+        <p id="tfaError" style="color:#EF4444;font-size:13px;min-height:20px"></p>
+        <div style="display:flex;gap:12px">
+          <button type="button" class="btn-pro-outline" id="tfaCancel" style="flex:1">Cancel</button>
+          <button type="submit" class="btn-pro" style="flex:1">Verify</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ TOAST CONTAINER ═══════════ -->
+<div class="modal-overlay" id="slabEditorModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2 class="modal-title">Edit Slab</h2>
+      <button class="btn-close" id="slabEditorClose"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Slab Name</label><input class="pro-input" type="text" id="slabName" placeholder="e.g. Local, City, Outskirts"></div>
+      <div class="form-group"><label>Min Distance (km)</label><input class="pro-input" type="number" step="0.1" id="slabMinDist"></div>
+      <div class="form-group"><label>Max Distance (km)</label><input class="pro-input" type="number" step="0.1" id="slabMaxDist"></div>
+      <div class="form-group"><label>Delivery Fee (₹)</label><input class="pro-input" type="number" step="1" id="slabCharge"></div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:12px;padding:16px 24px">
+      <button class="btn-pro-outline" id="slabEditorCancel" style="flex:1">Cancel</button>
+      <button class="btn-pro" id="slabEditorSave" style="flex:1">Save Slab</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-overlay" id="toastContainer"></div>
 
+<!-- ═══════════ BOTTOM NAV ═══════════ -->
+<nav class="bottom-nav mobile-only" id="bottomNav">
+  <button class="nav-item active" data-tab="dashboard"><i data-lucide="layout-dashboard"></i><span>Home</span></button>
+  <button class="nav-item" data-tab="liveorders"><i data-lucide="shopping-bag"></i><span>Orders</span></button>
+  <button class="nav-item" data-tab="businesses"><i data-lucide="store"></i><span>Business</span></button>
+  <button class="nav-item" data-tab="riders"><i data-lucide="bike"></i><span>Riders</span></button>
+  <button class="nav-item" id="navMoreBtn"><i data-lucide="grid-3x3"></i><span>More</span></button>
+</nav>
+
+<!-- ═══════════ NOTIFICATION SHEET ═══════════ -->
+<div class="notification-sheet" id="notificationSheet">
+  <div class="notification-sheet-header">
+    <h3>Notifications</h3>
+    <button class="notification-sheet-close" id="notificationSheetClose"><i data-lucide="x"></i></button>
+  </div>
+  <div style="padding:16px 20px;color:var(--color-muted);font-size:14px;text-align:center" id="notificationSheetBody">No notifications</div>
+</div>
+
+<script src="env-config.js?v=9"></script>
+<script src="firebase/firebase-app-compat.js?v=9"></script>
+<script src="firebase/firebase-auth-compat.js?v=9"></script>
+<script src="firebase/firebase-database-compat.js?v=9"></script>
+<script src="firebase/firebase-firestore-compat.js?v=9"></script>
 <script>
-  lucide.createIcons();
+// ── Non-blocking CDN loader for non-critical libs ──
+var CDN_URLS = [
+  'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'
+];
+window.__CDN_LOADED__ = {};
+function loadCDN() {
+  var idx = 0;
+  function next() {
+    if (idx >= CDN_URLS.length) return;
+    var url = CDN_URLS[idx++];
+    var s = document.createElement('script');
+    s.src = url;
+    s.onload = function() { window.__CDN_LOADED__[url]=true; if(url.indexOf('lucide')>-1) setTimeout(function(){try{lucide.createIcons()}catch(e){}},100); next(); };
+    s.onerror = function() { window.__CDN_LOADED__[url]=false; next(); };
+    document.body.appendChild(s);
+  }
+  next();
+}
+if (document.readyState === 'complete') loadCDN(); else window.addEventListener('load', loadCDN);
 </script>
-<script src="env-config.js"></script>
-<script src="app.js"></script>
+<script defer src="app.js?v=10"></script>
 </body>
 </html>
-
-

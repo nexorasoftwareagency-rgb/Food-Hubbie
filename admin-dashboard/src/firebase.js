@@ -1,6 +1,8 @@
 import { initializeApp, deleteApp } from "firebase/app";
 import {
-  getDatabase, ref, get, child, onValue, off, update, push, set, remove, serverTimestamp, query, orderByChild, equalTo, runTransaction
+  getDatabase, ref, get, child, onValue, off, update, push, set, remove, serverTimestamp,
+  query, orderByChild, orderByKey, equalTo, limitToLast, startAt, endAt, endBefore,
+  onChildAdded, onChildChanged, runTransaction
 } from "firebase/database";
 import {
   getAuth, setPersistence, browserLocalPersistence,
@@ -127,8 +129,15 @@ export async function uploadImage(file, storagePath) {
 }
 
 export async function deleteImage(url) {
+  if (!url) return;
   try {
-    const ref_ = storageRef(storage, url);
+    let storagePath = url;
+    if (url.includes("firebasestorage.googleapis.com")) {
+      const match = url.match(/\/o\/(.+?)\?/);
+      if (match) storagePath = decodeURIComponent(match[1]);
+      else throw new Error("Could not extract storage path from URL");
+    }
+    const ref_ = storageRef(storage, storagePath);
     await deleteObject(ref_);
   } catch (e) {
     console.warn("Image delete skipped:", e.message);
@@ -166,7 +175,9 @@ export function startBotStatusWatcher() {
 export {
   db, storage,
   ref, get, child, onValue, off, update, push, set, remove, serverTimestamp,
-  query, orderByChild, equalTo, runTransaction,
+  query, orderByChild, orderByKey, equalTo, limitToLast, startAt, endAt, endBefore,
+  onChildAdded, onChildChanged,
+  runTransaction,
   onAuthStateChanged, signInWithEmailAndPassword, signOut,
   EmailAuthProvider, reauthenticateWithCredential,
   storageRef, getDownloadURL,

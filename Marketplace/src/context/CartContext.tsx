@@ -234,7 +234,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       };
       persistCart();
     }
-  }, [state.items, state.outletId, state.businessId, state.appliedCoupon, authState, user]);
+  }, [state.items, state.outletId, state.businessId, state.appliedCoupon, authState, user?.id]);
 
   return (
     <CartContext.Provider

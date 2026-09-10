@@ -3,13 +3,16 @@ if (self.location.protocol !== 'https:' && self.location.hostname !== 'localhost
   throw new Error('Service Worker requires HTTPS');
 }
 
-const CACHE_NAME = 'roshani-rider-v7.0';
+const CACHE_NAME = 'roshani-rider-v4.7.1';
 const ASSETS = [
   './',
+  './index.html',
+  './app.js',
   './login.html',
   './style.css',
+  './env-config.js',
   './icon-512.png',
-  './assets/sounds/alert.mp3',
+
   'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'

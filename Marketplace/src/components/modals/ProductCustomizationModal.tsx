@@ -65,7 +65,7 @@ export function ProductCustomizationModal({ item, isOpen, onClose }: ProductCust
           className="bg-card w-full max-w-md rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl border border-border mb-20 sm:mb-0"
         >
           <div className="relative">
-            <img src={item.image} alt={item.name} className="w-full h-32 object-cover" />
+            <img src={item.image || '/favicon.svg'} alt={item.name} className="w-full h-32 object-cover" onError={(e) => { const t = e.target as HTMLImageElement; if (!t.dataset.fallback) { t.dataset.fallback = '1'; t.src = '/favicon.svg'; } }} />
             <button
               onClick={onClose}
               className="absolute top-3 right-3 bg-background/80 backdrop-blur text-foreground p-1.5 rounded-full hover:bg-background transition-colors z-10 shadow-lg"

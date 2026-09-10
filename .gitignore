@@ -26,7 +26,6 @@ food-hubbie-firebase-adminsdk-*.json
 
 # Firebase
 .firebase/
-.firebaserc
 
 # IDE
 .vscode/
@@ -54,6 +53,17 @@ pnpm-debug.log*
 .tmp/
 temp/
 scratch/
+
+# Debug & test artifacts
+.playwright-mcp/
+*.yml
+*.err
+*.png
+!SupremeAdmin/icon-192.png
+!SupremeAdmin/icon-512.png
+
+# Audit files (internal, not source)
+CLAUDE AUDIT/
 
 # Legacy artifacts to prune (these should not be committed)
 Pizza-bot/

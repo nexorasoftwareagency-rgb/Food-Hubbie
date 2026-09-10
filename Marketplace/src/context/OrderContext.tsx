@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from "react";
 import type { Order, OrderStatus } from "@/types";
 import {
   loadOrders,
@@ -9,6 +9,7 @@ import {
   type PlaceOrderInput,
 } from "@/services/orderService";
 import { useAuth } from "./AuthContext";
+import { db, ref, onValue, off } from "@/lib/firebase";
 
 type OrderContextValue = {
   currentOrder: Order | null;
@@ -26,25 +27,73 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const { user, authState } = useAuth();
   const [orders, setOrders] = useState<Order[]>(() => loadOrders());
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
+  const unsubRefs = useRef<Array<() => void>>([]);
+
+  // Cleanup all Firebase listeners
+  const cleanupListeners = useCallback(() => {
+    unsubRefs.current.forEach(unsub => unsub());
+    unsubRefs.current = [];
+  }, []);
 
   useEffect(() => {
     if (authState === "authenticated" && user?.id) {
+      let cancelled = false;
+
       const loadUserOrders = async () => {
         try {
           const fbOrders = await fetchOrdersFromFirebase(user.id);
+          if (cancelled) return;
           setOrders(fbOrders);
           persistOrders(fbOrders);
+
+          // Set up real-time listeners for each business/outlet pair
+          cleanupListeners();
+          const listenedPaths = new Set<string>();
+
+          for (const order of fbOrders) {
+            const path = `businesses/${order.businessId}/outlets/${order.outletId}/orders`;
+            if (listenedPaths.has(path)) continue;
+            listenedPaths.add(path);
+
+            const ordersRef = ref(db, path);
+            const unsub = () => off(ordersRef);
+            unsubRefs.current.push(unsub);
+
+            onValue(ordersRef, (snapshot) => {
+              if (cancelled) return;
+              const data = snapshot.val();
+              if (!data) return;
+
+              setOrders(prev => {
+                const updated = prev.map(o => {
+                  const fbOrder = data[o.id];
+                  if (fbOrder && fbOrder.status !== o.status) {
+                    return { ...o, status: fbOrder.status, statusHistory: fbOrder.statusHistory || o.statusHistory, updatedAt: fbOrder.updatedAt || o.updatedAt };
+                  }
+                  return o;
+                });
+                persistOrders(updated);
+                return updated;
+              });
+            });
+          }
         } catch (err) {
           console.error("[OrderContext] Failed to fetch orders from Firebase:", err);
         }
       };
       loadUserOrders();
+
+      return () => {
+        cancelled = true;
+        cleanupListeners();
+      };
     } else if (authState === "unauthenticated") {
+      cleanupListeners();
       setOrders([]);
       persistOrders([]);
       setCurrentOrder(null);
     }
-  }, [authState, user?.id]);
+  }, [authState, user?.id, cleanupListeners]);
 
   const placeOrder = useCallback(async (input: PlaceOrderInput): Promise<string> => {
     try {

@@ -159,7 +159,7 @@ function PaymentsPage({ showToast }) {
           <button type="button" onClick={() => setDisputeOpen(false)} style={{ width:36, height:36, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", border:"1px solid rgba(232, 73, 8,0.12)", background:"white", color:"#64748b", cursor:"pointer" }}><X size={18} /></button>
         </div>
         {disputeOrder && <div style={{ fontSize:13, color:"#64748b", marginBottom:12 }}>Order <strong>#{disputeOrder.orderId || disputeOrder.id.slice(-5)}</strong> — {fmt(disputeOrder.total)} via {disputeOrder.paymentMethod || "Cash"}</div>}
-        <label style={_discLabelStyle}>Dispute Reason *</label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6, display: "block" }}>Dispute Reason *</label>
         <textarea value={disputeReason} onChange={e => setDisputeReason(e.target.value)} placeholder="Describe the reason for disputing this payment..." rows={3} style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1.5px solid #e2e8f0", fontSize:12, outline:"none", resize:"vertical", fontFamily:"inherit" }} />
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,0.06)" }}>
           <BtnSecondary onClick={() => setDisputeOpen(false)} style={{ padding:"8px 18px", fontSize:13 }}>Cancel</BtnSecondary>

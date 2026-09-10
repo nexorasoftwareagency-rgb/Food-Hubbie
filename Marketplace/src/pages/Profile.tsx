@@ -79,7 +79,7 @@ export default function Profile() {
       address: newAddress.address,
       landmark: newAddress.landmark,
       coords: { lat: 0, lng: 0 },
-      isDefault: user?.savedAddresses.length === 0,
+      isDefault: user?.savedAddresses?.length === 0,
     }];
     try {
       await updateUser({ savedAddresses: updatedAddresses } as any);
@@ -351,9 +351,10 @@ export default function Profile() {
                   <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all scale-110" />
                   {user?.avatar ? (
                     <img
-                      src={user.avatar}
+                      src={user.avatar || '/favicon.svg'}
                       alt={user.name}
                       className="w-28 h-28 rounded-full object-cover border-4 border-background shadow-2xl relative"
+                      onError={(e) => { const t = e.target as HTMLImageElement; t.style.display = 'none'; }}
                     />
                   ) : (
                     <div className="w-28 h-28 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center border-4 border-background shadow-2xl relative">

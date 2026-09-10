@@ -1,0 +1,30 @@
+{
+  "projects": {
+    "default": "food-hubbie"
+  },
+  "targets": {
+    "food-hubbie": {
+      "hosting": {
+        "marketplace": [
+          "foodhubbie"
+        ],
+        "admin": [
+          "foodhubbie-admin"
+        ],
+        "rider": [
+          "foodhubbie-rider"
+        ],
+        "superadmin": [
+          "foodhubbie-superadmin"
+        ],
+        "supreme": [
+          "foodhubbie-supreme"
+        ],
+        "menu": [
+          "foodhubbie-menu"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

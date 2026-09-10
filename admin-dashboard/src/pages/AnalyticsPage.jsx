@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { ShoppingBag, DollarSign, TrendingUp, Download, Star, XCircle } from "lucide-react";
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { db, ref, onValue, off, Outlet } from "../firebase";
 import { fmt, downloadCSV, normalizeRider, aggregateByDay, aggregateByHour, aggregateByCategory, aggregateByDish, aggregateByCustomer } from "../utils";
 import { KPICard, StarRating, Pill, SectionHeader, GlassCard, BtnSecondary, Avatar, SkeletonPage } from "../components";

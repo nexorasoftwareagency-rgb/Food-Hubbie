@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 const QR_BASE = "https://foodhubbie-menu.web.app/";
-import { Grid3x3, Plus, QrCode, Printer, Download, Search, X, ChevronRight, ChevronLeft, Trash2, Edit3, Ban, Check, CheckCheck, Receipt, ExternalLink, Clock, Users, DollarSign, AlertTriangle, WifiOff, Bell } from "lucide-react";
+import { Grid3x3, Plus, QrCode, Printer, Download, Search, X, Trash2, Edit3, Ban, Check, CheckCheck, Receipt, Clock, Users, DollarSign, Bell } from "lucide-react";
 import { get, Outlet, getCurrentOutletContext, onValue, off, set, update, push, remove, runTransaction, serverTimestamp } from "./firebase";
 import { ORANGE, COLORS, ORD_ST } from "./constants";
 import { fmt, esc } from "./utils";
@@ -21,7 +21,7 @@ function secureToken() {
   return Array.from(bytes, b => b.toString(36)).join("").slice(0, 16).toUpperCase();
 }
 
-function TablesPage({ showToast, outletInfo, setPage, setSelOrder }) {
+function TablesPage({ showToast, outletInfo, setPage }) {
   const [tables, setTables] = useState({});
   const [sessions, setSessions] = useState({});
   const [orders, setOrders] = useState({});
@@ -106,7 +106,7 @@ function TablesPage({ showToast, outletInfo, setPage, setSelOrder }) {
   const activeSessions = useMemo(() => Object.values(sessions).filter(s => s.status !== "closed"), [sessions]);
 
   const kpis = useMemo(() => ({
-    free: tableCounts.free, occupied: tableCounts.occupied, billing: tableCounts.billing,
+    free: tableCounts.free, occupied: tableCounts.occupied, billing: tableCounts.billing, disabled: tableCounts.disabled,
     sessionCount: activeSessions.length,
     guestCount: activeSessions.reduce((s, sess) => s + (sess.guestCount || 0), 0),
     revenue: activeSessions.reduce((s, sess) => s + (sess.grandTotal || 0), 0),
@@ -587,7 +587,7 @@ function TablesPage({ showToast, outletInfo, setPage, setSelOrder }) {
                             <div style={{ fontSize:11, fontWeight:600, color:"#475569", marginBottom:6 }}>Orders ({sess.orders?.length || 0})</div>
                             {ordersForSession(sess.sessionId).map(o => (
                               <div key={o.id} style={{ padding:"8px 10px", borderRadius:8, background:"#f8fafc", marginBottom:6 }}>
-                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer" }} onClick={() => { if (setPage && setSelOrder) { setSelOrder(o); setPage("orders"); } }}>
+                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer" }} onClick={() => { if (setPage) setPage("orders"); }}>
                                   <span style={{ fontSize:11, fontWeight:600, color:"#475569" }}>#{String(o.id).slice(-6).toUpperCase()}</span>
                                   <span style={{ padding:"1px 6px", borderRadius:4, fontSize:9, fontWeight:700, background:ORD_ST[o.status]?.bg||"#f1f5f9", color:ORD_ST[o.status]?.color||"#64748b" }}>{o.status}</span>
                                 </div>

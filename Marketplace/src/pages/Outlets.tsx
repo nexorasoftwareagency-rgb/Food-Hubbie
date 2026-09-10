@@ -32,10 +32,14 @@ export default function Outlets() {
   const { state: locationState, requestLocation } = useLocationContext();
 
   useEffect(() => {
+    let cancelled = false;
     fetchOutlets().then((data) => {
-      setOutlets(sortByDistance(data, locationState.coords));
-      setLoading(false);
-    });
+      if (!cancelled) {
+        setOutlets(sortByDistance(data, locationState.coords));
+        setLoading(false);
+      }
+    }).catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [locationState.coords]);
 
   const filtered = filterOutlets(outlets, searchQuery, activeFilter);
@@ -55,36 +59,23 @@ export default function Outlets() {
     { value: "min_order", label: "Lowest min. order", icon: "💰" },
   ];
 
-  if (locationState.permissionStatus !== "granted") {
+  if (locationState.permissionStatus !== "granted" && locationState.permissionStatus !== "denied") {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
           <div className="bg-primary/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
             <MapPin className="h-10 w-10 text-primary" />
           </div>
-          <h2 className="text-2xl font-heading font-bold mb-3">
-            {locationState.permissionStatus === "denied"
-              ? "Location Access Blocked"
-              : "Share Your Location"}
-          </h2>
+          <h2 className="text-2xl font-heading font-bold mb-3">Share Your Location</h2>
           <p className="text-muted-foreground mb-8 leading-relaxed">
-            {locationState.permissionStatus === "denied"
-              ? "Please enable location access in your browser settings, then refresh the page."
-              : "We need your location to show restaurants near you and provide accurate delivery estimates."}
+            We need your location to show restaurants near you and provide accurate delivery estimates.
           </p>
-          {locationState.permissionStatus === "prompt" && (
-            <button
-              onClick={requestLocation}
-              className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-lg hover:bg-primary/90 transition-colors"
-            >
-              Allow Location Access
-            </button>
-          )}
-          {locationState.permissionStatus === "denied" && (
-            <p className="text-sm text-muted-foreground">
-              Open your browser settings → Site permissions → Location → select "Allow"
-            </p>
-          )}
+          <button
+            onClick={requestLocation}
+            className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-lg hover:bg-primary/90 transition-colors"
+          >
+            Allow Location Access
+          </button>
         </div>
       </div>
     );

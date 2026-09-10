@@ -1,9 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingBag, User, Home } from "lucide-react";
+import { Search, ShoppingBag, User } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLocationContext } from "@/context/LocationContext";
-import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Wallet } from "lucide-react";
 
@@ -20,13 +19,6 @@ export function TopNav() {
       setLocation(`/search?q=${encodeURIComponent(query.trim())}`);
     }
   };
-
-  const navItems = [
-    { label: "Home", icon: Home, href: "/", active: location === "/" },
-    { label: "Search", icon: Search, href: "/search", active: location === "/search" },
-    { label: "Orders", icon: ShoppingBag, href: "/orders", active: location === "/orders" },
-    { label: "Profile", icon: User, href: "/profile", active: location === "/profile" },
-  ];
 
   return (
     <>
@@ -80,26 +72,6 @@ export function TopNav() {
           </div>
         </div>
       </header>
-
-      {/* Bottom Navigation for Mobile */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border px-6 py-3 flex items-center justify-between shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
-        {navItems.map((item) => (
-          <Link key={item.label} href={item.href} className="flex flex-col items-center gap-1 group">
-            <div className={cn(
-              "p-1.5 rounded-xl transition-all duration-300",
-              item.active ? "bg-primary text-white shadow-lg shadow-primary/20 scale-110" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-            )}>
-              <item.icon className="h-5 w-5" />
-            </div>
-            <span className={cn(
-              "text-[10px] font-bold transition-colors",
-              item.active ? "text-primary" : "text-muted-foreground"
-            )}>
-              {item.label}
-            </span>
-          </Link>
-        ))}
-      </nav>
     </>
   );
 }

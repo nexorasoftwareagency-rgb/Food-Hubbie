@@ -1,0 +1,20 @@
+{
+  "name": "Foodhubbie — Your Neighbourhood Food Hub",
+  "short_name": "Foodhubbie",
+  "description": "Discover the best restaurants near you. Order food online with real-time tracking and fast delivery.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF5200",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["food", "shopping"]
+}

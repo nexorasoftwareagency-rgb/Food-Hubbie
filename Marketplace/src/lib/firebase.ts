@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getDatabase, ref, get, child, query, orderByChild, equalTo, push, set, update } from "firebase/database";
+import { getDatabase, ref, get, child, query, orderByChild, equalTo, push, set, update, onValue, off } from "firebase/database";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 const FOODHUBBIE_FIREBASE_CONFIG = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD60fL5Q-St64KyMavdfA9to4ZyCdR-qG8",
@@ -39,6 +39,8 @@ export {
   equalTo,
   push,
   set,
-  update
+  update,
+  onValue,
+  off
 };
 export default app;

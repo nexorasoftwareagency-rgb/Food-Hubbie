@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { X, CheckCircle, EyeOff, Send } from "lucide-react";
+import { X, CheckCircle, EyeOff } from "lucide-react";
 import { update, onValue, off, Outlet } from "../firebase";
 import { relTime } from "../utils";
 import { StarRating, Pill, GlassCard, Avatar, SkeletonPage, Pagination } from "../components";

@@ -49,11 +49,11 @@ export default function OutletDetails() {
         fetchMenuByOutlet(o.id, o.businessId).then((items) => {
           setMenuItems(items);
           setLoading(false);
-        });
+        }).catch(() => setLoading(false));
       } else {
         setLoading(false);
       }
-    });
+    }).catch(() => setLoading(false));
   }, [identifier]);
 
   const categories = [

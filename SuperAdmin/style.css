@@ -672,3 +672,30 @@ h1, h2, h3, h4, .font-black { font-weight: 700; letter-spacing: -0.02em; }
   padding: 0 4px;
   font-weight: 600;
 }
+
+@media (max-width: 768px) {
+  .pro-sidebar {
+    position: fixed;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  .pro-sidebar.open { transform: translateX(0); box-shadow: 0 0 20px rgba(0,0,0,0.2); }
+  .pro-main { margin-left: 0; padding: 12px; }
+  .metric-grid.grid-cols-3, .grid-cols-2 { grid-template-columns: 1fr 1fr !important; }
+  .pro-table { font-size: 11px; display: block; overflow-x: auto; white-space: nowrap; }
+  .pro-table th, .pro-table td { padding: 6px 8px; }
+  .kpi-value { font-size: 1.1rem; }
+  .kpi-label { font-size: 0.65rem; }
+  .modal { max-width: 95%; margin: 10px; max-height: 90vh; overflow-y: auto; }
+  .page-header h1 { font-size: 1.25rem; }
+  .btn-pro, .btn-pro-outline { padding: 8px 14px; font-size: 12px; }
+  .filter-bar { flex-direction: column; }
+  .filter-bar input, .filter-bar select { width: 100%; }
+}
+@media (max-width: 480px) {
+  .metric-grid.grid-cols-3 { grid-template-columns: 1fr !important; }
+  .metric-grid.grid-cols-2 { grid-template-columns: 1fr !important; }
+  .pro-main { padding: 8px; }
+  .kanban-column { min-width: 260px; max-width: 260px; }
+}

@@ -3,7 +3,7 @@ import { ShoppingBag, ChefHat, Search, AlertTriangle, Clock } from "lucide-react
 import { update, onValue, off, Outlet } from "../firebase";
 import { fmt, orderItemsCount } from "../utils";
 import { Pill, EmptyState, SectionHeader, StatusBadge, GlassCard, BtnPrimary, BtnSecondary, Modal } from "../components";
-import { ORANGE, ORD_ST, KITCHEN_ST } from "../constants";
+import { ORANGE, ORD_ST } from "../constants";
 import "../App.css";
 
 function KitchenPage({ showToast }) {
@@ -174,7 +174,7 @@ function KitchenPage({ showToast }) {
                       <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{backgroundColor:color}}>{item.qty || item.quantity || 1}</span>
                       <span className="text-sm font-medium text-slate-800">{item.name || item.item || "Item"}</span>
                     </div>
-                    <span className="text-sm font-semibold text-slate-600">{fmt((item.lineTotal || item.total || item.price || 0) * (item.qty || item.quantity || 1))}</span>
+                    <span className="text-sm font-semibold text-slate-600">{fmt(item.lineTotal || item.total || (item.price || 0) * (item.qty || item.quantity || 1))}</span>
                   </div>
                 )) : (
                   <div className="text-sm text-slate-400 p-3">Item details not available</div>
